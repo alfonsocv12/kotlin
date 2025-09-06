@@ -157,6 +157,8 @@ open class KonanInteropTask @Inject constructor(
         }
         val workQueue = workerExecutor.noIsolation()
 
+        print("Alfonso villa cinteropt")
+        print(args)
         if (allowRunningCInteropInProcess) {
             workQueue.submit(KonanInteropInProcessAction::class.java) {
                 this.isolatedClassLoadersService.set(this@KonanInteropTask.isolatedClassLoadersService)

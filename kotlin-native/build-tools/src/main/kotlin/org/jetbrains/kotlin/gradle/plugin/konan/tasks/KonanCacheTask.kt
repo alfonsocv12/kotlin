@@ -91,6 +91,9 @@ open class KonanCacheTask @Inject constructor(
                 addAll(platform(targetByName(target.get())).additionalCacheFlags)
             }
         }
+
+        print("Alfonso Villa")
+        print(args.toString())
         val workQueue = workerExecutor.noIsolation()
         workQueue.submit(KonanCacheAction::class.java) {
             this.isolatedClassLoaderService.set(this@KonanCacheTask.isolatedClassLoadersService)

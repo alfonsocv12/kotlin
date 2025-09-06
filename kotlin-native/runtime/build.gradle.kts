@@ -5,7 +5,7 @@
 import org.jetbrains.kotlin.*
 import org.jetbrains.kotlin.bitcode.CompileToBitcodeExtension
 import org.jetbrains.kotlin.cpp.CppUsage
-import org.jetbrains.kotlin.gradle.plugin.konan.tasks.KonanStaticCacheTask
+import org.jetbrains.kotlin.gradle.plugin.konan.tasks.KonanCacheTask
 import org.jetbrains.kotlin.gradle.plugin.konan.tasks.KonanCompileTask
 import org.jetbrains.kotlin.konan.target.*
 import org.jetbrains.kotlin.library.KOTLIN_NATIVE_STDLIB_NAME
@@ -652,7 +652,7 @@ val nativeStdlib by tasks.registering(Sync::class) {
 val cacheableTargetNames = platformManager.hostPlatform.cacheableTargets
 
 cacheableTargetNames.forEach { targetName ->
-    tasks.register("${targetName}StdlibCache", KonanStaticCacheTask::class.java) {
+    tasks.register("${targetName}StdlibCache", KonanCacheTask::class.java) {
         val dist = nativeDistribution
 
         // Requires Native distribution with stdlib klib and runtime modules for `targetName`.
