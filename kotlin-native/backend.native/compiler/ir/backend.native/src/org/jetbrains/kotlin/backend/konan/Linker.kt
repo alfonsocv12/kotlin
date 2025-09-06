@@ -131,8 +131,15 @@ internal class Linker(
         }
         File(executable).delete()
 
+        val dynamicLibraries = if (caches.dynamic.isEmpty())
+            caches.dynamic
+        else tempFiles.create("dynamicLibraries").let { dylibListFile ->
+            dylibListFile.writeLines(caches.dynamic)
+            listOf("-filelist", dylibListFile.absolutePath)
+        }
+
         val linkerArgs = asLinkerArgs(config.configuration.getNotNull(KonanConfigKeys.LINKER_ARGS)) +
-                caches.dynamic +
+                dynamicLibraries +
                 libraryProvidedLinkerFlags + additionalLinkerArgs
 
         return with(linker) {
