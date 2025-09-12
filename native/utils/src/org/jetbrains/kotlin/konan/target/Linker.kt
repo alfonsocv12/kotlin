@@ -180,7 +180,7 @@ class MacOSBasedLinker(targetProperties: AppleConfigurables)
     : LinkerFlags(targetProperties), AppleConfigurables by targetProperties {
 
     private val libtool = "$absoluteTargetToolchain/bin/libtool"
-    private val linker = "$absoluteTargetToolchain/bin/ld"
+    private val linker = "$absoluteTargetToolchain/bin/ld64.lld"
     private val strip = "$absoluteTargetToolchain/bin/strip"
     private val dsymutil = "$absoluteTargetToolchain/bin/dsymutil"
 

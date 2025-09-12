@@ -84,7 +84,7 @@ open class KonanCacheTask @Inject constructor(
             add("-target")
             add(target.get())
             add("-produce")
-            add("static_cache")
+            add("dynamic_cache")
             add("-Xadd-cache=${klib.get().asFile.absolutePath}")
             add("-Xcache-directory=${outputDirectory.get().asFile.parentFile.absolutePath}")
             PlatformManager(compilerDistribution.get().root.asFile.absolutePath).apply {
