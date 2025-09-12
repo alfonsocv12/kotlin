@@ -59,6 +59,7 @@ val updateDefFileTasksPerFamily = if (HostManager.hostIsMac) {
 
 enabledTargets(platformManager).forEach { target ->
     val targetName = target.visibleName
+    println(targetName)
     val installTasks = mutableListOf<TaskProvider<out Task>>()
     val cacheTasks = mutableListOf<TaskProvider<out Task>>()
 
