@@ -84,6 +84,7 @@ sealed class ClangArgs(
             // Do not depend on link.exe from Visual Studio.
             add(listOf("-fuse-ld=lld"))
         }
+        add(listOf("-miphoneos-version-min=17.5"))
         add(listOf("-fno-stack-protector"))
         if (configurables is GccConfigurables) {
             add(listOf("--gcc-toolchain=${configurables.absoluteGccToolchain}"))
