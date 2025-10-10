@@ -4,6 +4,7 @@ import org.jetbrains.kotlin.konan.file.*
 import org.jetbrains.kotlin.library.*
 import org.jetbrains.kotlin.util.removeSuffixIfPresent
 import java.nio.file.FileSystem
+import java.util.logging.Logger
 
 open class KotlinLibraryLayoutImpl(val klib: File, override val component: String?) : KotlinLibraryLayout {
     val isZipped = klib.isFile
@@ -38,7 +39,7 @@ class IrLibraryLayoutImpl(klib: File, component: String) : KotlinLibraryLayoutIm
 open class BaseLibraryAccess<L : KotlinLibraryLayout>(val klib: File, component: String?, zipAccessor: ZipFileSystemAccessor? = null) {
     open val layout = KotlinLibraryLayoutImpl(klib, component)
 
-    private val klibZipAccessor = zipAccessor ?: ZipFileSystemInPlaceAccessor
+    private val klibZipAccessor = getZipAccessor(zipAccessor)
 
     fun <T> inPlace(action: (L) -> T): T =
         if (layout.isZipped)
@@ -47,6 +48,20 @@ open class BaseLibraryAccess<L : KotlinLibraryLayout>(val klib: File, component:
             }
         else
             action(layout as L)
+
+    private companion object {
+        private val logger = Logger.getLogger("BaseLibraryAccess")
+
+        fun getZipAccessor(zipAccessor: ZipFileSystemAccessor?): ZipFileSystemAccessor {
+            if (zipAccessor != null) {
+                val stackTrace = Thread.currentThread().stackTrace
+                val caller = stackTrace[2]
+                logger.warning { "NOT using" + (caller as StackTraceElement).methodName }
+            }
+
+            return zipAccessor ?: ZipFileSystemCacheableAccessor(100)
+        }
+    }
 }
 
 
