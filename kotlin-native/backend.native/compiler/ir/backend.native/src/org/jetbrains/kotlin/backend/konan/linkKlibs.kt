@@ -161,20 +161,13 @@ internal fun LinkKlibsContext.linkKlibs(
 
             // context.config.librariesWithDependencies could change at each iteration.
             var dependenciesCount = 0
+
+            val sortedDependecies = DFS.topologicalOrder(moduleDescriptor.allDependencyModules) {
+                it.allDependencyModules
+            }.reversed().filter { it != moduleDescriptor }
+
             while (true) {
-                // context.config.librariesWithDependencies could change at each iteration.
-                val libsWithDeps = config.librariesWithDependencies().toSet()
-                val dependencies = moduleDescriptor.allDependencyModules.filter {
-                    libsWithDeps.contains(it.konanLibrary)
-                }
-
-                fun sortDependencies(dependencies: List<ModuleDescriptor>): Collection<ModuleDescriptor> {
-                    return DFS.topologicalOrder(dependencies) {
-                        it.allDependencyModules
-                    }.reversed()
-                }
-
-                for (dependency in sortDependencies(dependencies).filter { it != moduleDescriptor }) {
+                for (dependency in sortedDependecies) {
                     val kotlinLibrary = (dependency.getCapability(KlibModuleOrigin.CAPABILITY) as? DeserializedKlibModuleOrigin)?.library
                     val isFullyCachedLibrary = kotlinLibrary != null &&
                             config.cachedLibraries.isLibraryCached(kotlinLibrary) && kotlinLibrary != config.libraryToCache?.klib
@@ -185,8 +178,8 @@ internal fun LinkKlibsContext.linkKlibs(
                     else
                         linker.deserializeIrModuleHeader(dependency, kotlinLibrary, dependency.name.asString())
                 }
-                if (dependencies.size == dependenciesCount) break
-                dependenciesCount = dependencies.size
+                if (sortedDependecies.size == dependenciesCount) break
+                dependenciesCount = sortedDependecies.size
             }
 
             // We need to run `buildAllEnumsAndStructsFrom` before `generateModuleFragment` because it adds references to symbolTable
