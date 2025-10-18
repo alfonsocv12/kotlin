@@ -5,7 +5,7 @@
 
 package org.jetbrains.kotlin.backend.common.extensions
 
-import org.jetbrains.kotlin.backend.common.ir.BuiltinSymbolsBase
+import org.jetbrains.kotlin.backend.common.ir.Symbols
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
@@ -25,6 +25,8 @@ import org.jetbrains.kotlin.ir.declarations.IrDeclaration
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
 import org.jetbrains.kotlin.backend.common.linkage.IrDeserializer
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationWithName
+import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.symbols.*
 import org.jetbrains.kotlin.ir.util.IdSignature
 import org.jetbrains.kotlin.ir.util.ReferenceSymbolTable
@@ -55,8 +57,10 @@ open class IrPluginContextImpl(
     )
     override val messageCollector: MessageCollector,
     diagnosticReporter: DiagnosticReporter = DiagnosticReporterFactory.createReporter(messageCollector),
-    override val symbols: BuiltinSymbolsBase = BuiltinSymbolsBase(irBuiltIns)
 ) : IrPluginContext {
+    @Deprecated("This API is deprecated. Use `irBuiltIns` instead.", level = DeprecationLevel.ERROR)
+    override val symbols: Symbols
+        get() = error("`symbols` are deprecated")
 
     override val afterK2: Boolean = false
 
@@ -195,6 +199,8 @@ open class IrPluginContextImpl(
         return referenceProperties(callableId.asSingleFqName())
     }
 
+    override fun recordLookup(declaration: IrDeclarationWithName, fromFile: IrFile) {}
+
     @Deprecated("This API is deprecated. It will be removed after the 2.3 release", level = DeprecationLevel.WARNING)
     @FirIncompatiblePluginAPI
     override fun referenceTopLevel(
@@ -208,6 +214,8 @@ open class IrPluginContextImpl(
     }
 
     private object DummyIrGeneratedDeclarationsRegistrar : IrGeneratedDeclarationsRegistrar() {
+        override fun getMetadataVisibleAnnotationsForElement(declaration: IrDeclaration): MutableList<IrConstructorCall> = mutableListOf()
+
         override fun addMetadataVisibleAnnotationsToElement(declaration: IrDeclaration, annotations: List<IrConstructorCall>) {
             declaration.annotations += annotations
         }

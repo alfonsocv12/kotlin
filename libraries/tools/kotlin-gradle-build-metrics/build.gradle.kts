@@ -17,13 +17,6 @@ extensions.extraProperties["kotlin.stdlib.default.dependency"] = "false"
 dependencies {
     val coreDepsVersion = libs.versions.kotlin.`for`.gradle.plugins.compilation.get()
     compileOnly("org.jetbrains.kotlin:kotlin-stdlib:$coreDepsVersion")
-
-    testImplementation(kotlinTest("junit"))
-    testImplementation(libs.junit4)
-}
-
-projectTest {
-    workingDir = rootDir
 }
 
 publishing {

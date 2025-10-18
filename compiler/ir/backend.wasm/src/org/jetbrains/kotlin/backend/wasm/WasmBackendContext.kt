@@ -56,12 +56,14 @@ class WasmBackendContext(
     // Place to store declarations excluded from code generation
     private val excludedDeclarations = mutableMapOf<FqName, IrPackageFragment>()
 
-    fun getExcludedPackageFragment(fqName: FqName): IrPackageFragment = excludedDeclarations.getOrPut(fqName) {
+    fun getExcludedPackageFragmentOrCreate(fqName: FqName): IrPackageFragment = excludedDeclarations.getOrPut(fqName) {
         IrExternalPackageFragmentImpl(
             DescriptorlessExternalPackageFragmentSymbol(),
             fqName
         )
     }
+
+    fun getExcludedPackageFragment(fqName: FqName): IrPackageFragment? = excludedDeclarations.get(fqName)
 
     class CrossFileContext {
         var mainFunctionWrapper: IrSimpleFunction? = null
@@ -75,6 +77,9 @@ class WasmBackendContext(
         val classAssociatedObjects: MutableMap<IrClass, MutableList<Pair<IrClass, IrClass>>> = mutableMapOf()
 
         var testFunctionDeclarator: IrSimpleFunction? = null
+
+        var objectInstanceFieldInitializer: IrSimpleFunction? = null
+        var nonConstantFieldInitializer: IrSimpleFunction? = null
     }
 
     val fileContexts = mutableMapOf<IrFile, CrossFileContext>()
@@ -93,9 +98,6 @@ class WasmBackendContext(
     override val sharedVariablesManager = KlibSharedVariablesManager(wasmSymbols)
     override val reflectionSymbols: ReflectionSymbols get() = wasmSymbols.reflectionSymbols
 
-    override val enumEntries = wasmSymbols.enumEntries
-    override val createEnumEntries = wasmSymbols.createEnumEntries
-
     override val propertyLazyInitialization: PropertyLazyInitialization =
         PropertyLazyInitialization(enabled = propertyLazyInitialization, eagerInitialization = wasmSymbols.eagerInitialization)
 
@@ -107,11 +109,6 @@ class WasmBackendContext(
     //
     // Unit test support, mostly borrowed from the JS implementation
     //
-
-    override val suiteFun: IrSimpleFunctionSymbol?
-        get() = wasmSymbols.suiteFun
-    override val testFun: IrSimpleFunctionSymbol?
-        get() = wasmSymbols.testFun
 
     override val partialLinkageSupport = createPartialLinkageSupportForLowerings(
         configuration.partialLinkageConfig,

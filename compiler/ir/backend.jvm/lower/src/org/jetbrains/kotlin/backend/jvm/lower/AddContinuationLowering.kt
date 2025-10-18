@@ -10,7 +10,7 @@ import org.jetbrains.kotlin.backend.common.ir.moveBodyTo
 import org.jetbrains.kotlin.backend.common.lower.LocalDeclarationsLowering
 import org.jetbrains.kotlin.backend.common.lower.createIrBuilder
 import org.jetbrains.kotlin.backend.common.peek
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
+import org.jetbrains.kotlin.backend.common.phaser.PhasePrerequisites
 import org.jetbrains.kotlin.backend.common.pop
 import org.jetbrains.kotlin.backend.common.push
 import org.jetbrains.kotlin.backend.jvm.*
@@ -27,7 +27,6 @@ import org.jetbrains.kotlin.ir.builders.declarations.*
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.expressions.impl.*
-import org.jetbrains.kotlin.backend.common.originalBeforeInline
 import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.types.IrType
@@ -48,10 +47,7 @@ import kotlin.contracts.contract
 /**
  * Adds continuation classes and parameters to suspend functions.
  */
-@PhaseDescription(
-    name = "AddContinuation",
-    prerequisite = [SuspendLambdaLowering::class, JvmLocalDeclarationsLowering::class, TailCallOptimizationLowering::class]
-)
+@PhasePrerequisites(SuspendLambdaLowering::class, JvmLocalDeclarationsLowering::class, TailCallOptimizationLowering::class)
 internal class AddContinuationLowering(context: JvmBackendContext) : SuspendLoweringUtils(context), FileLoweringPass {
     override fun lower(irFile: IrFile) {
         addContinuationObjectAndContinuationParameterToSuspendFunctions(irFile)
@@ -299,11 +295,27 @@ internal class AddContinuationLowering(context: JvmBackendContext) : SuspendLowe
                 return declaration
             }
 
-            private fun transformToView(function: IrSimpleFunction): List<IrFunction> {
+            override fun visitRichFunctionReference(expression: IrRichFunctionReference): IrExpression {
+                val function = expression.invokeFunction
+                if (function.isSuspend) {
+                    expression.invokeFunction = transformToView(function).single()
+                    return expression
+                }
+                return super.visitRichFunctionReference(expression)
+            }
+
+            private fun transformToView(function: IrSimpleFunction): List<IrSimpleFunction> {
                 function.accept(this, null)
 
                 val capturesCrossinline = function.isCapturingCrossinline()
                 val view = function.suspendFunctionViewOrStub(context)
+
+                // if X is original for Y, then (view for X) is an original for the (view for Y)
+                function.originalFunctionForDefaultImpl?.let { originalForDefaultImplBridge ->
+                    val viewForOriginal = originalForDefaultImplBridge.suspendFunctionOriginal().viewOfOriginalSuspendFunction
+                    if (viewForOriginal != null) view.originalFunctionForDefaultImpl = viewForOriginal
+                }
+
                 val continuationParameter = view.continuationParameter()
                 val parameterMap = function.parameters.zip(view.parameters.filter { it != continuationParameter }).toMap()
                 view.body = function.moveBodyTo(view, parameterMap)
@@ -374,7 +386,7 @@ internal class AddContinuationLowering(context: JvmBackendContext) : SuspendLowe
 
             private fun IrSimpleFunction.isCapturingCrossinline(): Boolean {
                 var capturesCrossinline = false
-                (this.originalBeforeInline ?: this).acceptVoid(object : IrVisitorVoid() {
+                this.acceptVoid(object : IrVisitorVoid() {
                     override fun visitElement(element: IrElement) {
                         element.acceptChildrenVoid(this)
                     }

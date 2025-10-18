@@ -10,21 +10,20 @@ import org.jetbrains.jps.incremental.CompileContext
 import org.jetbrains.kotlin.build.report.metrics.BuildMetricsReporter
 import org.jetbrains.kotlin.build.report.metrics.BuildMetricsReporterImpl
 import org.jetbrains.kotlin.build.report.metrics.JpsBuildPerformanceMetric
-import org.jetbrains.kotlin.build.report.metrics.JpsBuildTime
+import org.jetbrains.kotlin.build.report.metrics.JpsBuildTimeMetric
 import org.jetbrains.kotlin.build.report.statistics.BuildDataType
 import org.jetbrains.kotlin.build.report.statistics.StatTag
 import org.jetbrains.kotlin.compilerRunner.JpsCompilationResult
 import java.net.InetAddress
 import java.util.*
-import kotlin.collections.ArrayList
 
 class JpsBuilderMetricReporterImpl(
     chunk: ModuleChunk,
-    private val reporter: BuildMetricsReporterImpl<JpsBuildTime, JpsBuildPerformanceMetric>,
+    private val reporter: BuildMetricsReporterImpl<JpsBuildTimeMetric, JpsBuildPerformanceMetric>,
     private val label: String? = null,
     private val kotlinVersion: String = "kotlin_version"
 ) :
-    JpsBuilderMetricReporter, BuildMetricsReporter<JpsBuildTime, JpsBuildPerformanceMetric> by reporter {
+    JpsBuilderMetricReporter, BuildMetricsReporter<JpsBuildTimeMetric, JpsBuildPerformanceMetric> by reporter {
 
     companion object {
         private val hostName: String? = try {
@@ -86,7 +85,7 @@ class JpsBuilderMetricReporterImpl(
             kotlinVersion = kotlinVersion,
             hostName = hostName,
             finishTime = finishTime,
-            buildTimesMetrics = buildMetrics.buildTimes.asMapMs(),
+            buildTimesMetrics = buildMetrics.buildTimes.buildTimesMapMs(),
             performanceMetrics = buildMetrics.buildPerformanceMetrics.asMap(),
             compilerArguments = compilerArguments,
             nonIncrementalAttributes = emptySet(),

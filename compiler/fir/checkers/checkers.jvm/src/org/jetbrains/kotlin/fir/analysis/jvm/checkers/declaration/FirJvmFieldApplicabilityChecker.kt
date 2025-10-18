@@ -41,7 +41,7 @@ object FirJvmFieldApplicabilityChecker : FirPropertyChecker(MppCheckerKind.Commo
         val session = context.session
         val annotation = declaration.backingField?.getAnnotationByClassId(JVM_FIELD_ANNOTATION_CLASS_ID, session)
             ?: return
-        val containingClassSymbol = declaration.containingClassLookupTag()?.toRegularClassSymbol(session)
+        val containingClassSymbol = declaration.containingClassLookupTag()?.toRegularClassSymbol()
 
         val problem = when {
             declaration.delegate != null -> DELEGATE
@@ -63,6 +63,7 @@ object FirJvmFieldApplicabilityChecker : FirPropertyChecker(MppCheckerKind.Commo
             declaration.returnTypeRef.isInlineClassThatRequiresMangling(session) -> RETURN_TYPE_IS_VALUE_CLASS
             declaration.returnTypeRef.needsMultiFieldValueClassFlattening(session) -> RETURN_TYPE_IS_VALUE_CLASS
             containingClassSymbol?.classKind == ClassKind.ANNOTATION_CLASS -> ANNOTATION
+            declaration.hasExplicitBackingField -> PROPERTY_WITH_EXPLICIT_FIELD
             else -> return
         }
 

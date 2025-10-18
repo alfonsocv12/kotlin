@@ -1,8 +1,8 @@
-PsiJetFileStubImpl[package=test]
+FILE[kind=File[packageFqName=test]]
   PACKAGE_DIRECTIVE
     REFERENCE_EXPRESSION[referencedName=test]
   IMPORT_LIST
-  CLASS[classId=test/Types, fqName=test.Types, isClsStubCompiledToJvmDefaultImplementation=false, isEnumEntry=false, isInterface=false, isLocal=false, isTopLevel=true, name=Types, superNames=[]]
+  CLASS[classId=test/Types, fqName=test.Types, isClsStubCompiledToJvmDefaultImplementation=false, isInterface=false, isLocal=false, isTopLevel=true, name=Types, superNames=[]]
     MODIFIER_LIST[abstract]
     CLASS_BODY
       PROPERTY[fqName=test.Types.nullable, hasBackingField=null, hasDelegate=false, hasDelegateExpression=false, hasInitializer=true, hasReturnTypeRef=true, isExtension=false, isTopLevel=false, isVar=false, name=nullable]
@@ -204,10 +204,10 @@ PsiJetFileStubImpl[package=test]
       FUN[fqName=test.Types.extOnFunctionType, hasBody=true, hasNoExpressionBody=true, hasTypeParameterListBeforeFunctionName=true, isExtension=true, isTopLevel=false, mayHaveContract=false, name=extOnFunctionType]
         MODIFIER_LIST[public]
         TYPE_PARAMETER_LIST
-          TYPE_PARAMETER[fqName=null, isInVariance=false, isOutVariance=false, name=P1]
-          TYPE_PARAMETER[fqName=null, isInVariance=false, isOutVariance=false, name=P2]
-          TYPE_PARAMETER[fqName=null, isInVariance=false, isOutVariance=false, name=P3]
-          TYPE_PARAMETER[fqName=null, isInVariance=false, isOutVariance=false, name=R]
+          TYPE_PARAMETER[fqName=null, name=P1]
+          TYPE_PARAMETER[fqName=null, name=P2]
+          TYPE_PARAMETER[fqName=null, name=P3]
+          TYPE_PARAMETER[fqName=null, name=R]
         TYPE_REFERENCE
           USER_TYPE
             REFERENCE_EXPRESSION[referencedName=Function3]

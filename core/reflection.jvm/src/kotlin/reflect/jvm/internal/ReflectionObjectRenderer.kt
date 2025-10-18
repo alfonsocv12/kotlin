@@ -18,7 +18,6 @@ package kotlin.reflect.jvm.internal
 
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.builtins.isNumberedFunctionClassFqName
-import org.jetbrains.kotlin.builtins.jvm.JavaToKotlinClassMap
 import org.jetbrains.kotlin.name.FqNameUnsafe
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.renderer.render
@@ -27,6 +26,7 @@ import kotlin.reflect.*
 import kotlin.reflect.full.contextParameters
 import kotlin.reflect.full.extensionReceiverParameter
 import kotlin.reflect.full.valueParameters
+import kotlin.reflect.jvm.internal.types.AbstractKType
 import kotlin.reflect.jvm.jvmName
 
 internal object ReflectionObjectRenderer {
@@ -34,7 +34,7 @@ internal object ReflectionObjectRenderer {
         append(renderType(receiver.type)).append(".")
 
     private fun StringBuilder.appendReceivers(callable: KCallable<*>) {
-        val receivers = (callable as KCallableImpl<*>).receiverParameters.filter {
+        val receivers = (callable as ReflectKCallable<*>).receiverParameters.filter {
             it.kind == KParameter.Kind.INSTANCE || it.kind == KParameter.Kind.EXTENSION_RECEIVER
         }
         receivers.getOrNull(0)?.let { appendReceiverType(it) }
@@ -120,12 +120,18 @@ internal object ReflectionObjectRenderer {
             }
 
             append(" of ")
-            append(renderCallable((parameter as KParameterImpl).callable))
+            append(renderCallable((parameter as ReflectKParameter).callable))
         }
     }
 
-    fun renderType(type: KType): String {
-        val lowerBound = (type as AbstractKType).lowerBoundIfFlexible()
+    fun renderType(type: KType, renderRawArgumentPrefix: Boolean = false): String {
+        type as AbstractKType
+
+        if (type.isRawType) {
+            return renderType(type.lowerBoundIfFlexible()!!, renderRawArgumentPrefix = true)
+        }
+
+        val lowerBound = type.lowerBoundIfFlexible()
         val upperBound = type.upperBoundIfFlexible()
         if (lowerBound != null && upperBound != null) {
             return renderFlexibleType(renderType(lowerBound), renderType(upperBound))
@@ -151,12 +157,12 @@ internal object ReflectionObjectRenderer {
                     if (isNumberedFunctionClassFqName(fqName) && KTypeProjection.STAR !in type.arguments) {
                         renderFunctionType(type)
                     } else {
-                        renderSimpleType(classifier, fqName, type.arguments, type.isMarkedNullable)
+                        renderSimpleType(classifier, fqName, type.arguments, type.isMarkedNullable, renderRawArgumentPrefix)
                     }
                 }
                 is KTypeAliasImpl -> {
                     classifier.fqName.pathSegments().joinTo(this, separator = ".") { it.render() }
-                    renderTypeArgumentsAndNullability(type.arguments, type.isMarkedNullable)
+                    renderTypeArgumentsAndNullability(type.arguments, type.isMarkedNullable, renderRawArgumentPrefix)
                 }
                 else -> {
                     append("???")
@@ -172,36 +178,48 @@ internal object ReflectionObjectRenderer {
     private fun getTypeClassFqName(type: AbstractKType, klass: KClass<*>): FqNameUnsafe? {
         if (type.isNothingType)
             return StandardNames.FqNames.nothing
-        val fqName = klass.qualifiedName?.let(::FqNameUnsafe) ?: return null
-        if (type.isMutableCollectionType)
-            return JavaToKotlinClassMap.readOnlyToMutable(fqName)?.toUnsafe()
-        return fqName
+        return (type.mutableCollectionClass ?: klass).qualifiedName?.let(::FqNameUnsafe)
     }
 
-    private fun StringBuilder.renderFunctionType(type: KType) {
+    private fun StringBuilder.renderFunctionType(type: AbstractKType) {
         if (type.isMarkedNullable) append("(")
+        if (type.isSuspendFunctionType) append("suspend ")
         type.arguments.dropLast(1).joinTo(this, prefix = "(", postfix = ") -> ")
         append(type.arguments.last())
         if (type.isMarkedNullable) append(")?")
     }
 
     private fun StringBuilder.renderSimpleType(
-        klass: KClass<*>, classFqName: FqNameUnsafe, allArguments: List<KTypeProjection>, isMarkedNullable: Boolean,
+        klass: KClass<*>,
+        classFqName: FqNameUnsafe,
+        allArguments: List<KTypeProjection>,
+        isMarkedNullable: Boolean,
+        renderRawArgumentPrefix: Boolean,
     ) {
         if (klass.typeParameters.size < allArguments.size && klass.java.declaringClass != null) {
-            renderSimpleType(klass.java.declaringClass.kotlin, classFqName.parent(), allArguments.drop(klass.typeParameters.size), false)
+            renderSimpleType(
+                klass.java.declaringClass.kotlin,
+                classFqName.parent(),
+                allArguments.drop(klass.typeParameters.size),
+                false,
+                renderRawArgumentPrefix
+            )
             append(".")
             append(classFqName.shortName().render())
         } else {
             append(classFqName.render())
         }
 
-        renderTypeArgumentsAndNullability(allArguments.take(klass.typeParameters.size), isMarkedNullable)
+        renderTypeArgumentsAndNullability(allArguments.take(klass.typeParameters.size), isMarkedNullable, renderRawArgumentPrefix)
     }
 
-    private fun StringBuilder.renderTypeArgumentsAndNullability(typeArguments: List<KTypeProjection>, isMarkedNullable: Boolean) {
+    private fun StringBuilder.renderTypeArgumentsAndNullability(
+        typeArguments: List<KTypeProjection>, isMarkedNullable: Boolean, renderRawArgumentPrefix: Boolean,
+    ) {
         if (typeArguments.isNotEmpty()) {
-            typeArguments.joinTo(this, prefix = "<", postfix = ">")
+            typeArguments.joinTo(this, prefix = "<", postfix = ">") {
+                (if (renderRawArgumentPrefix) "(raw) " else "") + it.toString()
+            }
         }
         if (isMarkedNullable) {
             append("?")

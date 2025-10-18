@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.fir.renderer
 
 import org.jetbrains.kotlin.builtins.functions.AllowedToUsedOnlyInK1
 import org.jetbrains.kotlin.builtins.functions.FunctionTypeKindExtractor
+import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget
 import org.jetbrains.kotlin.fir.FirAnnotationContainer
 import org.jetbrains.kotlin.fir.FirElement
@@ -15,6 +16,7 @@ import org.jetbrains.kotlin.fir.contracts.FirContractDescription
 import org.jetbrains.kotlin.fir.contracts.FirEffectDeclaration
 import org.jetbrains.kotlin.fir.contracts.description.ConeContractRenderer
 import org.jetbrains.kotlin.fir.declarations.*
+import org.jetbrains.kotlin.fir.declarations.utils.visibility
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.expressions.impl.FirElseIfTrueCondition
 import org.jetbrains.kotlin.fir.expressions.impl.FirExpressionStub
@@ -23,6 +25,7 @@ import org.jetbrains.kotlin.fir.expressions.impl.FirUnitExpression
 import org.jetbrains.kotlin.fir.isCatchParameter
 import org.jetbrains.kotlin.fir.references.*
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.RenderingInternals
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.visitors.FirVisitorVoid
 import org.jetbrains.kotlin.name.StandardClassIds
@@ -32,7 +35,7 @@ import org.jetbrains.kotlin.utils.addToStdlib.applyIf
 import org.jetbrains.kotlin.utils.addToStdlib.shouldNotBeCalled
 import java.util.*
 
-@OptIn(DirectDeclarationsAccess::class)
+@OptIn(DirectDeclarationsAccess::class, RenderingInternals::class)
 class FirRenderer(
     builder: StringBuilder = StringBuilder(),
     override val annotationRenderer: FirAnnotationRenderer? = FirAnnotationRenderer(),
@@ -291,7 +294,7 @@ class FirRenderer(
                     idRenderer.renderCallableId(callableDeclaration.symbol.callableId)
                 }
                 is FirVariable -> {
-                    idRenderer.renderCallableId(callableDeclaration.symbol.callableId)
+                    idRenderer.renderCallableId(callableDeclaration.symbol.callableIdForRendering)
                 }
                 else -> {}
             }
@@ -374,7 +377,7 @@ class FirRenderer(
 
         override fun visitProperty(property: FirProperty) {
             visitVariable(property)
-            if (property.isLocal) return
+            if (property.isLocal || property.visibility == Visibilities.Local) return
             propertyAccessorRenderer?.render(property)
         }
 
@@ -426,6 +429,7 @@ class FirRenderer(
             if (body == null) {
                 bodyRenderer?.renderDelegatedConstructor(delegatedConstructor)
             }
+            contractRenderer?.render(constructor)
             bodyRenderer?.renderBody(body, listOfNotNull<FirStatement>(delegatedConstructor))
         }
 
@@ -497,7 +501,7 @@ class FirRenderer(
             renderPhaseAndAttributes(danglingModifierList)
             annotationRenderer?.render(danglingModifierList)
             renderContexts(danglingModifierList.contextParameters)
-            print("<DANGLING MODIFIER: ${danglingModifierList.diagnostic.reason}>")
+            print(typeRenderer.renderDiagnostic(danglingModifierList.diagnostic, prefix = "<DANGLING MODIFIER: ", suffix = ">"))
         }
 
         override fun visitBlock(block: FirBlock) {
@@ -844,7 +848,7 @@ class FirRenderer(
 
         override fun visitErrorTypeRef(errorTypeRef: FirErrorTypeRef) {
             annotationRenderer?.render(errorTypeRef)
-            print("<ERROR TYPE REF: ${errorTypeRef.diagnostic.reason}>")
+            print(typeRenderer.renderDiagnostic(errorTypeRef.diagnostic, prefix = "<ERROR TYPE REF: ", suffix = ">"))
         }
 
         override fun visitImplicitTypeRef(implicitTypeRef: FirImplicitTypeRef) {
@@ -949,18 +953,18 @@ class FirRenderer(
         }
 
         override fun visitErrorNamedReference(errorNamedReference: FirErrorNamedReference) {
-            print("<${errorNamedReference.diagnostic.reason}>#")
+            print(typeRenderer.renderDiagnostic(errorNamedReference.diagnostic, prefix = "<", suffix = ">#"))
         }
 
         override fun visitBackingFieldReference(backingFieldReference: FirBackingFieldReference) {
             print("F|")
-            print(backingFieldReference.resolvedSymbol.fir.propertySymbol.callableId)
+            print(backingFieldReference.resolvedSymbol.fir.propertySymbol.callableIdForRendering)
             print("|")
         }
 
         override fun visitDelegateFieldReference(delegateFieldReference: FirDelegateFieldReference) {
             print("D|")
-            print(delegateFieldReference.resolvedSymbol.callableId)
+            print(delegateFieldReference.resolvedSymbol.callableIdForRendering)
             print("|")
         }
 
@@ -974,6 +978,10 @@ class FirRenderer(
 
         override fun visitResolvedCallableReference(resolvedCallableReference: FirResolvedCallableReference) {
             visitResolvedNamedReference(resolvedCallableReference)
+        }
+
+        override fun visitPropertyWithExplicitBackingFieldResolvedNamedReference(propertyWithExplicitBackingFieldResolvedNamedReference: FirPropertyWithExplicitBackingFieldResolvedNamedReference) {
+            visitResolvedNamedReference(propertyWithExplicitBackingFieldResolvedNamedReference)
         }
 
         override fun visitThisReference(thisReference: FirThisReference) {
@@ -1172,10 +1180,10 @@ class FirRenderer(
             print(")")
         }
 
-        override fun visitArrayLiteral(arrayLiteral: FirArrayLiteral) {
-            annotationRenderer?.render(arrayLiteral)
-            print("<implicitArrayOf>")
-            visitCall(arrayLiteral)
+        override fun visitCollectionLiteral(collectionLiteral: FirCollectionLiteral) {
+            annotationRenderer?.render(collectionLiteral)
+            print("<collectionLiteralCall>")
+            visitCall(collectionLiteral)
         }
 
         override fun visitThrowExpression(throwExpression: FirThrowExpression) {

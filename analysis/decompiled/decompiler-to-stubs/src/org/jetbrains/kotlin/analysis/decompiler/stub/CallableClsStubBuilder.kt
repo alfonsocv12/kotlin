@@ -24,6 +24,8 @@ import org.jetbrains.kotlin.metadata.jvm.JvmProtoBuf
 import org.jetbrains.kotlin.metadata.jvm.deserialization.JvmProtoBufUtil
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.protobuf.MessageLite
+import org.jetbrains.kotlin.psi.KtContextReceiverList
 import org.jetbrains.kotlin.psi.KtParameterList
 import org.jetbrains.kotlin.psi.stubs.KotlinPropertyStub
 import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes
@@ -107,6 +109,7 @@ abstract class CallableClsStubBuilder(
     protected val typeStubBuilder = TypeClsStubBuilder(c)
     protected val isTopLevel: Boolean get() = protoContainer is ProtoContainer.Package
     protected val callableStub: StubElement<out PsiElement> by lazy(LazyThreadSafetyMode.NONE) { doCreateCallableStub(parent) }
+    protected abstract val callableProto: MessageLite
 
     fun build() {
         createModifierListStub()
@@ -123,6 +126,7 @@ abstract class CallableClsStubBuilder(
 
     abstract val returnType: ProtoBuf.Type?
     abstract val contextReceiverTypes: List<ProtoBuf.Type>
+    abstract val contextParameters: List<ProtoBuf.ValueParameter>
 
     private fun createReceiverTypeReferenceStub() {
         receiverType?.let {
@@ -139,18 +143,45 @@ abstract class CallableClsStubBuilder(
     protected fun createModifierListStubForCallableDeclaration(
         flags: Int,
         flagsToTranslate: List<FlagsToModifiers>,
-        mustUseReturnValueFlag: Flags.BooleanFlagField?,
+        returnValueStatus: Flags.FlagField<ProtoBuf.ReturnValueStatus>,
     ): KotlinModifierListStubImpl {
         val modifierListStub = createModifierListStubForDeclaration(
             callableStub,
             flags,
             flagsToTranslate,
             additionalModifiers = emptyList(),
-            mustUseReturnValueFlag = mustUseReturnValueFlag,
+            returnValueStatus = returnValueStatus,
         )
 
-        typeStubBuilder.createContextReceiverStubs(modifierListStub, contextReceiverTypes)
+        createContextParameterStubs(modifierListStub)
         return modifierListStub
+    }
+
+    protected fun createContextParameterStubs(modifierListStub: KotlinModifierListStubImpl) {
+        val contextParameters = contextParameters
+        if (contextParameters.isEmpty()) {
+            // Fallback for old metadata where context parameters don't exist (KT-74546)
+            return typeStubBuilder.createContextReceiverStubs(modifierListStub, contextReceiverTypes)
+        }
+
+        val contextReceiverListStub = KotlinPlaceHolderStubImpl<KtContextReceiverList>(
+            modifierListStub,
+            KtStubElementTypes.CONTEXT_RECEIVER_LIST,
+        )
+
+        typeStubBuilder.createValueParameterStubs(
+            contextParameters,
+            contextReceiverListStub,
+            protoContainer,
+            callableProto,
+            when (callableProto) {
+                is ProtoBuf.Function -> AnnotatedCallableKind.FUNCTION
+                // Context parameters are declared on getters/setters
+                is ProtoBuf.Property -> AnnotatedCallableKind.PROPERTY_GETTER
+                else -> error("Unsupported callable proto: ${callableProto::class.simpleName}")
+            },
+            isContextParameter = true,
+        )
     }
 
     abstract fun createModifierListStub()
@@ -181,8 +212,14 @@ private class FunctionClsStubBuilder(
     override val returnType: ProtoBuf.Type
         get() = functionProto.returnType(c.typeTable)
 
+    override val callableProto: MessageLite
+        get() = functionProto
+
     override val contextReceiverTypes: List<ProtoBuf.Type>
         get() = functionProto.contextReceiverTypes(c.typeTable)
+
+    override val contextParameters: List<ProtoBuf.ValueParameter>
+        get() = functionProto.contextParameterList
 
     override fun createValueParameterList() {
         typeStubBuilder.createValueParameterListStub(callableStub, functionProto, functionProto.valueParameterList, protoContainer)
@@ -203,7 +240,7 @@ private class FunctionClsStubBuilder(
                 SUSPEND,
                 EXPECT_FUNCTION,
             ) + modalityModifier,
-            mustUseReturnValueFlag = Flags.HAS_MUST_USE_RETURN_VALUE_FUNCTION,
+            returnValueStatus = Flags.RETURN_VALUE_STATUS_FUNCTION,
         )
 
         // If function is marked as having no annotations, we don't create stubs for it
@@ -259,21 +296,26 @@ private class PropertyClsStubBuilder(
     override val returnType: ProtoBuf.Type
         get() = propertyProto.returnType(c.typeTable)
 
+    override val contextParameters: List<ProtoBuf.ValueParameter>
+        get() = propertyProto.contextParameterList
+
     override val contextReceiverTypes: List<ProtoBuf.Type>
         get() = propertyProto.contextReceiverTypes(c.typeTable)
+
+    override val callableProto: MessageLite
+        get() = propertyProto
 
     override fun createValueParameterList() {
     }
 
     override fun createModifierListStub() {
-        val constModifier = if (isVar) listOf() else listOf(CONST)
-        val modalityModifier = if (isTopLevel) listOf() else listOf(MODALITY)
-
         val flags = propertyProto.flags
+        val constModifier = if (isVar) listOf() else listOf(CONST)
+        val modalityModifier = if (isTopLevel || Flags.IS_CONST[flags]) listOf() else listOf(MODALITY)
         val modifierListStubImpl = createModifierListStubForCallableDeclaration(
             flags = flags,
             flagsToTranslate = listOf(VISIBILITY, LATEINIT, EXTERNAL_PROPERTY, EXPECT_PROPERTY) + constModifier + modalityModifier,
-            mustUseReturnValueFlag = Flags.HAS_MUST_USE_RETURN_VALUE_PROPERTY,
+            returnValueStatus = Flags.RETURN_VALUE_STATUS_PROPERTY,
         )
 
         // If field is marked as having no annotations, we don't create stubs for it
@@ -317,8 +359,13 @@ private class PropertyClsStubBuilder(
     }
 
     override fun createCallableSpecialParts() {
-        if ((callableStub as KotlinPropertyStub).hasInitializer()) {
-            KotlinNameReferenceExpressionStubImpl(callableStub, StringRef.fromString(COMPILED_DEFAULT_INITIALIZER))
+        val propertyStub = callableStub as KotlinPropertyStub
+        if (propertyStub.hasInitializer && !propertyStub.hasDelegate) {
+            KotlinNameReferenceExpressionStubImpl(
+                callableStub,
+                StringRef.fromString(COMPILED_DEFAULT_INITIALIZER),
+                false,
+            )
         }
 
         createGetterStubsIfNeeded(callableStub)
@@ -450,7 +497,7 @@ private class PropertyClsStubBuilder(
             accessorFlags,
             ACCESSOR_FLAGS,
             additionalModifiers = emptyList(),
-            mustUseReturnValueFlag = null,
+            returnValueStatus = null,
         )
 
         if (annotations.isNotEmpty()) {
@@ -548,8 +595,14 @@ private class ConstructorClsStubBuilder(
     override val returnType: ProtoBuf.Type?
         get() = null
 
+    override val contextParameters: List<ProtoBuf.ValueParameter>
+        get() = emptyList()
+
     override val contextReceiverTypes: List<ProtoBuf.Type>
         get() = emptyList()
+
+    override val callableProto: MessageLite
+        get() = constructorProto
 
     override fun createValueParameterList() {
         typeStubBuilder.createValueParameterListStub(callableStub, constructorProto, constructorProto.valueParameterList, protoContainer)
@@ -560,7 +613,7 @@ private class ConstructorClsStubBuilder(
         val modifierListStubImpl = createModifierListStubForCallableDeclaration(
             flags = flags,
             flagsToTranslate = listOf(VISIBILITY),
-            mustUseReturnValueFlag = Flags.HAS_MUST_USE_RETURN_VALUE_CTOR,
+            returnValueStatus = Flags.RETURN_VALUE_STATUS_CTOR,
         )
 
         // If constructor is marked as having no annotations, we don't create stubs for it

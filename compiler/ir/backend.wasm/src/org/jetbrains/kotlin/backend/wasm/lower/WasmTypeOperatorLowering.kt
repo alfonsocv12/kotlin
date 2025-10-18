@@ -16,6 +16,7 @@ import org.jetbrains.kotlin.backend.wasm.WasmBackendContext
 import org.jetbrains.kotlin.backend.wasm.instanceCheckForExternalClass
 import org.jetbrains.kotlin.backend.wasm.ir2wasm.getRuntimeClass
 import org.jetbrains.kotlin.backend.wasm.ir2wasm.isExternalType
+import org.jetbrains.kotlin.backend.wasm.jsFunctionForExternalAdapterFunction
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.builders.*
@@ -28,6 +29,7 @@ import org.jetbrains.kotlin.ir.types.*
 import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.ir.util.isNullable
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
+import org.jetbrains.kotlin.name.FqName
 
 
 class WasmTypeOperatorLowering(val context: WasmBackendContext) : FileLoweringPass {
@@ -284,7 +286,7 @@ class WasmBaseTypeOperatorTransformer(val context: WasmBackendContext) : IrEleme
 
     private fun lowerCast(
         expression: IrTypeOperatorCall,
-        isSafe: Boolean
+        isSafe: Boolean,
     ): IrExpression {
         val toType = expression.typeOperand
         val fromType = expression.argument.type
@@ -318,12 +320,39 @@ class WasmBaseTypeOperatorTransformer(val context: WasmBackendContext) : IrEleme
         }
     }
 
-    private fun lowerImplicitCast(expression: IrTypeOperatorCall): IrExpression =
-        narrowType(
-            fromType = expression.argument.type,
-            toType = expression.typeOperand,
-            value = expression.argument
-        )
+    private fun shouldGenerateKotlinCast(expression: IrExpression, toType: IrType): Boolean {
+        if (toType.isNullableAny()) return false
+        if (toType.isTypeParameter()) return false
+
+        val argumentType = when (expression) {
+            is IrCall -> {
+                val function = expression.symbol.owner
+
+                val packageFragment = function.getPackageFragment()
+                if (context.getExcludedPackageFragment(packageFragment.packageFqName) == packageFragment) return false
+
+                function.returnType
+            }
+            is IrGetField -> expression.symbol.owner.type
+            else -> expression.type
+        }
+        return argumentType.isTypeParameter()
+    }
+
+    private fun lowerImplicitCast(expression: IrTypeOperatorCall): IrExpression {
+        return if (shouldGenerateKotlinCast(expression.argument, expression.typeOperand)) {
+            lowerCast(
+                expression = expression,
+                isSafe = false
+            )
+        } else {
+            narrowType(
+                fromType = expression.argument.type,
+                toType = expression.typeOperand,
+                value = expression.argument
+            )
+        }
+    }
 
     private fun generateTypeCheckWithTypeParameter(argument: IrExpression, toType: IrType): IrExpression {
         val typeParameter = toType.classifierOrNull?.owner as? IrTypeParameter
@@ -376,8 +405,14 @@ class WasmBaseTypeOperatorTransformer(val context: WasmBackendContext) : IrEleme
 
     private fun generateIsExternalClass(argument: IrExpression, klass: IrClass): IrExpression {
         val instanceCheckFunction = klass.instanceCheckForExternalClass!!
-        return builder.irCall(instanceCheckFunction).also {
-            it.arguments[0] = narrowType(argument.type, context.irBuiltIns.anyType, argument) //TODO("Why we need it?)
+        if (isExternalType(argument.type) && instanceCheckFunction.jsFunctionForExternalAdapterFunction != null) {
+            return builder.irCall(instanceCheckFunction.jsFunctionForExternalAdapterFunction!!).also {
+                it.arguments[0] = argument
+            }
+        } else {
+            return builder.irCall(instanceCheckFunction).also {
+                it.arguments[0] = narrowType(argument.type, context.irBuiltIns.anyType, argument) //TODO("Why we need it?)
+            }
         }
     }
 }

@@ -363,12 +363,12 @@ abstract class FirVisitorVoid : FirVisitor<Unit, Nothing?>() {
         visitElement(integerLiteralOperatorCall)
     }
 
-    final override fun visitArrayLiteral(arrayLiteral: FirArrayLiteral, data: Nothing?) {
-        visitArrayLiteral(arrayLiteral)
+    final override fun visitCollectionLiteral(collectionLiteral: FirCollectionLiteral, data: Nothing?) {
+        visitCollectionLiteral(collectionLiteral)
     }
 
-    open fun visitArrayLiteral(arrayLiteral: FirArrayLiteral) {
-        visitElement(arrayLiteral)
+    open fun visitCollectionLiteral(collectionLiteral: FirCollectionLiteral) {
+        visitElement(collectionLiteral)
     }
 
     final override fun visitCheckNotNullCall(checkNotNullCall: FirCheckNotNullCall, data: Nothing?) {
@@ -1011,6 +1011,14 @@ abstract class FirVisitorVoid : FirVisitor<Unit, Nothing?>() {
         visitElement(resolvedNamedReference)
     }
 
+    final override fun visitPropertyWithExplicitBackingFieldResolvedNamedReference(propertyWithExplicitBackingFieldResolvedNamedReference: FirPropertyWithExplicitBackingFieldResolvedNamedReference, data: Nothing?) {
+        visitPropertyWithExplicitBackingFieldResolvedNamedReference(propertyWithExplicitBackingFieldResolvedNamedReference)
+    }
+
+    open fun visitPropertyWithExplicitBackingFieldResolvedNamedReference(propertyWithExplicitBackingFieldResolvedNamedReference: FirPropertyWithExplicitBackingFieldResolvedNamedReference) {
+        visitElement(propertyWithExplicitBackingFieldResolvedNamedReference)
+    }
+
     final override fun visitResolvedCallableReference(resolvedCallableReference: FirResolvedCallableReference, data: Nothing?) {
         visitResolvedCallableReference(resolvedCallableReference)
     }
@@ -1265,6 +1273,14 @@ abstract class FirVisitorVoid : FirVisitor<Unit, Nothing?>() {
 
     open fun visitLegacyRawContractDescription(legacyRawContractDescription: FirLegacyRawContractDescription) {
         visitElement(legacyRawContractDescription)
+    }
+
+    final override fun visitLazyContractDescription(lazyContractDescription: FirLazyContractDescription, data: Nothing?) {
+        visitLazyContractDescription(lazyContractDescription)
+    }
+
+    open fun visitLazyContractDescription(lazyContractDescription: FirLazyContractDescription) {
+        visitElement(lazyContractDescription)
     }
 
     final override fun visitErrorContractDescription(errorContractDescription: FirErrorContractDescription, data: Nothing?) {

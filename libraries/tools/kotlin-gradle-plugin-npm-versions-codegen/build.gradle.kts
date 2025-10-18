@@ -12,6 +12,10 @@ dependencies {
     implementation(libs.gson)
     implementation("org.apache.velocity:velocity-engine-core:2.3")
     implementation(libs.kotlinx.serialization.core)
+
+    constraints {
+        api(libs.apache.commons.lang)
+    }
 }
 
 node {
@@ -58,7 +62,7 @@ val allLocationsForLockFiles = allLocationsForPackageJsonFile +
         mainGradlePluginLocationForLockFiles
 
 val npmProjectSetup = project.layout.buildDirectory.map { it.dir("npm-project-installed") }
-val setupNpmProject by tasks.registering(Copy::class) {
+val setupNpmProject by tasks.registering(Sync::class) {
     dependsOn(generateNpmVersions)
     from(npmProjectDefault)
     into(npmProjectSetup)
@@ -71,7 +75,7 @@ val npmInstallDeps by tasks.registering(NpmTask::class) {
 }
 
 val yarnProjectSetup = project.layout.buildDirectory.map { it.dir("yarn-project-installed") }
-val setupYarnProject by tasks.registering(Copy::class) {
+val setupYarnProject by tasks.registering(Sync::class) {
     dependsOn(generateNpmVersions)
     from(npmProjectDefault)
     into(yarnProjectSetup)

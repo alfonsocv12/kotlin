@@ -8,8 +8,8 @@ package org.jetbrains.kotlin.incremental
 import org.jetbrains.kotlin.build.GeneratedFile
 import org.jetbrains.kotlin.build.GeneratedJvmClass
 import org.jetbrains.kotlin.build.report.BuildReporter
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildPerformanceMetric
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildTime
+import org.jetbrains.kotlin.build.report.metrics.BuildPerformanceMetric
+import org.jetbrains.kotlin.build.report.metrics.BuildTimeMetric
 import org.jetbrains.kotlin.build.report.reportPerformanceData
 import org.jetbrains.kotlin.cli.common.ExitCode
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments
@@ -19,6 +19,7 @@ import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
 import org.jetbrains.kotlin.config.Services
 import org.jetbrains.kotlin.incremental.DifferenceCalculatorForPackageFacade.Companion.getVisibleTypeAliasFqNames
 import org.jetbrains.kotlin.incremental.components.ExpectActualTracker
+import org.jetbrains.kotlin.incremental.components.ICFileMappingTracker
 import org.jetbrains.kotlin.incremental.components.LookupTracker
 import org.jetbrains.kotlin.incremental.javaInterop.JavaInteropCoordinator
 import org.jetbrains.kotlin.load.java.JavaClassesTracker
@@ -38,7 +39,7 @@ import java.io.File
  */
 abstract class IncrementalJvmCompilerRunnerBase(
     workingDir: File,
-    reporter: BuildReporter<GradleBuildTime, GradleBuildPerformanceMetric>,
+    reporter: BuildReporter<BuildTimeMetric, BuildPerformanceMetric>,
     buildHistoryFile: File?, // part of build history implementation is in abstract runner, so this stays
     outputDirs: Collection<File>?,
     kotlinSourceFilesExtensions: Set<String>,
@@ -137,11 +138,12 @@ abstract class IncrementalJvmCompilerRunnerBase(
         args: K2JVMCompilerArguments,
         lookupTracker: LookupTracker,
         expectActualTracker: ExpectActualTracker,
+        fileMappingTracker: ICFileMappingTracker,
         caches: IncrementalJvmCachesManager,
         dirtySources: Set<File>,
         isIncremental: Boolean
     ): Services.Builder =
-        super.makeServices(args, lookupTracker, expectActualTracker, caches, dirtySources, isIncremental).apply {
+        super.makeServices(args, lookupTracker, expectActualTracker, fileMappingTracker, caches, dirtySources, isIncremental).apply {
             val moduleName = requireNotNull(args.moduleName) { "'moduleName' is null!" }
             val targetId = TargetId(moduleName, "java-production")
             val targetToCache = mapOf(targetId to caches.platformCache)

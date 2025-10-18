@@ -14,6 +14,10 @@ object CommonExpressionCheckers : ExpressionCheckers() {
         FirOptInAnnotationCallChecker,
     )
 
+    override val annotationCheckers: Set<FirAnnotationChecker> = setOf(
+        FirDslMarkerUseSiteChecker,
+    )
+
     override val basicExpressionCheckers: Set<FirBasicExpressionChecker> = setOf(
         FirUnderscoreChecker,
         FirExpressionAnnotationChecker,
@@ -24,6 +28,7 @@ object CommonExpressionCheckers : ExpressionCheckers() {
         FirAnnotatedBinaryExpressionChecker,
         FirExpressionWithErrorTypeChecker,
         FirInlineBodyResolvableExpressionChecker,
+        ArrayEqualityCanBeReplacedWithContentEquals,
     )
 
     override val throwExpressionCheckers: Set<FirThrowExpressionChecker> = setOf(
@@ -38,7 +43,7 @@ object CommonExpressionCheckers : ExpressionCheckers() {
         FirProjectionsOnNonClassTypeArgumentChecker,
         FirDataClassCopyUsageWillBecomeInaccessibleChecker,
         FirIncompatibleProjectionsOnTypeArgumentChecker,
-        FirUpperBoundViolatedExpressionChecker,
+        FirUpperBoundViolatedQualifiedAccessExpressionChecker,
         FirTypeArgumentsNotAllowedExpressionChecker,
         FirTypeParameterInQualifiedAccessChecker,
         FirSealedClassConstructorCallChecker,
@@ -53,7 +58,7 @@ object CommonExpressionCheckers : ExpressionCheckers() {
         FirArrayOfNothingQualifierChecker,
         FirPrivateToThisAccessChecker,
         FirContextParameterInCalledSignatureChecker,
-        FirInlineExposedLessVisibleTypeQualifierAccessChecker,
+        FirInlineExposedLessVisibleTypeQualifiedAccessChecker,
     )
 
     override val callCheckers: Set<FirCallChecker> = setOf(
@@ -76,6 +81,8 @@ object CommonExpressionCheckers : ExpressionCheckers() {
         FirCommonAtomicArrayToPrimitiveCallChecker,
         FirGenericQualifierOnConstructorCallChecker,
         FirVarargWithNonTrivialUpperBoundInferredToNothingChecker,
+        PlatformClassMappedToKotlinConstructorCallChecker,
+        RedundantCallOfConversionMethodChecker,
     )
 
     override val propertyAccessExpressionCheckers: Set<FirPropertyAccessExpressionChecker> = setOf(
@@ -150,6 +157,7 @@ object CommonExpressionCheckers : ExpressionCheckers() {
 
     override val typeOperatorCallCheckers: Set<FirTypeOperatorCallChecker> = setOf(
         FirCastOperatorsChecker,
+        FirContextSensitiveResolutionAmbiguityCheckerForTypeOperators,
     )
 
     override val resolvedQualifierCheckers: Set<FirResolvedQualifierChecker> = setOf(
@@ -166,9 +174,10 @@ object CommonExpressionCheckers : ExpressionCheckers() {
 
     override val equalityOperatorCallCheckers: Set<FirEqualityOperatorCallChecker> = setOf(
         FirEqualityCompatibilityChecker,
+        FirContextSensitiveResolutionAmbiguityCheckerForEqualities,
     )
 
-    override val arrayLiteralCheckers: Set<FirArrayLiteralChecker> = setOf(
+    override val collectionLiteralCheckers: Set<FirCollectionLiteralChecker> = setOf(
         FirUnsupportedArrayLiteralChecker
     )
 
@@ -188,5 +197,9 @@ object CommonExpressionCheckers : ExpressionCheckers() {
 
     override val literalExpressionCheckers: Set<FirLiteralExpressionChecker> = setOf(
         FirMultiDollarInterpolationCheckerLiteral,
+    )
+
+    override val thisReceiverExpressionCheckers: Set<FirThisReceiverExpressionChecker> = setOf(
+        FirInlineExposedLessVisibleThisReceiverChecker
     )
 }

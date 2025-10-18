@@ -8,6 +8,7 @@ import org.jetbrains.kotlin.gradle.plugin.konan.tasks.KonanInteropTask
 import org.jetbrains.kotlin.PlatformInfo
 import org.jetbrains.kotlin.konan.target.*
 import org.jetbrains.kotlin.konan.util.*
+import org.jetbrains.kotlin.nativeDistribution.nativeBootstrapDistribution
 import org.jetbrains.kotlin.nativeDistribution.nativeDistribution
 import org.jetbrains.kotlin.platformLibs.*
 import org.jetbrains.kotlin.platformManager
@@ -73,9 +74,14 @@ enabledTargets(platformManager).forEach { target ->
 
             updateDefFileTasksPerFamily[target.family]?.let { dependsOn(it) }
 
-            // Requires Native distribution with compiler JARs and stdlib klib.
-            this.compilerDistribution.set(nativeDistribution)
-            dependsOn(":kotlin-native:distStdlib")
+            if (kotlinBuildProperties.buildPlatformLibsByBootstrapCompiler) {
+                this.compilerDistribution.set(nativeBootstrapDistribution)
+            } else {
+                // Requires Native distribution with compiler JARs and stdlib klib.
+                this.compilerDistribution.set(nativeDistribution)
+                dependsOn(":kotlin-native:distCompiler")
+                dependsOn(":kotlin-native:distStdlib")
+            }
 
             this.target.set(targetName)
             this.outputDirectory.set(
@@ -126,6 +132,8 @@ enabledTargets(platformManager).forEach { target ->
                 // Requires Native distribution with stdlib klib and its cache for `targetName`.
                 this.compilerDistribution.set(dist)
                 dependsOn(":kotlin-native:${targetName}CrossDist")
+                // Make sure the cache clean-up has happened, so this task can safely write into the shared cache folder
+                mustRunAfter(":kotlin-native:distInvalidateStaleCaches")
                 inputs.dir(dist.map { it.stdlibCache(targetName) }) // manually depend on the contents of stdlib cache
 
                 // Also, all the depended upon platform libs must have installed their klibs and caches into the native distribution above.

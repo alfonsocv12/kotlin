@@ -6,17 +6,15 @@
 package org.jetbrains.kotlin.backend.wasm
 
 import org.jetbrains.kotlin.backend.common.LoweringContext
-import org.jetbrains.kotlin.backend.common.ir.Symbols.Companion.isTypeOfIntrinsic
+import org.jetbrains.kotlin.backend.common.ir.PreSerializationSymbols
 import org.jetbrains.kotlin.backend.common.lower.*
 import org.jetbrains.kotlin.backend.common.lower.coroutines.AddContinuationToNonLocalSuspendFunctionsLowering
 import org.jetbrains.kotlin.backend.common.lower.inline.LocalClassesInInlineLambdasLowering
 import org.jetbrains.kotlin.backend.common.lower.loops.ForLoopsLowering
 import org.jetbrains.kotlin.backend.common.lower.optimizations.PropertyAccessorInlineLowering
 import org.jetbrains.kotlin.backend.common.phaser.*
-import org.jetbrains.kotlin.backend.common.lower.DelegatedPropertyOptimizationLowering
 import org.jetbrains.kotlin.backend.wasm.lower.*
 import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.config.KlibConfigurationKeys
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.config.phaser.CompilerPhase
@@ -36,7 +34,7 @@ private fun List<CompilerPhase<WasmBackendContext, IrModuleFragment, IrModuleFra
     reduce { acc, lowering -> acc.then(lowering) }
 
 private val validateIrBeforeLowering = makeIrModulePhase(
-    ::IrValidationBeforeLoweringPhase,
+    ::KlibIrValidationBeforeLoweringPhase,
     name = "ValidateIrBeforeLowering",
 )
 
@@ -55,26 +53,18 @@ private val validateIrAfterInliningOnlyPrivateFunctionsPhase = makeIrModulePhase
 
 private val validateIrAfterInliningAllFunctionsPhase = makeIrModulePhase(
     { context: WasmBackendContext ->
-        IrValidationAfterInliningAllFunctionsPhase(
+        IrValidationAfterInliningAllFunctionsOnTheSecondStagePhase(
             context,
-            checkInlineFunctionCallSites = { inlineFunctionUseSite ->
+            checkInlineFunctionCallSites = check@{ inlineFunctionUseSite ->
                 // No inline function call sites should remain at this stage.
                 val inlineFunction = inlineFunctionUseSite.symbol.owner
-                when {
-                    // TODO: remove this condition after the fix of KT-70361:
-                    isTypeOfIntrinsic(inlineFunction.symbol) -> true // temporarily permitted
-
-                    else -> false // forbidden
-                }
+                // it's fine to have typeOf<T>, it would be ignored by inliner and handled on the second stage of compilation
+                if (PreSerializationSymbols.isTypeOfIntrinsic(inlineFunction.symbol)) return@check true
+                return@check inlineFunction.body == null
             }
         )
     },
     name = "IrValidationAfterInliningAllFunctionsPhase",
-)
-
-private val dumpSyntheticAccessorsPhase = makeIrModulePhase<WasmBackendContext>(
-    ::DumpSyntheticAccessors,
-    name = "DumpSyntheticAccessorsPhase",
 )
 
 private val validateIrAfterLowering = makeIrModulePhase(
@@ -298,13 +288,18 @@ private val callableReferencePhase = makeIrModulePhase(
     name = "WasmCallableReferenceLowering",
 )
 
+private val inventNamesForLocalFunctionsPhase = makeIrModulePhase<WasmBackendContext>(
+    { KlibInventNamesForLocalFunctions() },
+    name = "InventNamesForLocalFunctions",
+)
+
 private val singleAbstractMethodPhase = makeIrModulePhase(
     ::JsSingleAbstractMethodLowering,
     name = "SingleAbstractMethod",
 )
 
 private val localDelegatedPropertiesLoweringPhase = makeIrModulePhase<WasmBackendContext>(
-    { LocalDelegatedPropertiesLowering() },
+    ::LocalDelegatedPropertiesLowering,
     name = "LocalDelegatedPropertiesLowering",
 )
 
@@ -314,16 +309,16 @@ private val localDeclarationsLoweringPhase = makeIrModulePhase(
     prerequisite = setOf(sharedVariablesLoweringPhase, localDelegatedPropertiesLoweringPhase)
 )
 
-private val localClassExtractionPhase = makeIrModulePhase(
-    ::LocalClassPopupLowering,
-    name = "LocalClassExtractionPhase",
+private val localDeclarationExtractionPhase = makeIrModulePhase(
+    ::LocalDeclarationPopupLowering,
+    name = "LocalDeclarationExtractionPhase",
     prerequisite = setOf(localDeclarationsLoweringPhase)
 )
 
 private val staticCallableReferenceLoweringPhase = makeIrModulePhase(
     ::WasmStaticCallableReferenceLowering,
     name = "WasmStaticCallableReferenceLowering",
-    prerequisite = setOf(callableReferencePhase, localClassExtractionPhase)
+    prerequisite = setOf(callableReferencePhase, localDeclarationExtractionPhase)
 )
 
 private val innerClassesLoweringPhase = makeIrModulePhase<WasmBackendContext>(
@@ -412,7 +407,7 @@ private val delegateToPrimaryConstructorLoweringPhase = makeIrModulePhase(
 private val initializersLoweringPhase = makeIrModulePhase(
     ::InitializersLowering,
     name = "InitializersLowering",
-    prerequisite = setOf(primaryConstructorLoweringPhase, localClassExtractionPhase)
+    prerequisite = setOf(primaryConstructorLoweringPhase, localDeclarationExtractionPhase)
 )
 
 private val initializersCleanupLoweringPhase = makeIrModulePhase(
@@ -426,15 +421,10 @@ private val excludeDeclarationsFromCodegenPhase = makeIrModulePhase(
     name = "ExcludeDeclarationsFromCodegen",
 )
 
-private val unhandledExceptionLowering = makeIrModulePhase(
-    ::UnhandledExceptionLowering,
-    name = "UnhandledExceptionLowering",
-)
-
 private val tryCatchCanonicalization = makeIrModulePhase(
     ::TryCatchCanonicalization,
     name = "TryCatchCanonicalization",
-    prerequisite = setOf(inlineAllFunctionsPhase, unhandledExceptionLowering)
+    prerequisite = setOf(inlineAllFunctionsPhase)
 )
 
 private val bridgesConstructionPhase = makeIrModulePhase(
@@ -462,6 +452,11 @@ private val staticMembersLoweringPhase = makeIrModulePhase(
     name = "StaticMembersLowering",
 )
 
+private val fieldInitializersLowering = makeIrModulePhase(
+    ::FieldInitializersLowering,
+    name = "FieldInitializersLowering",
+)
+
 private val classReferenceLoweringPhase = makeIrModulePhase(
     ::WasmClassReferenceLowering,
     name = "WasmClassReferenceLowering",
@@ -485,7 +480,7 @@ private val builtInsLoweringPhase = makeIrModulePhase(
 private val associatedObjectsLowering = makeIrModulePhase(
     ::AssociatedObjectsLowering,
     name = "AssociatedObjectsLowering",
-    prerequisite = setOf(localClassExtractionPhase)
+    prerequisite = setOf(localDeclarationExtractionPhase)
 )
 
 private val objectDeclarationLoweringPhase = makeIrModulePhase(
@@ -597,12 +592,7 @@ val constEvaluationPhase = makeIrModulePhase(
 fun wasmLoweringsOfTheFirstPhase(
     languageVersionSettings: LanguageVersionSettings,
 ): List<NamedCompilerPhase<WasmPreSerializationLoweringContext, IrModuleFragment, IrModuleFragment>> = buildList {
-    // TODO: after the fix of KT-76260 this condition should be simplified to just the check of `IrRichCallableReferencesInKlibs` feature
-    val supportsIrInliner = languageVersionSettings.supportsFeature(LanguageFeature.IrInlinerBeforeKlibSerialization)
-    val enableRichReferences = languageVersionSettings.supportsFeature(LanguageFeature.IrRichCallableReferencesInKlibs) ||
-            supportsIrInliner
-
-    if (enableRichReferences) {
+    if (languageVersionSettings.supportsFeature(LanguageFeature.IrRichCallableReferencesInKlibs)) {
         this += upgradeCallableReferences
     }
     this += loweringsOfTheFirstPhase(JsManglerIr, languageVersionSettings)
@@ -610,7 +600,7 @@ fun wasmLoweringsOfTheFirstPhase(
 
 fun getWasmLowerings(
     configuration: CompilerConfiguration,
-    isIncremental: Boolean,
+    disableCrossFileOptimisations: Boolean,
 ): List<NamedCompilerPhase<WasmBackendContext, IrModuleFragment, IrModuleFragment>> {
     val isDebugFriendlyCompilation = configuration.getBoolean(WasmConfigurationKeys.WASM_FORCE_DEBUG_FRIENDLY_COMPILATION)
 
@@ -629,7 +619,6 @@ fun getWasmLowerings(
         // just because it goes so in Native.
         validateIrAfterInliningOnlyPrivateFunctionsPhase,
         inlineAllFunctionsPhase,
-        dumpSyntheticAccessorsPhase.takeIf { configuration[KlibConfigurationKeys.SYNTHETIC_ACCESSORS_DUMP_DIR] != null },
         validateIrAfterInliningAllFunctionsPhase,
         // END: Common Native/JS/Wasm prefix.
 
@@ -664,8 +653,9 @@ fun getWasmLowerings(
 
         singleAbstractMethodPhase,
         localDelegatedPropertiesLoweringPhase,
+        inventNamesForLocalFunctionsPhase,
         localDeclarationsLoweringPhase,
-        localClassExtractionPhase,
+        localDeclarationExtractionPhase,
         staticCallableReferenceLoweringPhase,
         innerClassesLoweringPhase,
         innerClassesMemberBodyLoweringPhase,
@@ -696,7 +686,6 @@ fun getWasmLowerings(
 
         invokeOnExportedFunctionExitLowering,
 
-        unhandledExceptionLowering,
         tryCatchCanonicalization,
 
         forLoopsLoweringPhase,
@@ -706,7 +695,7 @@ fun getWasmLowerings(
         // This doesn't work with IC as of now for accessors within inline functions because
         //  there is no special case for Wasm in the computation of inline function transitive
         //  hashes the same way it's being done with the calculation of symbol hashes.
-        propertyAccessorInlinerLoweringPhase.takeIf { !isIncremental && !isDebugFriendlyCompilation },
+        propertyAccessorInlinerLoweringPhase.takeIf { !disableCrossFileOptimisations && !isDebugFriendlyCompilation },
 
         stringConcatenationLowering,
 
@@ -737,7 +726,9 @@ fun getWasmLowerings(
         autoboxingTransformerPhase,
 
         objectUsageLoweringPhase,
-        purifyObjectInstanceGettersLoweringPhase.takeIf { !isIncremental && !isDebugFriendlyCompilation },
+        purifyObjectInstanceGettersLoweringPhase.takeIf { !disableCrossFileOptimisations && !isDebugFriendlyCompilation },
+
+        fieldInitializersLowering,
 
         explicitlyCastExternalTypesPhase,
         typeOperatorLoweringPhase,
@@ -750,7 +741,7 @@ fun getWasmLowerings(
         staticMembersLoweringPhase,
 
         // This is applied for non-IC mode, which is a better optimization than inlineUnitInstanceGettersLowering
-        inlineObjectsWithPureInitializationLoweringPhase.takeIf { !isIncremental && !isDebugFriendlyCompilation },
+        inlineObjectsWithPureInitializationLoweringPhase.takeIf { !disableCrossFileOptimisations && !isDebugFriendlyCompilation },
 
         whenBranchOptimiserLoweringPhase,
         validateIrAfterLowering,

@@ -3,8 +3,11 @@
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
+@file:Suppress("DEPRECATION")
+
 package org.jetbrains.kotlin.buildtools.api
 
+import org.jetbrains.kotlin.buildtools.api.CompilationService.Companion.loadImplementation
 import org.jetbrains.kotlin.buildtools.api.internal.KotlinCompilerVersion
 import org.jetbrains.kotlin.buildtools.api.internal.wrappers.PreKotlin220Wrapper
 import org.jetbrains.kotlin.buildtools.api.jvm.ClassSnapshotGranularity
@@ -25,6 +28,7 @@ import java.io.File
  *
  * This interface is not intended to be implemented by the API consumers. An instance of [CompilationService] is expected to be obtained from [loadImplementation].
  */
+@Deprecated("Use the new BTA API with entry points in KotlinToolchain instead")
 @ExperimentalBuildToolsApi
 public interface CompilationService {
     /**
@@ -39,7 +43,7 @@ public interface CompilationService {
     public fun calculateClasspathSnapshot(
         classpathEntry: File,
         granularity: ClassSnapshotGranularity,
-        parseInlinedLocalClasses: Boolean
+        parseInlinedLocalClasses: Boolean,
     ): ClasspathEntrySnapshot
 
     /**
@@ -54,7 +58,7 @@ public interface CompilationService {
      */
     public fun calculateClasspathSnapshot(
         classpathEntry: File,
-        granularity: ClassSnapshotGranularity
+        granularity: ClassSnapshotGranularity,
     ): ClasspathEntrySnapshot
 
     /**

@@ -19,20 +19,11 @@ dependencies {
 
     compileOnly(intellijCore())
     compileOnly(libs.guava)
-
-    testCompileOnly(intellijCore())
-    testRuntimeOnly(intellijCore())
 }
 
 sourceSets {
-    "main" {
-        projectDefault()
-    }
+    "main" { projectDefault() }
     "test" { none() }
-}
-
-projectTest(parallel = true) {
-    workingDir = rootDir
 }
 
 generatedDiagnosticContainersAndCheckerComponents()

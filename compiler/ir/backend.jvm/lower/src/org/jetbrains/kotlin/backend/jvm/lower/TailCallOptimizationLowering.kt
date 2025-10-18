@@ -6,7 +6,6 @@
 package org.jetbrains.kotlin.backend.jvm.lower
 
 import org.jetbrains.kotlin.backend.common.FileLoweringPass
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.declarations.IrFile
@@ -16,7 +15,6 @@ import org.jetbrains.kotlin.ir.expressions.impl.IrReturnImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrTypeOperatorCallImpl
 import org.jetbrains.kotlin.ir.types.isUnit
 import org.jetbrains.kotlin.ir.util.fqNameWhenAvailable
-import org.jetbrains.kotlin.ir.util.isFunctionInlining
 import org.jetbrains.kotlin.ir.util.isSuspend
 import org.jetbrains.kotlin.ir.util.parentAsClass
 import org.jetbrains.kotlin.ir.visitors.IrTransformer
@@ -28,19 +26,11 @@ import org.jetbrains.kotlin.name.Name
  *
  * This is needed so that the codegen would be able to generate code which is understandable by the old backend's tail-call optimizer.
  */
-@PhaseDescription(name = "TailCallOptimization")
 internal class TailCallOptimizationLowering(private val context: JvmBackendContext) : FileLoweringPass {
     override fun lower(irFile: IrFile) {
         irFile.transformChildren(object : IrTransformer<TailCallOptimizationData?>() {
             override fun visitSimpleFunction(declaration: IrSimpleFunction, data: TailCallOptimizationData?) =
                 super.visitSimpleFunction(declaration, if (declaration.isSuspend) TailCallOptimizationData(declaration) else null)
-
-            override fun visitInlinedFunctionBlock(inlinedBlock: IrInlinedFunctionBlock, data: TailCallOptimizationData?): IrExpression {
-                if (inlinedBlock.isFunctionInlining()) {
-                    return inlinedBlock
-                }
-                return super.visitInlinedFunctionBlock(inlinedBlock, data)
-            }
 
             override fun visitCall(expression: IrCall, data: TailCallOptimizationData?): IrExpression {
                 val transformed = super.visitCall(expression, data) as IrExpression
@@ -66,8 +56,7 @@ private class TailCallOptimizationData(val function: IrSimpleFunction) {
         when {
             this is IrCall && isSuspend && !immediateReturn && (returnsUnit || type == function.returnType) ->
                 tailCalls += this
-            // We want to avoid tail call optimization in inlined block because it ruins line number generation
-            this is IrBlock && !(this is IrInlinedFunctionBlock && this.isFunctionInlining()) ->
+            this is IrBlock ->
                 statements.findTailCall(returnsUnit)?.findCallsOnTailPositionWithoutImmediateReturn()
             this is IrWhen ->
                 branches.forEach { it.result.findCallsOnTailPositionWithoutImmediateReturn() }

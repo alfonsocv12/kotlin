@@ -5,7 +5,6 @@
 
 package org.jetbrains.kotlin.ir.backend.js.lower
 
-import org.jetbrains.kotlin.backend.common.lower.UpgradeCallableReferences.Companion.selectSAMOverriddenFunction
 import org.jetbrains.kotlin.backend.common.lower.createIrBuilder
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
@@ -85,20 +84,20 @@ class TestGenerator(val context: JsCommonBackendContext) {
 
         val function = context.irFactory.buildFun {
             this.name = Name.identifier("$name test fun")
-            this.returnType = if (this@createInvocation == context.suiteFun!!) context.irBuiltIns.unitType else context.irBuiltIns.anyNType
+            this.returnType = if (this@createInvocation == context.symbols.suiteFun!!) context.irBuiltIns.unitType else context.irBuiltIns.anyNType
             this.origin = JsIrBuilder.SYNTHESIZED_DECLARATION
         }
 
         function.parent = parentFunction
         function.body = body
 
-        val refType = context.symbols.functionN(0).typeWith(function.returnType)
+        val refClass = context.symbols.functionN(0)
         val testFunReference = IrRichFunctionReferenceImpl(
             startOffset = UNDEFINED_OFFSET,
             endOffset = UNDEFINED_OFFSET,
-            type = refType,
+            type = refClass.typeWith(function.returnType),
             reflectionTargetSymbol = null,
-            overriddenFunctionSymbol = selectSAMOverriddenFunction(refType),
+            overriddenFunctionSymbol = refClass.owner.selectSAMOverriddenFunction().symbol,
             invokeFunction = function,
             origin = null,
             isRestrictedSuspension = false,
@@ -117,7 +116,7 @@ class TestGenerator(val context: JsCommonBackendContext) {
         if (irClass.modality == Modality.ABSTRACT || irClass.isEffectivelyExternal() || irClass.isExpect) return
 
         val suiteFunBody by lazy(LazyThreadSafetyMode.NONE) {
-            context.suiteFun!!.createInvocation(irClass.name.asString(), parentFunction(), irClass.isIgnored)
+            context.symbols.suiteFun!!.createInvocation(irClass.name.asString(), parentFunction(), irClass.isIgnored)
         }
 
         val beforeFunctions = irClass.declarations.filterIsInstanceAnd<IrSimpleFunction> { it.isBefore }
@@ -161,7 +160,7 @@ class TestGenerator(val context: JsCommonBackendContext) {
         irClass: IrClass,
         parentFunction: IrSimpleFunction,
     ) {
-        val fn = context.testFun!!.createInvocation(testFun.name.asString(), parentFunction, testFun.isIgnored)
+        val fn = context.symbols.testFun!!.createInvocation(testFun.name.asString(), parentFunction, testFun.isIgnored)
         val body = fn.body as IrBlockBody
 
         val exceptionMessage = when {
@@ -237,13 +236,13 @@ class TestGenerator(val context: JsCommonBackendContext) {
                 )
             }
 
-            val refType = context.symbols.functionN(0).typeWith(afterFunction.returnType)
+            val refClass = context.symbols.functionN(0)
             val finallyLambda = IrRichFunctionReferenceImpl(
                 startOffset = UNDEFINED_OFFSET,
                 endOffset = UNDEFINED_OFFSET,
-                type = refType,
+                type = refClass.typeWith(afterFunction.returnType),
                 reflectionTargetSymbol = null,
-                overriddenFunctionSymbol = selectSAMOverriddenFunction(refType),
+                overriddenFunctionSymbol = refClass.owner.selectSAMOverriddenFunction().symbol,
                 invokeFunction = afterFunction,
                 origin = null,
                 isRestrictedSuspension = false,

@@ -103,7 +103,7 @@ class ConstantExpressionEvaluator(
         val argumentsAsVararg = varargElementType != null && !hasSpread(resolvedArgument)
         val constantType = if (argumentsAsVararg) varargElementType else parameterDescriptor.type
         val expectedType = getEffectiveExpectedType(parameterDescriptor, resolvedArgument, languageVersionSettings, trace)
-        val compileTimeConstants = resolveAnnotationValueArguments(resolvedArgument, constantType!!, expectedType, trace)
+        val compileTimeConstants = resolveAnnotationValueArguments(resolvedArgument, constantType, expectedType, trace)
         val constants = compileTimeConstants.map { it.toConstantValue(expectedType) }
 
         if (argumentsAsVararg) {
@@ -164,7 +164,7 @@ class ConstantExpressionEvaluator(
         // array(1, <!>null<!>, 3) - error should be reported on inner expression
         val callArguments = when (argumentExpression) {
             is KtCallExpression -> getArgumentExpressionsForArrayCall(argumentExpression, trace)
-            is KtCollectionLiteralExpression -> getArgumentExpressionsForCollectionLiteralCall(argumentExpression, trace)
+            is KtCollectionLiteralExpression -> getArgumentExpressionsForCollectionLiteral(argumentExpression, trace)
             else -> null
         }
 
@@ -214,7 +214,7 @@ class ConstantExpressionEvaluator(
         return getArgumentExpressionsForArrayLikeCall(resolvedCall)
     }
 
-    private fun getArgumentExpressionsForCollectionLiteralCall(
+    private fun getArgumentExpressionsForCollectionLiteral(
         expression: KtCollectionLiteralExpression,
         trace: BindingTrace
     ): List<KtExpression>? {
@@ -486,7 +486,7 @@ private class ConstantExpressionEvaluatorVisitor(
     }
 
     override fun visitConstantExpression(expression: KtConstantExpression, expectedType: KotlinType?): CompileTimeConstant<*>? {
-        val text = expression.text ?: return null
+        val text = expression.text
 
         val nodeElementType = expression.node.elementType
         if (nodeElementType == KtNodeTypes.NULL) return NullValue().wrap()

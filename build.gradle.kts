@@ -17,7 +17,8 @@ buildscript {
      * Affected Libraries:
      * └── org.apache.commons
      *     ├── commons-compress:* → 1.27.1
-     *     └── commons-io:* → 2.18.0
+     *     ├── commons-io:* → 2.18.0
+     *     └── commons-lang3:* → 3.18.0
      *
      * Mitigated Vulnerabilities:
      * 1. Commons Compress
@@ -28,6 +29,9 @@ buildscript {
      * 2. Commons IO
      *    - CVE-2024-26308: Security vulnerability
      *    - CVE-2023-42503: Input processing risk
+     *
+     * 3. Commons Lang
+     *    - CVE-2025-48924: Uncontrolled Recursion vulnerability
      */
     configurations.all {
         resolutionStrategy.eachDependency {
@@ -39,6 +43,10 @@ buildscript {
             if (requested.group == "commons-io" && requested.name == "commons-io") {
                 useVersion(libs.versions.commons.io.get())
                 because("CVE-2024-26308, CVE-2023-42503")
+            }
+            if (requested.group == "org.apache.commons" && requested.name == "commons-lang3") {
+                useVersion(libs.versions.commons.lang.get())
+                because("CVE-2025-48924")
             }
         }
     }
@@ -64,6 +72,9 @@ plugins {
     `jvm-toolchains`
     alias(libs.plugins.gradle.node) apply false
     id("nodejs-cache-redirector-configuration")
+    id("gradle-plugins-documentation") apply false
+    id("com.autonomousapps.dependency-analysis") version "2.19.0"
+    id("project-tests-convention") apply false
 }
 
 val isTeamcityBuild = project.kotlinBuildProperties.isTeamcityBuild
@@ -111,11 +122,12 @@ rootProject.apply {
 IdeVersionConfigurator.setCurrentIde(project)
 
 if (!project.hasProperty("versions.kotlin-native")) {
-    // BEWARE! Bumping this version doesn't take an immediate effect on TeamCity: KTI-1107
-    extra["versions.kotlin-native"] = if (kotlinBuildProperties.isKotlinNativeEnabled) {
+    extra["versions.kotlin-native"] = if (kotlinBuildProperties.isTeamcityBuild) {
+        kotlinVersion
+    } else if (kotlinBuildProperties.isKotlinNativeEnabled) {
         kotlinBuildProperties.defaultSnapshotVersion
     } else {
-        "2.2.20-dev-5253"
+        "2.3.20-dev-670"
     }
 }
 
@@ -131,7 +143,10 @@ val irCompilerModules = arrayOf(
     ":compiler:ir.actualization",
     ":compiler:ir.interpreter",
     ":compiler:ir.inline",
-    ":wasm:wasm.ir"
+    ":compiler:ir.validation",
+    ":wasm:wasm.ir",
+    ":js:typescript-export-model",
+    ":js:typescript-printer",
 ).also { extra["irCompilerModules"] = it }
 
 val irCompilerModulesForIDE = arrayOf(
@@ -145,6 +160,7 @@ val irCompilerModulesForIDE = arrayOf(
     ":compiler:ir.actualization",
     ":compiler:ir.interpreter",
     ":compiler:ir.inline",
+    ":compiler:ir.validation",
 ).also { extra["irCompilerModulesForIDE"] = it }
 
 val commonCompilerModules = arrayOf(
@@ -177,6 +193,7 @@ val commonCompilerModules = arrayOf(
     ":core:util.runtime",
     ":compiler:frontend.common.jvm",
     ":compiler:frontend.java", // TODO this is fe10 module but some utils used in fir ide now
+    ":analysis:analysis-internal-utils",
     ":analysis:light-classes-base",
     ":analysis:decompiled:decompiler-to-stubs",
     ":analysis:decompiled:decompiler-to-file-stubs",
@@ -190,6 +207,7 @@ val commonCompilerModules = arrayOf(
     ":kotlin-util-klib",
     ":kotlin-util-klib-abi",
     ":native:base",
+    ":native:binary-options",
     ":native:kotlin-native-utils",
     ":compiler:build-tools:kotlin-build-statistics",
     ":compiler:build-tools:kotlin-build-tools-api",
@@ -251,7 +269,6 @@ val fe10CompilerModules = arrayOf(
     ":compiler:backend.js",
     ":compiler:backend.wasm",
     ":kotlin-util-klib-metadata",
-    ":compiler:backend-common",
     ":compiler:backend",
     ":compiler:plugin-api",
     ":compiler:javac-wrapper",
@@ -296,7 +313,6 @@ val projectsUsedInIntelliJKotlinPlugin =
                 ":analysis:analysis-api-standalone:analysis-api-standalone-base",
                 ":analysis:analysis-api-standalone:analysis-api-fir-standalone-base",
                 ":analysis:analysis-api-standalone",
-                ":analysis:analysis-internal-utils",
                 ":analysis:analysis-test-framework",
                 ":analysis:decompiled",
                 ":analysis:kt-references",
@@ -375,7 +391,7 @@ val projectsUsedInIntelliJKotlinPlugin =
             ) +
             arrayOf(
                 ":compiler:ir.serialization.native",
-                ":native:analysis-api-klib-reader",
+                ":libraries:tools:analysis-api-based-klib-reader",
                 ":native:base",
                 ":native:objcexport-header-generator",
                 ":native:objcexport-header-generator-analysis-api",
@@ -491,6 +507,7 @@ extra["compilerArtifactsForIde"] = listOfNotNull(
     ":kotlin-scripting-compiler",
     ":kotlin-scripting-compiler-impl",
     ":plugins:parcelize:parcelize-runtime",
+    ":plugins:jvm-abi-gen",
     ":kotlin-stdlib-common",
     ":kotlin-stdlib",
     ":kotlin-test",
@@ -545,7 +562,6 @@ val gradlePluginProjects = listOf(
     ":kotlin-gradle-plugin-annotations",
     ":kotlin-gradle-plugin-idea",
     ":kotlin-gradle-plugin-idea-proto",
-    ":kotlin-gradle-plugin-model",
     ":kotlin-gradle-plugin-tcs-android",
     ":compose-compiler-gradle-plugin",
     ":kotlin-allopen",
@@ -571,7 +587,9 @@ allprojects {
     if (!project.path.startsWith(":kotlin-ide.")) {
         pluginManager.apply("common-configuration")
     }
-
+    if (!project.path.startsWith(":compiler:build-tools")) {
+        pluginManager.apply("com.autonomousapps.dependency-analysis")
+    }
     if (kotlinBuildProperties.isInIdeaSync) {
         afterEvaluate {
             configurations.all {
@@ -655,6 +673,8 @@ allprojects {
         maven("https://packages.jetbrains.team/maven/p/ij/intellij-dependencies") {
             content {
                 includeGroupByRegex("org\\.jetbrains\\.intellij\\.deps(\\..+)?")
+                includeGroupByRegex("com.intellij.platform.*")
+                includeGroupByRegex("org.jetbrains.jps.*")
                 includeVersion("org.jetbrains.jps", "jps-javac-extension", "7")
                 includeVersion("com.google.protobuf", "protobuf-parent", "3.24.4-jb.2")
                 includeVersion("com.google.protobuf", "protobuf-java", "3.24.4-jb.2")
@@ -721,10 +741,6 @@ val dist = tasks.register("dist") {
     dependsOn(":kotlin-compiler:dist")
 }
 
-val syncMutedTests = tasks.register("syncMutedTests") {
-    dependsOn(":compiler:tests-mutes:tc-integration:run")
-}
-
 tasks.register("createIdeaHomeForTests") {
     val ideaBuildNumberFileForTests = ideaBuildNumberFileForTests()
     val intellijSdkVersion = rootProject.extra["versions.intellijSdk"]
@@ -739,8 +755,14 @@ tasks.register("createIdeaHomeForTests") {
 
 tasks {
     register("compileAll") {
+        val excludedNativePrefixes = listOf(
+            ":native",
+            ":libraries:tools:analysis-api-based-klib-reader:testProject",
+        )
         allprojects
-            .filter { !it.path.startsWith(":native") || kotlinBuildProperties.isKotlinNativeEnabled }
+            .filter {
+                excludedNativePrefixes.none(it.path::startsWith) || kotlinBuildProperties.isKotlinNativeEnabled
+            }
             .forEach {
                 dependsOn(it.tasks.withType<KotlinCompilationTask<*>>())
                 dependsOn(it.tasks.withType<JavaCompile>())
@@ -823,16 +845,15 @@ tasks {
     }
 
     register("wasmCompilerTest") {
-        dependsOn(":wasm:wasm.tests:testK1")
-        dependsOn(":wasm:wasm.tests:diagnosticTest")
+        // KTI-2670: TODO: don't invoke this obsolete task in KTI
+    }
+
+    register("wasmFirCompilerTest") {
+        dependsOn(":wasm:wasm.tests:test")
         // Windows WABT release requires Visual C++ Redistributable
         if (!kotlinBuildProperties.isTeamcityBuild || !org.gradle.internal.os.OperatingSystem.current().isWindows) {
             dependsOn(":wasm:wasm.ir:test")
         }
-    }
-
-    register("wasmFirCompilerTest") {
-        dependsOn(":wasm:wasm.tests:testFir")
     }
 
     // These tests run Native compiler and will be run in many different compilation modes that the compiler supports:
@@ -842,20 +863,26 @@ tasks {
     // ...
     register("nativeCompilerTest") {
         dependsOn(":kotlin-atomicfu-compiler-plugin:nativeTest")
-        dependsOn(":native:analysis-api-klib-reader:check")
+        dependsOn(":libraries:tools:analysis-api-based-klib-reader:check")
         dependsOn(":native:native.tests:test")
         dependsOn(":native:native.tests:cli-tests:check")
         dependsOn(":native:native.tests:codegen-box:check")
         dependsOn(":native:native.tests:driver:check")
-        dependsOn(":native:native.tests:gc-fuzzing-tests:check")
+        dependsOn(":native:native.tests:gc-fuzzing-tests:engine:check")
         dependsOn(":native:native.tests:stress:check")
         dependsOn(":native:native.tests:klib-compatibility:check")
+        dependsOn(":native:native.tests:litmus-tests:check")
+    }
+
+    // Similar to nativeCompilerTest, but should be executed only on macOS host as these tests
+    // technically or semantically depend on Xcode SDK.
+    register("nativeAppleSpecificTests") {
         dependsOn(":native:objcexport-header-generator:check")
-        dependsOn(":native:swift:swift-export-standalone:check")
+        dependsOn(":native:swift:swift-export-embeddable:testCoroutinesITWithEmbeddable")
         dependsOn(":native:swift:swift-export-embeddable:testExternalITWithEmbeddable")
         dependsOn(":native:swift:swift-export-embeddable:testSimpleITWithEmbeddable")
+        dependsOn(":native:swift:swift-export-standalone:check")
         dependsOn(":native:swift:swift-export-ide:test")
-        dependsOn(":native:native.tests:litmus-tests:check")
         dependsOn(":native:swift:sir-light-classes:check")
     }
 
@@ -937,11 +964,12 @@ tasks {
         dependsOn("compilerPluginTest")
         dependsOn(":kotlin-daemon-tests:test")
         dependsOn(":compiler:arguments:test")
+        dependsOn(":compiler:fir:modularized-tests:modelDumpTest")
+        dependsOn(":compiler:multiplatform-parsing:jvmTest")
     }
 
     register("miscTest") {
         dependsOn("coreLibsTest")
-        dependsOn("gradlePluginTest")
         dependsOn("toolsTest")
         dependsOn("examplesTest")
         dependsOn(":kotlin-build-common:test")
@@ -980,12 +1008,13 @@ tasks {
     register("toolsTest") {
         dependsOn(":tools:kotlinp-jvm:test")
         dependsOn(":native:kotlin-klib-commonizer:test")
-        dependsOn(":native:kotlin-klib-commonizer-api:test")
+//        dependsOn(":native:kotlin-klib-commonizer-api:test")
         dependsOn(":kotlin-tooling-core:check")
         dependsOn(":kotlin-tooling-metadata:check")
         dependsOn(":compiler:build-tools:kotlin-build-tools-api:check")
         dependsOn(":compiler:build-tools:kotlin-build-tools-api-tests:check")
         dependsOn(":tools:ide-plugin-dependencies-validator:test")
+        dependsOn(":tools:stats-analyser:test")
     }
 
     register("examplesTest") {
@@ -1097,10 +1126,11 @@ tasks {
         group = "publishing"
         workingDir = rootProject.projectDir.resolve("libraries")
         commandLine = getMvnwCmd() + listOf(
-            "clean", "deploy", "--activate-profiles=noTest",
+            "clean", "deploy", "--activate-profiles=noTest,local-bootstrap",
             "-Dinvoker.skip=true", "-DskipTests",
             "-Ddeploy-snapshot-repo=local",
-            "-Ddeploy-snapshot-url=file://${rootProject.projectDir.resolve("build/repo")}"
+            "-Ddeploy-snapshot-url=file://${rootProject.projectDir.resolve("build/repo")}",
+            "-Dlocal-bootstrap-url=file://${rootProject.projectDir.resolve("build/repo")}",
         )
 
         val jdkToolchain1_8 = getToolchainJdkHomeFor(JdkMajorVersion.JDK_1_8)
@@ -1111,9 +1141,17 @@ tasks {
 
     // 'mvnPublish' is required for local bootstrap
     if (!kotlinBuildProperties.isTeamcityBuild) {
-        register("publish") {
+        val localPublishTask = register("publish") {
             group = "publishing"
-            dependsOn(mvnPublishTask)
+            finalizedBy(mvnPublishTask)
+        }
+
+        subprojects {
+            tasks.configureEach {
+                if (name == "publish") {
+                    localPublishTask.get().dependsOn(this)
+                }
+            }
         }
     }
 

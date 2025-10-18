@@ -177,6 +177,7 @@ abstract class IrBuiltIns {
     abstract val intPlusSymbol: IrSimpleFunctionSymbol
     abstract val intTimesSymbol: IrSimpleFunctionSymbol
     abstract val intXorSymbol: IrSimpleFunctionSymbol
+    abstract val intAndSymbol: IrSimpleFunctionSymbol
 
     abstract val extensionToString: IrSimpleFunctionSymbol
     abstract val memberToString: IrSimpleFunctionSymbol
@@ -195,17 +196,6 @@ abstract class IrBuiltIns {
     abstract fun kSuspendFunctionN(arity: Int): IrClass
 
     abstract fun getKPropertyClass(mutable: Boolean, n: Int): IrClassSymbol
-
-    abstract fun getNonBuiltInFunctionsByExtensionReceiver(
-        name: Name, vararg packageNameSegments: String
-    ): Map<IrClassifierSymbol, IrSimpleFunctionSymbol>
-
-    abstract fun getNonBuiltinFunctionsByReturnType(
-        name: Name, vararg packageNameSegments: String
-    ): Map<IrClassifierSymbol, IrSimpleFunctionSymbol>
-
-    abstract fun getBinaryOperator(name: Name, lhsType: IrType, rhsType: IrType): IrSimpleFunctionSymbol
-    abstract fun getUnaryOperator(name: Name, receiverType: IrType): IrSimpleFunctionSymbol
 
     abstract val operatorsPackageFragment: IrExternalPackageFragment
     abstract val kotlinInternalPackageFragment: IrExternalPackageFragment
@@ -258,12 +248,6 @@ abstract class SymbolFinder {
     abstract fun findProperties(callableId: CallableId): Iterable<IrPropertySymbol>
     abstract fun findClass(classId: ClassId): IrClassSymbol?
 
-    // TODO: replace this with lazy get
-    abstract fun findGetter(property: IrPropertySymbol): IrSimpleFunctionSymbol?
-
-    // TODO: replace this with get by CallableId
-    abstract fun findBuiltInClassMemberFunctions(builtInClass: IrClassSymbol, name: Name): Iterable<IrSimpleFunctionSymbol>
-
     fun findFunctions(name: Name, vararg packageNameSegments: String = arrayOf("kotlin")): Iterable<IrSimpleFunctionSymbol> {
         return findFunctions(CallableId(FqName.fromSegments(listOf(*packageNameSegments)), name))
     }
@@ -283,12 +267,6 @@ abstract class SymbolFinder {
     fun findClass(name: Name, packageFqName: FqName): IrClassSymbol? {
         return findClass(ClassId(packageFqName, name))
     }
-
-    fun topLevelClass(classId: ClassId): IrClassSymbol =
-        findClass(classId.shortClassName, classId.packageFqName) ?: error("No class $classId found")
-
-    fun topLevelClass(packageName: FqName, name: String): IrClassSymbol =
-        findClass(Name.identifier(name), packageName) ?: error("No class ${packageName}.${name} found")
 
     fun topLevelProperty(packageName: FqName, name: String): IrPropertySymbol {
         val elements = findProperties(Name.identifier(name), packageName).toList()
@@ -321,8 +299,4 @@ abstract class SymbolFinder {
     ): IrSimpleFunctionSymbol {
         return topLevelFunction(CallableId(packageName, Name.identifier(name)), condition)
     }
-
-    fun findTopLevelPropertyGetter(packageName: FqName, name: String) =
-        findGetter(topLevelProperty(packageName, name))
-            ?: irError("Cannot find getter for $packageName.$name")
 }

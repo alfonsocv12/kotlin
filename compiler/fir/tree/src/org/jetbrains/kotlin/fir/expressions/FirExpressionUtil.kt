@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.fir.expressions
 
 import org.jetbrains.kotlin.KtSourceElement
 import org.jetbrains.kotlin.fir.FirElement
+import org.jetbrains.kotlin.fir.declarations.FirAnonymousFunction
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirProperty
 import org.jetbrains.kotlin.fir.declarations.FirValueParameter
@@ -123,7 +124,7 @@ fun FirExpression.unwrapAndFlattenArgument(flattenArrays: Boolean): List<FirExpr
 
 private fun FirExpression.unwrapAndFlattenArgumentTo(list: MutableList<FirExpression>, flattenArrays: Boolean) {
     when (val unwrapped = unwrapArgument()) {
-        is FirArrayLiteral, is FirFunctionCall -> {
+        is FirCollectionLiteral, is FirFunctionCall -> {
             if (flattenArrays) {
                 (unwrapped as FirCall).arguments.forEach { it.unwrapAndFlattenArgumentTo(list, flattenArrays) }
             } else {
@@ -204,4 +205,10 @@ inline fun FirFunctionCall.forAllReifiedTypeParameters(block: (ConeKotlinType, F
             block(type, typeArgument)
         }
     }
+}
+
+tailrec fun FirExpression.unwrapAnonymousFunctionExpression(): FirAnonymousFunction? = when (this) {
+    is FirAnonymousFunctionExpression -> anonymousFunction
+    is FirWrappedArgumentExpression -> expression.unwrapAnonymousFunctionExpression()
+    else -> null
 }

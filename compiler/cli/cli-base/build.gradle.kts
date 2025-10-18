@@ -30,10 +30,4 @@ sourceSets {
 optInToExperimentalCompilerApi()
 optInToK1Deprecation()
 
-testsJar {}
-
-projectTest {
-    workingDir = rootDir
-}
-
 generatedConfigurationKeys("CLIConfigurationKeys")

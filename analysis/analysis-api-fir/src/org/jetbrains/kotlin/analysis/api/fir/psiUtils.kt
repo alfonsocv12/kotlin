@@ -12,6 +12,8 @@ import org.jetbrains.kotlin.KtFakeSourceElementKind
 import org.jetbrains.kotlin.KtRealPsiSourceElement
 import org.jetbrains.kotlin.SuspiciousFakeSourceCheck
 import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
+import org.jetbrains.kotlin.analysis.api.diagnostics.KaDiagnosticWithPsi
+import org.jetbrains.kotlin.analysis.api.fir.diagnostics.KT_DIAGNOSTIC_CONVERTER
 import org.jetbrains.kotlin.analysis.api.fir.symbols.KaFirPropertySetterSymbol
 import org.jetbrains.kotlin.analysis.api.fir.symbols.KaFirSymbol
 import org.jetbrains.kotlin.analysis.api.fir.symbols.isTypeAliasedConstructor
@@ -20,6 +22,8 @@ import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolModality
 import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.descriptors.Visibility
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget
+import org.jetbrains.kotlin.diagnostics.KtDiagnostic
+import org.jetbrains.kotlin.diagnostics.KtPsiDiagnostic
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.declarations.FirCallableDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
@@ -31,6 +35,7 @@ import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.psi.psiUtil.containingClassOrObject
 import org.jetbrains.kotlin.psi.psiUtil.getParentOfTypes2
 import org.jetbrains.kotlin.resolve.calls.util.isSingleUnderscore
 import org.jetbrains.kotlin.utils.exceptions.errorWithAttachment
@@ -45,6 +50,7 @@ private val allowedFakeElementKinds = setOf(
     KtFakeSourceElementKind.ImplicitConstructor,
     KtFakeSourceElementKind.ImplicitJavaAnnotationConstructor,
     KtFakeSourceElementKind.SamConstructor,
+    KtFakeSourceElementKind.JavaRecordComponentFunction,
 )
 
 @OptIn(SuspiciousFakeSourceCheck::class)
@@ -83,7 +89,7 @@ fun FirBasedSymbol<*>.findPsi(scope: GlobalSearchScope): PsiElement? {
 internal fun FirDeclaration.findReferencePsi(scope: GlobalSearchScope): PsiElement? {
     return if (
         this is FirCallableDeclaration &&
-        !this.symbol.isTypeAliasedConstructor // typealiased constructors should not be unwrapped 
+        !this.symbol.isTypeAliasedConstructor // typealiased constructors should not be unwrapped
     ) {
         unwrapFakeOverridesOrDelegated().psi
     } else {
@@ -92,13 +98,22 @@ internal fun FirDeclaration.findReferencePsi(scope: GlobalSearchScope): PsiEleme
 }
 
 internal val KtNamedFunction.kaSymbolModality: KaSymbolModality?
-    get() = kaSymbolModalityByModifiers ?: when {
-        isTopLevel || isLocal -> KaSymbolModality.FINAL
+    get() {
+        val modalityByModifiers = kaSymbolModalityByModifiers
+        return when {
+            modalityByModifiers != null -> when {
+                // KT-80178: interface members with no body have implicit ABSTRACT modality
+                modalityByModifiers.isOpenFromInterface && !hasBody() -> KaSymbolModality.ABSTRACT
+                else -> modalityByModifiers
+            }
 
-        // Green code cannot have those modifiers with other modalities
-        hasModifier(KtTokens.INLINE_KEYWORD) || hasModifier(KtTokens.TAILREC_KEYWORD) -> KaSymbolModality.FINAL
+            isTopLevel || isLocal -> KaSymbolModality.FINAL
 
-        else -> null
+            // Green code cannot have those modifiers with other modalities
+            hasModifier(KtTokens.INLINE_KEYWORD) || hasModifier(KtTokens.TAILREC_KEYWORD) -> KaSymbolModality.FINAL
+
+            else -> null
+        }
     }
 
 internal val KtDestructuringDeclarationEntry.entryName: Name
@@ -107,7 +122,7 @@ internal val KtDestructuringDeclarationEntry.entryName: Name
 internal val KtParameter.parameterName: Name
     get() = when {
         destructuringDeclaration != null -> SpecialNames.DESTRUCT
-        isSingleUnderscore -> SpecialNames.UNDERSCORE_FOR_UNUSED_VAR
+        name == "_" -> SpecialNames.UNDERSCORE_FOR_UNUSED_VAR
         else -> nameAsSafeName
     }
 
@@ -124,11 +139,20 @@ internal val KtClassOrObject.kaSymbolModality: KaSymbolModality?
     }
 
 internal val KtProperty.kaSymbolModality: KaSymbolModality?
-    get() = kaSymbolModalityByModifiers ?: when {
+    get() {
+        val modalityByModifiers = kaSymbolModalityByModifiers
+        return when {
+            modalityByModifiers != null -> when {
+                // KT-80178: interface members with no body have implicit ABSTRACT modality
+                modalityByModifiers.isOpenFromInterface && !hasBody() -> KaSymbolModality.ABSTRACT
+                else -> modalityByModifiers
+            }
 
-        // Green code cannot have those modifiers with other modalities
-        hasModifier(KtTokens.CONST_KEYWORD) -> KaSymbolModality.FINAL
-        else -> null
+            // Green code cannot have those modifiers with other modalities
+            hasModifier(KtTokens.CONST_KEYWORD) -> KaSymbolModality.FINAL
+
+            else -> null
+        }
     }
 
 internal val KtDeclaration.kaSymbolModalityByModifiers: KaSymbolModality?
@@ -146,10 +170,17 @@ internal val KtNamedFunction.visibility: Visibility?
         else -> visibilityByModifiers
     }
 
-internal val KtClassOrObject.visibility: Visibility?
-    get() = when {
-        isLocal -> Visibilities.Local
-        else -> visibilityByModifiers
+/**
+ * The compiler forces the class-like declarations to have proper visibility right
+ * away during their constructions and forbids its changes later, so the visibility might be
+ * computed from the PSI directly
+ */
+internal val KtClassLikeDeclaration.visibility: Visibility
+    get() = when (this) {
+        // TODO: KT-80716 replaced with native isLocal check
+        is KtTypeAlias if getClassId() == null -> Visibilities.Local
+        is KtClassOrObject if isLocal -> Visibilities.Local
+        else -> visibilityByModifiers ?: Visibilities.Public
     }
 
 internal val KtProperty.visibility: Visibility?
@@ -208,3 +239,14 @@ internal val KtProperty.hasRegularSetter: Boolean
  */
 internal val KtProperty.hasRegularGetter: Boolean
     get() = hasDelegate() || getter?.hasBody() == true
+
+context(callable: KtCallableDeclaration)
+private val KaSymbolModality.isOpenFromInterface: Boolean
+    get() = this == KaSymbolModality.OPEN && (callable.containingClassOrObject as? KtClass)?.isInterface() == true
+
+context(analysisSession: KaFirSession)
+internal fun KtPsiDiagnostic.asKaDiagnostic(): KaDiagnosticWithPsi<*> = asKaDiagnostic(analysisSession)
+
+internal fun KtPsiDiagnostic.asKaDiagnostic(analysisSession: KaFirSession): KaDiagnosticWithPsi<*> {
+    return KT_DIAGNOSTIC_CONVERTER.convert(analysisSession, this as KtDiagnostic)
+}

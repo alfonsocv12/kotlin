@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -46,11 +46,13 @@ public class KtAnnotationEntry extends KtElementImplStub<KotlinAnnotationEntrySt
     }
 
     @Override
+    @SuppressWarnings("deprecation") // KT-78356
     public KtConstructorCalleeExpression getCalleeExpression() {
         return getStubOrPsiChild(KtStubBasedElementTypes.CONSTRUCTOR_CALLEE);
     }
 
     @Override
+    @SuppressWarnings("deprecation") // KT-78356
     public KtValueArgumentList getValueArgumentList() {
         KotlinAnnotationEntryStub stub = getStub();
         if (stub == null && getGreenStub() != null) {
@@ -64,7 +66,7 @@ public class KtAnnotationEntry extends KtElementImplStub<KotlinAnnotationEntrySt
     @Override
     public List<? extends ValueArgument> getValueArguments() {
         KotlinAnnotationEntryStub stub = getStub();
-        if (stub != null && !stub.hasValueArguments()) {
+        if (stub != null && !stub.getHasValueArguments()) {
             return Collections.<KtValueArgument>emptyList();
         }
 
@@ -108,6 +110,7 @@ public class KtAnnotationEntry extends KtElementImplStub<KotlinAnnotationEntrySt
     }
 
     @Nullable
+    @SuppressWarnings("deprecation") // KT-78356
     public KtAnnotationUseSiteTarget getUseSiteTarget() {
         KtAnnotationUseSiteTarget target = getStubOrPsiChild(KtStubBasedElementTypes.ANNOTATION_TARGET);
 

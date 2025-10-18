@@ -252,10 +252,8 @@ interface TypeSystemInferenceExtensionContext : TypeSystemContext, TypeSystemBui
     @AllowedToUsedOnlyInK1
     fun CapturedTypeMarker.withNotNullProjection(): KotlinTypeMarker
 
-    /**
-     * Only for K2.
-     */
-    fun CapturedTypeMarker.hasRawSuperType(): Boolean
+    @K2Only
+    fun CapturedTypeMarker.hasRawSuperTypeRecursive(): Boolean
 
     fun TypeVariableMarker.defaultType(): SimpleTypeMarker
 
@@ -326,21 +324,21 @@ interface TypeSystemInferenceExtensionContext : TypeSystemContext, TypeSystemBui
         }
 
     /**
-     * For case Foo <: (T..T?) return LowerConstraint for new constraint LowerConstraint <: T
-     * In K1, in case nullable it was just Foo?, so constraint was Foo? <: T
-     * But it's not 100% correct because prevent having not-nullable upper constraint on T while initial (Foo? <: (T..T?)) is not violated
+     * This flag handles the LowerConstraint returned for the case Foo(?) <: (T..T?)
      *
-     * In K2 (with +JavaTypeParameterDefaultRepresentationWithDNN), we try to have a correct one: (Foo & Any..Foo?) <: T
+     * With this flag (K2 +PreciseSimplificationFlexibleLowerConstraint),
+     * we use precise (Foo!!..Foo?) <: T for nullable type and (Foo!!..Foo) <: T for non-null type.
      *
-     * The same logic applies for T! <: UpperConstraint, as well
-     * In K1, it was reduced to T <: UpperConstraint..UpperConstraint?
-     * In K2 (with +JavaTypeParameterDefaultRepresentationWithDNN), we use UpperConstraint & Any..UpperConstraint?
+     * Without it (K1 or K2 -PreciseSimplificationToFlexibleLowerConstraint), we use Foo <: T for nullable type instead
+     * and it can lead to information loss. E.g. with initial constraints T = Bar, Bar? <: U, U? <: (T..T?)
+     * we infer a lower constraint U <: T and get Bar? <: Bar contradiction.
      *
-     * In future once we have only K2 (or FE 1.0 behavior is fixed) this method should be inlined to the use-site
-     * TODO: Get rid of this function once KT-59138 is fixed and the relevant feature for disabling it will be removed
-     * In fact it may be done during the fix of KT-76065 (dropping JavaTypeParameterDefaultRepresentationWithDNN)
+     * In K1 and early versions of K2 (2.0-2.2) this problem is mitigated with so-called TypePreservingVisibilityWrtHack,
+     * that allows us to use flexible types for explicit type arguments of Java type parameters
      */
-    fun useRefinedBoundsForTypeVariableInFlexiblePosition(): Boolean
+    fun usePreciseSimplificationToFlexibleLowerConstraint(): Boolean
+
+    fun simplifyFlexibleUpperConstraintWithDnnBoundToNullable(): Boolean
 
     /**
      * It's only relevant for K2 (and is not expected to be implemented properly in other contexts)

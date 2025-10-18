@@ -5,26 +5,27 @@
 
 package org.jetbrains.kotlin.psi.stubs.impl
 
-import com.intellij.psi.PsiElement
 import com.intellij.psi.stubs.StubElement
 import com.intellij.util.io.StringRef
 import org.jetbrains.kotlin.constant.ConstantValue
 import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.psi.KtImplementationDetail
 import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.stubs.KotlinPropertyStub
 import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes
 
+@OptIn(KtImplementationDetail::class)
 class KotlinPropertyStubImpl(
-    parent: StubElement<out PsiElement>?,
+    parent: StubElement<*>?,
     private val name: StringRef?,
-    private val isVar: Boolean,
-    private val isTopLevel: Boolean,
-    private val hasDelegate: Boolean,
-    private val hasDelegateExpression: Boolean,
-    private val hasInitializer: Boolean,
-    private val isExtension: Boolean,
-    private val hasReturnTypeRef: Boolean,
-    private val fqName: FqName?,
+    override val isVar: Boolean,
+    override val isTopLevel: Boolean,
+    override val hasDelegate: Boolean,
+    override val hasDelegateExpression: Boolean,
+    override val hasInitializer: Boolean,
+    override val isExtension: Boolean,
+    override val hasReturnTypeRef: Boolean,
+    override val fqName: FqName?,
     val constantInitializer: ConstantValue<*>?,
     val origin: KotlinStubOrigin?,
     override val hasBackingField: Boolean?,
@@ -39,13 +40,22 @@ class KotlinPropertyStubImpl(
         }
     }
 
-    override fun getFqName() = fqName
-    override fun isVar() = isVar
-    override fun isTopLevel() = isTopLevel
-    override fun hasDelegate() = hasDelegate
-    override fun hasDelegateExpression() = hasDelegateExpression
-    override fun hasInitializer() = hasInitializer
-    override fun isExtension() = isExtension
-    override fun hasReturnTypeRef() = hasReturnTypeRef
-    override fun getName() = StringRef.toString(name)
+    override fun getName(): String? = StringRef.toString(name)
+
+    @KtImplementationDetail
+    override fun copyInto(newParent: StubElement<*>?): KotlinPropertyStubImpl = KotlinPropertyStubImpl(
+        parent = newParent,
+        name = name,
+        isVar = isVar,
+        isTopLevel = isTopLevel,
+        hasDelegate = hasDelegate,
+        hasDelegateExpression = hasDelegateExpression,
+        hasInitializer = hasInitializer,
+        isExtension = isExtension,
+        hasReturnTypeRef = hasReturnTypeRef,
+        fqName = fqName,
+        constantInitializer = constantInitializer,
+        origin = origin,
+        hasBackingField = hasBackingField,
+    )
 }

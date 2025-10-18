@@ -11,14 +11,21 @@ import com.intellij.psi.stubs.NamedStub
 import com.intellij.psi.stubs.StubBase
 import com.intellij.psi.stubs.StubElement
 import org.jetbrains.kotlin.psi.KtElementImplStub
+import org.jetbrains.kotlin.psi.KtImplementationDetail
 import org.jetbrains.kotlin.psi.stubs.*
 import java.lang.reflect.Method
 
 val STUB_TO_STRING_PREFIX = "KotlinStub$"
 
-open class KotlinStubBaseImpl<T : KtElementImplStub<*>>(parent: StubElement<*>?, elementType: IStubElementType<*, *>) :
-    StubBase<T>(parent, elementType) {
+@OptIn(KtImplementationDetail::class)
+abstract class KotlinStubBaseImpl<T : KtElementImplStub<*>>(parent: StubElement<*>?, elementType: IStubElementType<*, *>) :
+    StubBase<T>(parent, elementType), KotlinStubElement<T> {
 
+    @KtImplementationDetail
+    abstract override fun copyInto(newParent: StubElement<*>?): KotlinStubBaseImpl<T>
+
+    @Deprecated("Deprecated stub API")
+    @Suppress("DEPRECATION") // KT-78356
     override fun getStubType(): IStubElementType<out StubElement<*>, *> =
         super.getStubType() as IStubElementType<out StubElement<*>, *>
 
@@ -26,9 +33,11 @@ open class KotlinStubBaseImpl<T : KtElementImplStub<*>>(parent: StubElement<*>?,
         val stubInterface = this::class.java.interfaces.single { it.name.contains("Stub") }
         val propertiesValues = renderPropertyValues(stubInterface)
         if (propertiesValues.isEmpty()) {
+            @Suppress("DEPRECATION") // KT-78356
             return "$STUB_TO_STRING_PREFIX$stubType"
         }
         val properties = propertiesValues.joinToString(separator = ", ", prefix = "[", postfix = "]")
+        @Suppress("DEPRECATION") // KT-78356
         return "$STUB_TO_STRING_PREFIX$stubType$properties"
     }
 
@@ -36,15 +45,13 @@ open class KotlinStubBaseImpl<T : KtElementImplStub<*>>(parent: StubElement<*>?,
         return collectProperties(stubInterface).mapNotNull { property -> renderProperty(property) }.sorted()
     }
 
-    private fun collectProperties(stubInterface: Class<*>): Collection<Method> {
-        val result = ArrayList<Method>()
-        result.addAll(stubInterface.declaredMethods.filter { it.parameterTypes!!.isEmpty() })
+    private fun collectProperties(stubInterface: Class<*>): Collection<Method> = buildList {
+        stubInterface.declaredMethods.filterTo(this) { it.parameterTypes.isEmpty() }
         for (baseInterface in stubInterface.interfaces) {
             if (baseInterface in BASE_STUB_INTERFACES) {
-                result.addAll(collectProperties(baseInterface))
+                this += collectProperties(baseInterface)
             }
         }
-        return result
     }
 
     private fun renderProperty(property: Method): String? {
@@ -59,7 +66,7 @@ open class KotlinStubBaseImpl<T : KtElementImplStub<*>>(parent: StubElement<*>?,
     }
 
     private fun getPropertyName(method: Method): String {
-        val methodName = method.name!!
+        val methodName = method.name
         if (methodName.startsWith("get")) {
             return methodName.substring(3).replaceFirstChar(Char::lowercaseChar)
         }

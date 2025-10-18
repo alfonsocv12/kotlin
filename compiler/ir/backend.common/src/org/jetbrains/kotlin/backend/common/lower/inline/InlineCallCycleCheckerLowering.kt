@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.backend.common.lower.inline
 import org.jetbrains.kotlin.backend.common.CommonBackendErrors
 import org.jetbrains.kotlin.backend.common.ModuleLoweringPass
 import org.jetbrains.kotlin.backend.common.PreSerializationLoweringContext
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.config.languageVersionSettings
 import org.jetbrains.kotlin.diagnostics.impl.deduplicating
 import org.jetbrains.kotlin.ir.IrDiagnosticReporter
@@ -18,18 +17,13 @@ import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
 import org.jetbrains.kotlin.ir.expressions.IrBody
 import org.jetbrains.kotlin.ir.expressions.IrCall
-import org.jetbrains.kotlin.ir.expressions.IrExpression
-import org.jetbrains.kotlin.ir.expressions.impl.IrErrorCallExpressionImpl
 import org.jetbrains.kotlin.ir.util.file
-import org.jetbrains.kotlin.ir.util.render
-import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.ir.visitors.IrVisitor
 
 internal data class CallNode(val function: IrFunction, val callLocation: IrBody)
 
 internal data class CallEdge(val call: IrCall?, val callNode: CallNode)
 
-@PhaseDescription("InlineCallCycleCheckerLowering")
 class InlineCallCycleCheckerLowering<Context : PreSerializationLoweringContext>(val context: Context) : ModuleLoweringPass {
     override fun lower(irModule: IrModuleFragment) {
         val irDiagnosticReporter = KtDiagnosticReporterWithImplicitIrBasedContext(
@@ -42,7 +36,6 @@ class InlineCallCycleCheckerLowering<Context : PreSerializationLoweringContext>(
 
         irModule.accept(IrInlineCallGraphBuilder(callGraph), null)
         traverseCallGraph(callGraph, irDiagnosticReporter, callsInInlineCycle)
-        irModule.accept(IrInlineCallCycleRemover(callsInInlineCycle), null)
     }
 
     private fun traverseCallGraph(
@@ -124,15 +117,4 @@ internal class IrInlineCallGraphBuilder(
 
         callGraph.getOrPut(callerNode) { mutableSetOf() }.addAll(callNodes)
     }
-}
-
-class IrInlineCallCycleRemover(private val callsInInlineCycle: MutableSet<IrCall>) : IrElementTransformerVoid() {
-    override fun visitCall(expression: IrCall): IrExpression =
-        if (expression in callsInInlineCycle) IrErrorCallExpressionImpl(
-            startOffset = expression.startOffset,
-            endOffset = expression.endOffset,
-            type = expression.type,
-            description = "'${expression.render()}' is a part of an inline call cycle"
-        )
-        else super.visitCall(expression)
 }

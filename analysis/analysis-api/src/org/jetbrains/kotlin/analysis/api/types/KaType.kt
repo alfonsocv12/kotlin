@@ -5,10 +5,7 @@
 
 package org.jetbrains.kotlin.analysis.api.types
 
-import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
-import org.jetbrains.kotlin.analysis.api.KaImplementationDetail
-import org.jetbrains.kotlin.analysis.api.KaNonPublicApi
-import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.*
 import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotated
 import org.jetbrains.kotlin.analysis.api.base.KaContextReceiversOwner
 import org.jetbrains.kotlin.analysis.api.lifetime.KaLifetimeOwner
@@ -29,6 +26,12 @@ import org.jetbrains.kotlin.name.Name
 @KaExperimentalApi
 @SubclassOptInRequired(KaImplementationDetail::class)
 public interface KaTypePointer<out T : KaType> {
+    /**
+     * Returns the restored [KaType] (possibly a new type instance) if the pointer is still valid, or `null` otherwise.
+     *
+     * Do not use this function directly, as it is an implementation detail.
+     * Use [KaSession.restore][org.jetbrains.kotlin.analysis.api.KaSession.restore] instead.
+     */
     @KaImplementationDetail
     public fun restore(session: KaSession): T?
 }
@@ -154,7 +157,15 @@ public interface KaType : KaLifetimeOwner, KaAnnotated {
      */
     public val abbreviation: KaUsualClassType?
 
+    /**
+     * Creates a type pointer.
+     *
+     * Unlike [KaType], a [KaTypePointer] may be safely stored and passed around outside the
+     * (analyze)[org.jetbrains.kotlin.analysis.api.analyze] block. Use the [KaSession.restore] function to get the type instance back.
+     * Note that depending on the use-site session (analysisScope)[KaSession.analysisScope], a type might not be restored.
+     */
     @KaExperimentalApi
+    @KaK1Unsupported
     public fun createPointer(): KaTypePointer<KaType>
 }
 
@@ -234,6 +245,7 @@ public sealed class KaClassType : KaType {
     public abstract val qualifiers: List<KaResolvedClassTypeQualifier>
 
     @KaExperimentalApi
+    @KaK1Unsupported
     public abstract override fun createPointer(): KaTypePointer<KaClassType>
 }
 
@@ -299,6 +311,7 @@ public abstract class KaFunctionType : KaClassType(), KaContextReceiversOwner {
     /**
      * The function's arity, i.e. the number of [*parameter types*][parameterTypes].
      */
+    @Deprecated("Use `parameters.size` instead. See KT-80545", ReplaceWith("parameters.size"))
     public abstract val arity: Int
 
     /**
@@ -331,6 +344,7 @@ public abstract class KaFunctionType : KaClassType(), KaContextReceiversOwner {
     public abstract val hasContextReceivers: Boolean
 
     @KaExperimentalApi
+    @KaK1Unsupported
     public abstract override fun createPointer(): KaTypePointer<KaFunctionType>
 }
 
@@ -374,6 +388,7 @@ public abstract class KaFunctionValueParameter : KaLifetimeOwner {
 @SubclassOptInRequired(KaImplementationDetail::class)
 public abstract class KaUsualClassType : KaClassType() {
     @KaExperimentalApi
+    @KaK1Unsupported
     public abstract override fun createPointer(): KaTypePointer<KaUsualClassType>
 }
 
@@ -397,6 +412,7 @@ public abstract class KaClassErrorType : KaErrorType {
     public abstract val candidateSymbols: Collection<KaClassLikeSymbol>
 
     @KaExperimentalApi
+    @KaK1Unsupported
     public abstract override fun createPointer(): KaTypePointer<KaClassErrorType>
 }
 
@@ -418,6 +434,7 @@ public abstract class KaTypeParameterType : KaType {
     public abstract val symbol: KaTypeParameterSymbol
 
     @KaExperimentalApi
+    @KaK1Unsupported
     public abstract override fun createPointer(): KaTypePointer<KaTypeParameterType>
 }
 
@@ -432,6 +449,7 @@ public abstract class KaCapturedType : KaType {
     public abstract val projection: KaTypeProjection
 
     @KaExperimentalApi
+    @KaK1Unsupported
     public abstract override fun createPointer(): KaTypePointer<KaCapturedType>
 }
 
@@ -454,6 +472,7 @@ public abstract class KaDefinitelyNotNullType : KaType {
     final override val nullability: KaTypeNullability get() = withValidityAssertion { KaTypeNullability.NON_NULLABLE }
 
     @KaExperimentalApi
+    @KaK1Unsupported
     public abstract override fun createPointer(): KaTypePointer<KaDefinitelyNotNullType>
 }
 
@@ -477,6 +496,7 @@ public abstract class KaFlexibleType : KaType {
     public abstract val upperBound: KaType
 
     @KaExperimentalApi
+    @KaK1Unsupported
     public abstract override fun createPointer(): KaTypePointer<KaFlexibleType>
 }
 
@@ -493,6 +513,7 @@ public abstract class KaIntersectionType : KaType {
     public abstract val conjuncts: List<KaType>
 
     @KaExperimentalApi
+    @KaK1Unsupported
     public abstract override fun createPointer(): KaTypePointer<KaIntersectionType>
 }
 
@@ -506,5 +527,6 @@ public abstract class KaIntersectionType : KaType {
 @SubclassOptInRequired(KaImplementationDetail::class)
 public abstract class KaDynamicType : KaType {
     @KaExperimentalApi
+    @KaK1Unsupported
     public abstract override fun createPointer(): KaTypePointer<KaDynamicType>
 }

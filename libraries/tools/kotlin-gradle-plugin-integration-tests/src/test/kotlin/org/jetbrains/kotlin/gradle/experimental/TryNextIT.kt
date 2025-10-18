@@ -7,7 +7,7 @@ package org.jetbrains.kotlin.gradle.experimental
 
 import org.gradle.api.logging.LogLevel
 import org.gradle.util.GradleVersion
-import org.jetbrains.kotlin.cli.common.arguments.K2NativeCompilerArguments
+import org.jetbrains.kotlin.cli.common.arguments.*
 import org.jetbrains.kotlin.gradle.BrokenOnMacosTest
 import org.jetbrains.kotlin.gradle.BrokenOnMacosTestFailureExpectation
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
@@ -208,6 +208,7 @@ class TryNextIT : KGPBaseTest() {
                 assertTasksExecuted(":compileKotlinLinuxX64")
 
                 val compileTaskOutput = getOutputForTask(":compileKotlinLinuxX64")
+                @Suppress("DEPRECATION")
                 val compilerArgs = parseCompilerArgumentsFromBuildOutput(K2NativeCompilerArguments::class, compileTaskOutput)
                 assert(compilerArgs.languageVersion == nextKotlinLanguageVersion) {
                     ":compileKotlinLinuxX64 'languageVersion' is not '$nextKotlinLanguageVersion': ${compilerArgs.languageVersion}"
@@ -223,7 +224,7 @@ class TryNextIT : KGPBaseTest() {
         project(
             "commonizeHierarchically",
             gradleVersion,
-            buildOptions = defaultBuildOptions.copy(logLevel = LogLevel.DEBUG).disableKlibsCrossCompilation()
+            buildOptions = defaultBuildOptions.copy(logLevel = LogLevel.DEBUG)
         ) {
             enableTryNext()
 
@@ -237,6 +238,7 @@ class TryNextIT : KGPBaseTest() {
                 assertCompilerArgument(":p1:compileCommonMainKotlinMetadata", "-language-version $nextKotlinLanguageVersion")
                 assertCompilerArgument(":p1:compileConcurrentMainKotlinMetadata", "-language-version $nextKotlinLanguageVersion")
                 val taskOutput = getOutputForTask(":p1:compileAppleAndLinuxMainKotlinMetadata")
+                @Suppress("DEPRECATION")
                 val appleAndLinuxMetadataArgs = parseCompilerArgumentsFromBuildOutput(K2NativeCompilerArguments::class, taskOutput)
                 assert(appleAndLinuxMetadataArgs.languageVersion == nextKotlinLanguageVersion) {
                     ":compileAppleAndLinuxMainKotlinMetadata 'languageVersion' is not '$nextKotlinLanguageVersion': ${appleAndLinuxMetadataArgs.languageVersion}"
@@ -332,7 +334,6 @@ class TryNextIT : KGPBaseTest() {
         project(
             "native-configuration-cache",
             gradleVersion,
-            buildOptions = defaultBuildOptions.disableKlibsCrossCompilation(),
         ) {
             enableTryNext()
             build("build") {

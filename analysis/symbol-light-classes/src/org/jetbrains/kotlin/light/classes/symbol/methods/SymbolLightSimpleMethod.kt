@@ -145,7 +145,7 @@ internal class SymbolLightSimpleMethod private constructor(
 
     private val hasInlineOnlyAnnotation: Boolean by lazyPub { withFunctionSymbol { it.hasInlineOnlyAnnotation() } }
 
-    private val _modifierList: PsiModifierList by lazyPub {
+    override fun getModifierList(): PsiModifierList = cachedValue {
         SymbolLightMemberModifierList(
             containingDeclaration = this,
             modifiersBox = GranularModifiersBox(computer = ::computeModifiers),
@@ -182,8 +182,6 @@ internal class SymbolLightSimpleMethod private constructor(
             )
         )
     }
-
-    override fun getModifierList(): PsiModifierList = _modifierList
 
     override fun isConstructor(): Boolean = false
 
@@ -272,6 +270,7 @@ internal class SymbolLightSimpleMethod private constructor(
                     !functionSymbol.isOverride
 
             val isSuspend = functionSymbol.isSuspend
+            val isOverridable = functionSymbol.isOverridable()
             createMethodsJvmOverloadsAware(
                 declaration = functionSymbol,
                 methodIndexBase = methodIndex,
@@ -289,6 +288,7 @@ internal class SymbolLightSimpleMethod private constructor(
                     isAffectedByValueClass = hasMangledNameDueValueClassesInSignature || isNonMaterializableValueClassFunction,
                     hasJvmNameAnnotation = hasJvmNameAnnotation,
                     isSuspend = isSuspend,
+                    isOverridable = isOverridable
                 )
 
                 if (generationResult.isBoxedMethodRequired) {

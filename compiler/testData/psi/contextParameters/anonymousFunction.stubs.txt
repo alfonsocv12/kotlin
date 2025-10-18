@@ -1,4 +1,6 @@
-PsiJetFileStubImpl[package=]
+FILE[kind=Facade[packageFqName=<root>, facadeFqName=AnonymousFunctionKt]]
+  facadeFqName: AnonymousFunctionKt
+  partSimpleName: "AnonymousFunctionKt"
   PACKAGE_DIRECTIVE
   IMPORT_LIST
   PROPERTY[fqName=t, hasBackingField=null, hasDelegate=false, hasDelegateExpression=false, hasInitializer=true, hasReturnTypeRef=false, isExtension=false, isTopLevel=true, isVar=false, name=t]
@@ -19,7 +21,7 @@ PsiJetFileStubImpl[package=]
               USER_TYPE
                 REFERENCE_EXPRESSION[referencedName=A]
       TYPE_PARAMETER_LIST
-        TYPE_PARAMETER[fqName=null, isInVariance=false, isOutVariance=false, name=A]
+        TYPE_PARAMETER[fqName=null, name=A]
       VALUE_PARAMETER_LIST
   PROPERTY[fqName=t, hasBackingField=null, hasDelegate=false, hasDelegateExpression=false, hasInitializer=true, hasReturnTypeRef=false, isExtension=false, isTopLevel=true, isVar=false, name=t]
     FUN[fqName=null, hasBody=true, hasNoExpressionBody=true, hasTypeParameterListBeforeFunctionName=false, isExtension=false, isTopLevel=false, mayHaveContract=false, name=null]
@@ -53,7 +55,7 @@ PsiJetFileStubImpl[package=]
           TYPE_REFERENCE
             USER_TYPE
               REFERENCE_EXPRESSION[referencedName=Boolean]
-  CLASS[classId=/A, fqName=A, isClsStubCompiledToJvmDefaultImplementation=false, isEnumEntry=false, isInterface=false, isLocal=false, isTopLevel=true, name=A, superNames=[]]
+  CLASS[classId=/A, fqName=A, isClsStubCompiledToJvmDefaultImplementation=false, isInterface=false, isLocal=false, isTopLevel=true, name=A, superNames=[]]
     PRIMARY_CONSTRUCTOR[fqName=null, hasBody=false, hasNoExpressionBody=true, isDelegatedCallToThis=false, isExplicitDelegationCall=false, isExtension=false, isTopLevel=false, mayHaveContract=false, name=A]
       VALUE_PARAMETER_LIST
         VALUE_PARAMETER[fqName=A.k, hasDefaultValue=true, hasValOrVar=true, isMutable=false, name=k]

@@ -63,14 +63,17 @@ class PrepareCollectionsToExportLowering(private val context: JsIrBackendContext
 
     private val exportedCollectionsInfo = ExportedCollectionsInfo(context)
 
+    private val jsStatic by lazy(LazyThreadSafetyMode.NONE) {
+        context.symbols.jsStaticAnnotationSymbol.primaryConstructorSymbol
+    }
     private val jsNameCtor by lazy(LazyThreadSafetyMode.NONE) {
-        context.intrinsics.jsNameAnnotationSymbol.primaryConstructorSymbol
+        context.symbols.jsNameAnnotationSymbol.primaryConstructorSymbol
     }
     private val jsExportIgnoreCtor by lazy(LazyThreadSafetyMode.NONE) {
-        context.intrinsics.jsExportIgnoreAnnotationSymbol.primaryConstructorSymbol
+        context.symbols.jsExportIgnoreAnnotationSymbol.primaryConstructorSymbol
     }
     private val jsImplicitExportCtor by lazy(LazyThreadSafetyMode.NONE) {
-        context.intrinsics.jsImplicitExportAnnotationSymbol.primaryConstructorSymbol
+        context.symbols.jsImplicitExportAnnotationSymbol.primaryConstructorSymbol
     }
 
     override fun transformFlat(declaration: IrDeclaration): List<IrDeclaration>? {
@@ -91,12 +94,12 @@ class PrepareCollectionsToExportLowering(private val context: JsIrBackendContext
     }
 
     private val typesToItsFactoryMethods = hashMapOf(
-        context.symbols.list to FactoryMethod("fromJsArray", context.intrinsics.jsCreateListFrom),
-        context.symbols.mutableList to FactoryMethod("fromJsArray", context.intrinsics.jsCreateMutableListFrom),
-        context.symbols.set to FactoryMethod("fromJsSet", context.intrinsics.jsCreateSetFrom),
-        context.symbols.mutableSet to FactoryMethod("fromJsSet", context.intrinsics.jsCreateMutableSetFrom),
-        context.symbols.map to FactoryMethod("fromJsMap", context.intrinsics.jsCreateMapFrom),
-        context.symbols.mutableMap to FactoryMethod("fromJsMap", context.intrinsics.jsCreateMutableMapFrom)
+        context.symbols.list to FactoryMethod("fromJsArray", context.symbols.jsCreateListFrom),
+        context.symbols.mutableList to FactoryMethod("fromJsArray", context.symbols.jsCreateMutableListFrom),
+        context.symbols.set to FactoryMethod("fromJsSet", context.symbols.jsCreateSetFrom),
+        context.symbols.mutableSet to FactoryMethod("fromJsSet", context.symbols.jsCreateMutableSetFrom),
+        context.symbols.map to FactoryMethod("fromJsMap", context.symbols.jsCreateMapFrom),
+        context.symbols.mutableMap to FactoryMethod("fromJsMap", context.symbols.jsCreateMutableMapFrom)
     )
 
     private fun IrClass.addCompanionWithJsFactoryFunction() {
@@ -121,6 +124,7 @@ class PrepareCollectionsToExportLowering(private val context: JsIrBackendContext
             companionObject.parent = this
             companionObject.createThisReceiverParameter()
             companionObject.thisReceiver!!.origin = FACTORY_FOR_KOTLIN_COLLECTIONS
+            companionObject.excludeFromJsExport()
         }
 
         val factoryMethod = context.irFactory.createSimpleFunction(
@@ -140,6 +144,7 @@ class PrepareCollectionsToExportLowering(private val context: JsIrBackendContext
             isInfix = false,
             isExternal = false
         ).also {
+            it.addJsStatic()
             it.parent = companionObject
             it.copyValueAndTypeParametersFrom(factoryMethodForTheCollectionSymbol.owner)
             it.parameters = listOfNotNull(companionObject.thisReceiver?.copyTo(it)) + it.nonDispatchParameters
@@ -194,6 +199,10 @@ class PrepareCollectionsToExportLowering(private val context: JsIrBackendContext
         }
     }
 
+    private fun IrDeclarationWithName.addJsStatic() {
+        annotations = annotations memoryOptimizedPlus JsIrBuilder.buildConstructorCall(jsStatic)
+    }
+
     private fun IrDeclaration.markWithJsImplicitExport() {
         annotations = annotations memoryOptimizedPlus JsIrBuilder.buildConstructorCall(jsImplicitExportCtor).apply {
             arguments[0] = true.toIrConst(context.irBuiltIns.booleanType)
@@ -209,7 +218,7 @@ class PrepareCollectionsToExportLowering(private val context: JsIrBackendContext
 class RemoveImplicitExportsFromCollections(private val context: JsIrBackendContext) : DeclarationTransformer {
     private val strictImplicitExport = context.configuration.getBoolean(JSConfigurationKeys.GENERATE_STRICT_IMPLICIT_EXPORT)
     private val jsImplicitExportCtor by lazy(LazyThreadSafetyMode.NONE) {
-        context.intrinsics.jsImplicitExportAnnotationSymbol.primaryConstructorSymbol
+        context.symbols.jsImplicitExportAnnotationSymbol.primaryConstructorSymbol
     }
 
     private val exportedCollectionsInfo = ExportedCollectionsInfo(context)

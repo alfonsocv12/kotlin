@@ -67,6 +67,7 @@ import org.jetbrains.kotlin.fir.analysis.diagnostics.jvm.FirJvmErrors.JVM_INLINE
 import org.jetbrains.kotlin.fir.analysis.diagnostics.jvm.FirJvmErrors.JVM_PACKAGE_NAME_CANNOT_BE_EMPTY
 import org.jetbrains.kotlin.fir.analysis.diagnostics.jvm.FirJvmErrors.JVM_PACKAGE_NAME_MUST_BE_VALID_NAME
 import org.jetbrains.kotlin.fir.analysis.diagnostics.jvm.FirJvmErrors.JVM_PACKAGE_NAME_NOT_SUPPORTED_IN_FILES_WITH_CLASSES
+import org.jetbrains.kotlin.fir.analysis.diagnostics.jvm.FirJvmErrors.JVM_RECORDS_ILLEGAL_BYTECODE_TARGET
 import org.jetbrains.kotlin.fir.analysis.diagnostics.jvm.FirJvmErrors.JVM_RECORD_EXTENDS_CLASS
 import org.jetbrains.kotlin.fir.analysis.diagnostics.jvm.FirJvmErrors.JVM_RECORD_NOT_LAST_VARARG_PARAMETER
 import org.jetbrains.kotlin.fir.analysis.diagnostics.jvm.FirJvmErrors.JVM_RECORD_NOT_VAL_PARAMETER
@@ -129,20 +130,25 @@ import org.jetbrains.kotlin.fir.analysis.diagnostics.jvm.FirJvmErrors.WRONG_NULL
 object FirJvmErrorsDefaultMessages : BaseDiagnosticRendererFactory() {
 
     override val MAP: KtDiagnosticFactoryToRendererMap by KtDiagnosticFactoryToRendererMap("FIR") { map ->
-        map.put(JAVA_TYPE_MISMATCH, "Java type mismatch: expected ''{0}'' but found ''{1}''. Use explicit cast.", RENDER_TYPE, RENDER_TYPE)
-
         map.put(
-            NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS,
-            "Java type mismatch: inferred type is ''{0}'', but ''{1}'' was expected.{2}",
+            JAVA_TYPE_MISMATCH,
+            "Java type mismatch: expected ''{0}'' but found ''{1}''. Use explicit cast.",
             RENDER_TYPE,
             RENDER_TYPE,
-            OPTIONAL_SENTENCE,
         )
+
         map.put(
             RECEIVER_NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS,
             "Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type ''{0}''.{2}",
             RENDER_TYPE,
             NOT_RENDERED,
+            OPTIONAL_SENTENCE,
+        )
+        map.put(
+            NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS,
+            "Java type mismatch: inferred type is ''{0}'', but ''{1}'' was expected.{2}",
+            RENDER_TYPE,
+            RENDER_TYPE,
             OPTIONAL_SENTENCE,
         )
         map.put(
@@ -152,6 +158,7 @@ object FirJvmErrorsDefaultMessages : BaseDiagnosticRendererFactory() {
             RENDER_TYPE,
             OPTIONAL_SENTENCE,
         )
+
         map.put(
             TYPE_MISMATCH_WHEN_FLEXIBILITY_CHANGES,
             "Argument type mismatch: actual type is ''{0}'', but ''{1}'' was expected."
@@ -159,12 +166,12 @@ object FirJvmErrorsDefaultMessages : BaseDiagnosticRendererFactory() {
             RENDER_TYPE,
             RENDER_TYPE,
         )
+
         map.put(
             JAVA_CLASS_ON_COMPANION,
-            "The resulting type of this ''javaClass'' call is ''{0}'' and not ''{1}''. " +
-                    "Use ''::class.java'' to access type ''{1}''.",
+            "The resulting type of this ''javaClass'' call is ''{0}'' and not ''{1}''. Use ''::class.java'' to access type ''{1}''.",
             RENDER_TYPE,
-            RENDER_TYPE
+            RENDER_TYPE,
         )
 
         map.put(
@@ -261,6 +268,10 @@ object FirJvmErrorsDefaultMessages : BaseDiagnosticRendererFactory() {
         map.put(DELEGATION_BY_IN_JVM_RECORD, "Delegation is prohibited for '@JvmRecord' classes.")
         map.put(NON_DATA_CLASS_JVM_RECORD, "Only data classes are allowed to be marked as '@JvmRecord'.")
         map.put(ILLEGAL_JAVA_LANG_RECORD_SUPERTYPE, "Classes cannot have explicit 'java.lang.Record' supertype.")
+        map.put(
+            JVM_RECORDS_ILLEGAL_BYTECODE_TARGET,
+            "Using @JvmRecord is only allowed with -jvm-target 16 or later (or -jvm-target 15 with the -Xjvm-enable-preview flag enabled)."
+        )
 
         map.put(
             JAVA_MODULE_DOES_NOT_DEPEND_ON_MODULE,

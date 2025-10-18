@@ -22,8 +22,6 @@ import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.parsing.KotlinParsing.NameParsingMode;
 import org.jetbrains.kotlin.psi.stubs.elements.KtTokenSets;
 
-import java.util.*;
-
 import static org.jetbrains.kotlin.KtNodeTypes.*;
 import static org.jetbrains.kotlin.lang.BinaryOperationPrecedence.TOKEN_TO_BINARY_PRECEDENCE_MAP_WITH_SOFT_IDENTIFIERS;
 import static org.jetbrains.kotlin.lexer.KtTokens.*;
@@ -142,8 +140,12 @@ public class KotlinExpressionParsing extends AbstractKotlinParsing {
      *   ;
      */
     public void parseExpression() {
+        parseExpression("Expecting an expression");
+    }
+
+    private void parseExpression(String messageIfNotExpressionFirst) {
         if (!atSet(EXPRESSION_FIRST)) {
-            error("Expecting an expression");
+            error(messageIfNotExpressionFirst);
             return;
         }
 
@@ -993,11 +995,10 @@ public class KotlinExpressionParsing extends AbstractKotlinParsing {
 
     private void parseInnerExpressions(String missingElementErrorMessage) {
         while (true) {
-            if (at(COMMA)) errorAndAdvance(missingElementErrorMessage);
             if (at(RBRACKET)) {
                 break;
             }
-            parseExpression();
+            parseExpression(missingElementErrorMessage);
 
             if (!at(COMMA)) break;
             advance(); // COMMA
@@ -1056,7 +1057,7 @@ public class KotlinExpressionParsing extends AbstractKotlinParsing {
     private boolean parseLocalDeclaration(boolean rollbackIfDefinitelyNotExpression, boolean isScriptTopLevel) {
         PsiBuilder.Marker decl = mark();
         KotlinParsing.ModifierDetector detector = new KotlinParsing.ModifierDetector();
-        myKotlinParsing.parseModifierList(detector, TokenSet.EMPTY);
+        myKotlinParsing.parseModifierList(detector, TokenSet.EMPTY, /* localDeclaration = */true);
 
         IElementType declType = parseLocalDeclarationRest(detector, rollbackIfDefinitelyNotExpression, isScriptTopLevel);
 
@@ -1106,7 +1107,7 @@ public class KotlinExpressionParsing extends AbstractKotlinParsing {
             advance(); // ARROW
             paramsFound = true;
         }
-        else if (token == IDENTIFIER || token == COLON || token == LPAR) {
+        else if (token == IDENTIFIER || token == COLON || token == LPAR || token == LBRACKET) {
             // Try to parse a simple name list followed by an ARROW
             //   {a -> ...}
             //   {a, b -> ...}
@@ -1199,10 +1200,13 @@ public class KotlinExpressionParsing extends AbstractKotlinParsing {
             if (at(COLON)) {
                 error("Expecting parameter name");
             }
-            else if (at(LPAR)) {
+            else if (at(LPAR) || at(LBRACKET)) {
                 PsiBuilder.Marker destructuringDeclaration = mark();
-                myKotlinParsing.parseMultiDeclarationName(TOKEN_SET_TO_FOLLOW_AFTER_DESTRUCTURING_DECLARATION_IN_LAMBDA,
-                                                          TOKEN_SET_TO_FOLLOW_AFTER_DESTRUCTURING_DECLARATION_IN_LAMBDA_RECOVERY);
+                myKotlinParsing.parseMultiDeclarationEntry(
+                        TOKEN_SET_TO_FOLLOW_AFTER_DESTRUCTURING_DECLARATION_IN_LAMBDA,
+                        TOKEN_SET_TO_FOLLOW_AFTER_DESTRUCTURING_DECLARATION_IN_LAMBDA_RECOVERY,
+                        // No var in lambda parameter destructuring
+                        lookahead(1) == VAL_KEYWORD ? MultiDeclarationMode.FULL_VAL_ONLY : MultiDeclarationMode.SHORT);
                 destructuringDeclaration.done(DESTRUCTURING_DECLARATION);
             }
             else {
@@ -1427,9 +1431,13 @@ public class KotlinExpressionParsing extends AbstractKotlinParsing {
 
                 if (at(VAL_KEYWORD) || at(VAR_KEYWORD)) advance(); // VAL_KEYWORD or VAR_KEYWORD
 
-                if (at(LPAR)) {
+                if (at(LPAR) || at(LBRACKET)) {
                     PsiBuilder.Marker destructuringDeclaration = mark();
-                    myKotlinParsing.parseMultiDeclarationName(IN_KEYWORD_L_BRACE_SET, IN_KEYWORD_L_BRACE_RECOVERY_SET);
+                    myKotlinParsing.parseMultiDeclarationEntry(
+                            IN_KEYWORD_L_BRACE_SET,
+                            IN_KEYWORD_L_BRACE_RECOVERY_SET,
+                            // No var in destructured loop parameter
+                            lookahead(1) == VAL_KEYWORD ? MultiDeclarationMode.FULL_VAL_ONLY : MultiDeclarationMode.SHORT);
                     destructuringDeclaration.done(DESTRUCTURING_DECLARATION);
                 }
                 else {
@@ -1799,7 +1807,6 @@ public class KotlinExpressionParsing extends AbstractKotlinParsing {
         if (expect(LPAR, "Expecting an argument list", EXPRESSION_FOLLOW)) {
             if (!at(RPAR)) {
                 while (true) {
-                    while (at(COMMA)) errorAndAdvance("Expecting an argument");
                     parseValueArgument();
                     if (at(COLON) && lookahead(1) == IDENTIFIER) {
                         errorAndAdvance("Unexpected type specification", 2);
@@ -1844,7 +1851,7 @@ public class KotlinExpressionParsing extends AbstractKotlinParsing {
         if (at(MUL)) {
             advance(); // MUL
         }
-        parseExpression();
+        parseExpression("Expecting an argument");
         argument.done(VALUE_ARGUMENT);
     }
 

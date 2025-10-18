@@ -7,7 +7,6 @@ package org.jetbrains.kotlin.gradle
 
 import org.gradle.api.logging.LogLevel
 import org.gradle.util.GradleVersion
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildTime
 import org.jetbrains.kotlin.build.report.statistics.formatSize
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 import org.jetbrains.kotlin.gradle.internal.build.metrics.GradleBuildMetricsData
@@ -16,6 +15,7 @@ import org.jetbrains.kotlin.gradle.report.BuildReportType
 import org.jetbrains.kotlin.gradle.testbase.*
 import org.jetbrains.kotlin.gradle.testbase.BuildOptions.IsolatedProjectsMode
 import org.jetbrains.kotlin.gradle.testbase.TestVersions.ThirdPartyDependencies.GRADLE_ENTERPRISE_PLUGIN_VERSION
+import org.jetbrains.kotlin.gradle.uklibs.applyMultiplatform
 import org.jetbrains.kotlin.gradle.util.BuildOperationRecordImpl
 import org.jetbrains.kotlin.gradle.util.readJsonReport
 import org.jetbrains.kotlin.gradle.util.replaceText
@@ -30,6 +30,8 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import  org.jetbrains.kotlin.build.report.metrics.*
+import org.jetbrains.kotlin.gradle.report.data.BuildExecutionData
 
 @DisplayName("Build reports")
 class BuildReportsIT : KGPBaseTest() {
@@ -80,7 +82,7 @@ class BuildReportsIT : KGPBaseTest() {
     @GradleTest
     @JvmGradlePluginTests
     fun testBuildMetricsSmokeTest(gradleVersion: GradleVersion) {
-        testBuildReportInFile("simpleProject", "assemble", gradleVersion)
+        testBuildReport("simpleProject", "assemble", gradleVersion)
     }
 
     @DisplayName("Build metrics produces valid report for mpp-jvm")
@@ -90,7 +92,7 @@ class BuildReportsIT : KGPBaseTest() {
     @GradleTest
     @JvmGradlePluginTests
     fun testBuildMetricsForMppJvm(gradleVersion: GradleVersion) {
-        testBuildReportInFile("mppJvmWithJava", "assemble", gradleVersion)
+        testBuildReport("mppJvmWithJava", "assemble", gradleVersion)
     }
 
     @DisplayName("Build metrics produces valid report for mpp-js")
@@ -100,7 +102,7 @@ class BuildReportsIT : KGPBaseTest() {
     @GradleTest
     @JvmGradlePluginTests
     fun testBuildMetricsForMppJs(gradleVersion: GradleVersion) {
-        testBuildReportInFile(
+        testBuildReport(
             "kotlin-js-package-module-name",
             "assemble",
             gradleVersion,
@@ -117,7 +119,7 @@ class BuildReportsIT : KGPBaseTest() {
     @TestMetadata("kotlin-js-plugin-project")
     @JvmGradlePluginTests
     fun testBuildMetricsForJsProject(gradleVersion: GradleVersion) {
-        testBuildReportInFile(
+        testBuildReport(
             "kotlin-js-plugin-project",
             "compileKotlinJs",
             gradleVersion,
@@ -127,55 +129,244 @@ class BuildReportsIT : KGPBaseTest() {
         )
     }
 
-    private fun testBuildReportInFile(
+    @DisplayName("Build metrics produces valid report for lowerings in JS project")
+    @GradleTestVersions(
+        additionalVersions = [TestVersions.Gradle.G_8_0],
+    )
+    @GradleTest
+    @TestMetadata("kotlin-js-plugin-project")
+    @JvmGradlePluginTests
+    fun testLoweringsBuildMetricsForJsProject(gradleVersion: GradleVersion) {
+        testBuildReport(
+            "kotlin-js-plugin-project",
+            "compileKotlinJs",
+            gradleVersion,
+            languageVersion = KotlinVersion.DEFAULT.version,
+            // KT-75899 Support Gradle Project Isolation in KGP JS & Wasm
+            disableIsolatedProjects = true,
+            freeCompilerArgs = listOf(
+                "-Xklib-ir-inliner=full",
+            ),
+            buildReportOutput = BuildReportType.JSON,
+        ) {
+            validateJsonReport(
+                taskName = "compileKotlinJs",
+                CustomBuildTimeMetric.createIfDoesNotExistAndReturn("JsCodeOutliningLoweringOnFirstStage", IR_PRE_LOWERING),
+                IR_PRE_LOWERING
+            )
+        }
+    }
+
+    private fun TestProject.validateJsonReport(
+        taskName: String? = null,
+        vararg metrics: BuildPerformanceMetric,
+        additionalChecks: (BuildExecutionData) -> Unit = {},
+    ) {
+        val jsonReportFile = projectPath.getSingleFileInDir("report")
+        assertTrue { jsonReportFile.exists() }
+        val jsonReport = readJsonReport(jsonReportFile)
+        assertNotNull(jsonReport)
+
+        val buildMetrics = if (taskName != null) {
+            jsonReport.buildOperationRecord.find { it.path.endsWith(taskName) }?.buildMetrics
+                ?: error("No metrics for task $taskName was found")
+        } else {
+            jsonReport.aggregatedMetrics
+        }
+
+        val buildTimeMetrics = buildMetrics.buildTimes.buildTimesMapMs().keys
+        val missedMetrics = metrics.filter { it !in buildTimeMetrics }.map { it.name }
+        assertTrue("<${missedMetrics.joinToString(separator = ",")}> metrics are missing in JSON report") { missedMetrics.isEmpty() }
+
+        additionalChecks(jsonReport)
+    }
+
+    private fun testBuildReport(
         project: String,
         task: String,
         gradleVersion: GradleVersion,
         languageVersion: String = KotlinVersion.KOTLIN_2_0.version,
         disableIsolatedProjects: Boolean = false,
+        freeCompilerArgs: List<String> = listOf(),
+        expectedReportLines: List<String> = listOf(),
+        buildReportOutput: BuildReportType = BuildReportType.FILE,
+        reportValidation: TestProject.(String) -> Unit = { languageVersion ->
+            validateBuildReportFile(
+                nonIncrementalBuildFileExpectedContents(languageVersion),
+                expectedReportLines
+            )
+        },
     ) {
         val buildOptions = if (disableIsolatedProjects) defaultBuildOptions.copy(
             isolatedProjects = IsolatedProjectsMode.DISABLED
         ) else defaultBuildOptions
 
-        project(project, gradleVersion, buildOptions = buildOptions) {
+        project(project, gradleVersion, buildOptions = buildOptions.copy(buildReport = listOf(buildReportOutput))) {
+
+            val buildArguments = if (buildReportOutput == BuildReportType.JSON)
+                arrayOf(task, "-Pkotlin.build.report.json.directory=${projectPath.resolve("report").pathString}")
+            else arrayOf(task)
+
             if (!isWithJavaSupported && project == "mppJvmWithJava") buildGradle.replaceText("withJava()", "")
-            build(task) {
+            addCompilerArgs(freeCompilerArgs)
+            build(*buildArguments) {
                 assertBuildReportPathIsPrinted()
             }
             //Should contain build metrics for all compile kotlin tasks
-            validateBuildReportFile(KotlinVersion.DEFAULT.version)
+            reportValidation(KotlinVersion.DEFAULT.version)
         }
 
-        project(project, gradleVersion, buildOptions = buildOptions.copy(languageVersion = languageVersion)) {
+        project(
+            project,
+            gradleVersion,
+            buildOptions = buildOptions.copy(languageVersion = languageVersion, buildReport = listOf(buildReportOutput))
+        ) {
+            val buildArguments = if (buildReportOutput == BuildReportType.JSON)
+                arrayOf(task, "-Pkotlin.build.report.json.directory=${projectPath.resolve("report").pathString}")
+            else arrayOf(task)
             if (!isWithJavaSupported && project == "mppJvmWithJava") buildGradle.replaceText("withJava()", "")
-            build(task, buildOptions = buildOptions.copy(languageVersion = languageVersion)) {
+            addCompilerArgs(freeCompilerArgs)
+            build(*buildArguments) {
                 assertBuildReportPathIsPrinted()
             }
             //Should contain build metrics for all compile kotlin tasks
-            validateBuildReportFile(languageVersion)
+            reportValidation(languageVersion)
         }
     }
 
-    private fun TestProject.validateBuildReportFile(kotlinLanguageVersion: String) {
+    private fun TestProject.addCompilerArgs(args: List<String>) {
+        if (args.isNotEmpty()) {
+            buildGradleKts.appendText(
+                """
+                tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().configureEach {
+                    compilerOptions {
+                        freeCompilerArgs.addAll(${args.joinToString { "\"$it\"" }})
+                    }
+                }
+                """.trimIndent()
+            )
+        }
+    }
+
+    @DisplayName("Build metrics produces valid report for lowerings in Native project")
+    @GradleTestVersions(
+        additionalVersions = [TestVersions.Gradle.G_8_0],
+    )
+    @GradleTest
+    @TestMetadata("native-incremental-simple")
+    @NativeGradlePluginTests
+    fun testLoweringsBuildMetricsForNativeProject(gradleVersion: GradleVersion) {
+        testNativeBuildReport(
+            "native-incremental-simple",
+            "build",
+            gradleVersion,
+            // KT-75899 Support Gradle Project Isolation in KGP JS & Wasm
+            disableIsolatedProjects = true,
+            freeCompilerArgs = listOf(
+                "-Xklib-ir-inliner=full",
+            ),
+            buildReportOutput = BuildReportType.JSON,
+            reportValidation = {
+                validateJsonReport(taskName = null, *nativeBuildExpectedMetrics)
+            }
+        )
+    }
+
+    private fun testNativeBuildReport(
+        project: String,
+        task: String,
+        gradleVersion: GradleVersion,
+        disableIsolatedProjects: Boolean = false,
+        freeCompilerArgs: List<String> = listOf(),
+        additionalReportLines: List<String> = listOf(),
+        buildReportOutput: BuildReportType = BuildReportType.FILE,
+        reportValidation: TestProject.() -> Unit = {
+            validateBuildReportFile(
+                nativeBuildFileExpectedContents,
+                additionalReportLines,
+                doValidateSizeMetrics = false
+            )
+        },
+    ) {
+        val buildOptions = if (disableIsolatedProjects) defaultBuildOptions.copy(
+            isolatedProjects = IsolatedProjectsMode.DISABLED
+        ) else defaultBuildOptions
+
+        nativeProject(project, gradleVersion, buildOptions = buildOptions.copy(buildReport = listOf(buildReportOutput))) {
+            addNativeCompilerArgs(freeCompilerArgs)
+            build(task, "-Pkotlin.build.report.json.directory=${projectPath.resolve("report").pathString}") {
+                assertBuildReportPathIsPrinted()
+            }
+            //Should contain build metrics for all compile kotlin tasks
+            reportValidation()
+        }
+    }
+
+    private fun TestProject.addNativeCompilerArgs(args: List<String>) {
+        if (args.isNotEmpty()) {
+            buildGradleKts.appendText(
+                """
+                    
+                kotlin {
+                    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinNativeCompile>().configureEach {
+                        compilerOptions {
+                            freeCompilerArgs.addAll(${args.joinToString { "\"$it\"" }})
+                        }
+                    }
+                }
+                """.trimIndent()
+            )
+        }
+    }
+
+    val nativeBuildExpectedMetrics = arrayOf(
+        CustomBuildTimeMetric.createIfDoesNotExistAndReturn("InlineFunctionSerializationPreProcessing"),
+        CustomBuildTimeMetric.createIfDoesNotExistAndReturn("ValidateIrBeforeLowering"),
+        CustomBuildTimeMetric.createIfDoesNotExistAndReturn("ValidateIrAfterLowering"),
+        CustomBuildTimeMetric.createIfDoesNotExistAndReturn("llvm-default.AlwaysInlinerPass"),
+        CustomBuildTimeMetric.createIfDoesNotExistAndReturn("InlineFunctionSerializationPreProcessing"),
+        RUN_COMPILATION_IN_WORKER,
+        NATIVE_IN_PROCESS,
+        IR_PRE_LOWERING,
+        IR_SERIALIZATION,
+        IR_LOWERING,
+        BACKEND
+    )
+
+    val nativeBuildFileExpectedContents = listOf(
+        "Time metrics:",
+        "Size metrics:",
+    ) + nativeBuildExpectedMetrics.map { "${it.readableString}:" }
+
+
+    private fun nonIncrementalBuildFileExpectedContents(kotlinLanguageVersion: String) = listOf(
+        "Time metrics:",
+        "Run compilation:",
+        "Incremental compilation in daemon:",
+        "Size metrics:",
+        "Total size of the cache directory:",
+        "Total compiler iteration:",
+        "ABI snapshot size:",
+        //for non-incremental builds
+        "Build attributes:",
+        "REBUILD_REASON:",
+        //gc metrics
+        "GC count:",
+        "GC time:",
+        //task info
+        "Task info:",
+        "Kotlin language version: $kotlinLanguageVersion",
+    )
+
+    private fun TestProject.validateBuildReportFile(
+        expectedReportLines: List<String>,
+        additionalReportLines: List<String>,
+        doValidateSizeMetrics: Boolean = true,
+    ) {
         val fileContents = assertFileContains(
             reportFile,
-            "Time metrics:",
-            "Run compilation:",
-            "Incremental compilation in daemon:",
-            "Size metrics:",
-            "Total size of the cache directory:",
-            "Total compiler iteration:",
-            "ABI snapshot size:",
-            //for non-incremental builds
-            "Build attributes:",
-            "REBUILD_REASON:",
-            //gc metrics
-            "GC count:",
-            "GC time:",
-            //task info
-            "Task info:",
-            "Kotlin language version: $kotlinLanguageVersion",
+            *expectedReportLines.toTypedArray(),
+            *additionalReportLines.toTypedArray()
         )
 
         fun validateTotalCachesSizeMetric() {
@@ -206,8 +397,10 @@ class BuildReportsIT : KGPBaseTest() {
             assertEquals(formatSize(actualSnapshotSize), reportedSnapshotSize)
         }
 
-        validateTotalCachesSizeMetric()
-        validateSnapshotSizeMetric()
+        if (doValidateSizeMetrics) {
+            validateTotalCachesSizeMetric()
+            validateSnapshotSizeMetric()
+        }
     }
 
     @DisplayName("Compiler build metrics report is produced")
@@ -472,23 +665,14 @@ class BuildReportsIT : KGPBaseTest() {
             projectName = "simpleProject",
             gradleVersion = gradleVersion,
         ) {
-            val kotlinErrorPaths = setOf(
-                projectPersistentCache.resolve("errors"),
-                projectPath.resolve(".gradle/kotlin/errors")
-            )
-
-            build("compileKotlin", buildOptions = defaultBuildOptions.copy(logLevel = LogLevel.DEBUG)) {
-                assertOutputDoesNotContain("errors were stored into file")
-                for (kotlinErrorPath in kotlinErrorPaths) {
-                    assertDirectoryDoesNotExist(kotlinErrorPath)
+            assertNoErrorFilesCreated {
+                build("compileKotlin", buildOptions = defaultBuildOptions.copy(logLevel = LogLevel.DEBUG)) {
+                    assertNoErrorFileCreatedInOutput()
                 }
-            }
-            val kotlinFile = kotlinSourcesDir().resolve("helloWorld.kt")
-            kotlinFile.modify { it.replace("ArrayList", "skjfghsjk") }
-            buildAndFail("compileKotlin", buildOptions = defaultBuildOptions.copy(logLevel = LogLevel.DEBUG)) {
-                assertOutputDoesNotContain("errors were stored into file")
-                for (kotlinErrorPath in kotlinErrorPaths) {
-                    assertDirectoryDoesNotExist(kotlinErrorPath)
+                val kotlinFile = kotlinSourcesDir().resolve("helloWorld.kt")
+                kotlinFile.modify { it.replace("ArrayList", "skjfghsjk") }
+                buildAndFail("compileKotlin", buildOptions = defaultBuildOptions.copy(logLevel = LogLevel.DEBUG)) {
+                    assertNoErrorFileCreatedInOutput()
                 }
             }
         }
@@ -694,16 +878,17 @@ class BuildReportsIT : KGPBaseTest() {
     @DisplayName("build scan with project isolation")
     @JvmGradlePluginTests
     @GradleTestVersions(
-        minVersion = TestVersions.Gradle.G_8_0,
         //There is an exception for gradle 7.6 with project isolation:
         //Plugin 'com.gradle.enterprise': Cannot access project ':app' from project ':'
+        minVersion = TestVersions.Gradle.G_8_0,
+        // https://youtrack.jetbrains.com/issue/KT-68847
+        maxVersion = TestVersions.Gradle.G_8_14,
     )
     @GradleTest
     fun testBuildScanReportWithProjectIsolation(gradleVersion: GradleVersion) {
         project(
             "incrementalMultiproject", gradleVersion,
             buildOptions = defaultBuildOptions.copy(
-                logLevel = LogLevel.DEBUG,
                 isolatedProjects = IsolatedProjectsMode.ENABLED,
                 buildReport = listOf(BuildReportType.BUILD_SCAN)
             )
@@ -766,6 +951,35 @@ class BuildReportsIT : KGPBaseTest() {
         }
     }
 
+    @DisplayName("Verify metrics for for 2nd phase native in-process compilation")
+    @NativeGradlePluginTests
+    @GradleTest
+    @GradleTestVersions(
+        additionalVersions = [TestVersions.Gradle.G_8_2],
+    )
+    fun testMetricFor2ndPhaseNativeProjectInProcess(gradleVersion: GradleVersion) {
+        nativeProject(
+            "native-incremental-simple", gradleVersion, buildOptions = defaultBuildOptions.copy(
+                nativeOptions = defaultBuildOptions.nativeOptions.copy(
+                    incremental = true
+                ),
+                buildReport = listOf(BuildReportType.JSON)
+            )
+        ) {
+            build("linkDebugExecutableHost", "-Pkotlin.build.report.json.directory=${projectPath.resolve("report").pathString}") {
+                validateJsonReport(
+                    taskName = null, NATIVE_IN_PROCESS,
+                    CustomBuildTimeMetric.createIfDoesNotExistAndReturn("ValidateIrBeforeLowering", IR_LOWERING),
+                    CustomBuildTimeMetric.createIfDoesNotExistAndReturn("TestProcessor", IR_LOWERING),
+                    CustomBuildTimeMetric.createIfDoesNotExistAndReturn("Autobox", IR_LOWERING),
+                    CustomBuildTimeMetric.createIfDoesNotExistAndReturn("ConstructorsLowering", IR_LOWERING),
+                    CustomBuildTimeMetric.createIfDoesNotExistAndReturn("ValidateIrAfterLowering", IR_LOWERING),
+                    CustomBuildTimeMetric.createIfDoesNotExistAndReturn("UpgradeCallableReferences", IR_PRE_LOWERING),
+                )
+            }
+        }
+    }
+
     @DisplayName("Verify that the metric for native in-process compilation")
     @NativeGradlePluginTests
     @GradleTest
@@ -782,21 +996,91 @@ class BuildReportsIT : KGPBaseTest() {
             )
         ) {
             build("linkDebugExecutableHost", "-Pkotlin.build.report.json.directory=${projectPath.resolve("report").pathString}") {
-                val jsonReportFile = projectPath.getSingleFileInDir("report")
-                assertTrue { jsonReportFile.exists() }
-                val jsonReport = readJsonReport(jsonReportFile)
-                assertContains(jsonReport.aggregatedMetrics.buildTimes.asMapMs().keys, GradleBuildTime.NATIVE_IN_PROCESS)
 
-                val compilerMetrics = GradleBuildTime.COMPILER_PERFORMANCE.allChildrenMetrics()
-                val reportedCompilerMetrics = jsonReport.aggregatedMetrics.buildTimes.asMapMs().keys.filter { it in compilerMetrics }
+                validateJsonReport(
+                    taskName = null,
+                    NATIVE_IN_PROCESS,
+                    CustomBuildTimeMetric.createIfDoesNotExistAndReturn("AvoidLocalFOsInInlineFunctionsLowering", IR_PRE_LOWERING),
+                    CustomBuildTimeMetric.createIfDoesNotExistAndReturn("llvm-default.AlwaysInlinerPass", BACKEND)
+                ) { jsonReport ->
+                    val compilerMetrics = COMPILER_PERFORMANCE.getAllChildren()
+                    val reportedCompilerMetrics =
+                        jsonReport.aggregatedMetrics.buildTimes.buildTimesMapMs().keys.filter { it in compilerMetrics }
 
-                //After KT-76477 is fixed, all compiler metrics are expected
-                assertEquals(listOf(GradleBuildTime.COMPILER_INITIALIZATION), reportedCompilerMetrics)
+                    // Recursively (only two levels) gather leaves of subtree under COMPILER_PERFORMANCE, excluding nodes like CODE_GENERATION
+                    val expected = compilerPerformanceMetrics()
+                    reportedCompilerMetrics.assertContainsValues(expected)
+                }
+
+            }
+        }
+    }
+
+    @DisplayName("Verify that the metric for native in-process compilation with IR Inliner on 1st phase")
+    @NativeGradlePluginTests
+    @GradleTest
+    @GradleTestVersions(
+        additionalVersions = [TestVersions.Gradle.G_8_2],
+    )
+    fun testMetricForNativeProjectWithInilnedFunInKlibInProcess(gradleVersion: GradleVersion) {
+        nativeProject(
+            "native-incremental-simple", gradleVersion, buildOptions = defaultBuildOptions.copy(
+                nativeOptions = defaultBuildOptions.nativeOptions.copy(
+                    incremental = true
+                ),
+                buildReport = listOf(BuildReportType.JSON)
+            )
+        ) {
+            buildScriptInjection {
+                project.applyMultiplatform {
+                    compilerOptions.freeCompilerArgs.addAll(
+                        "-Xklib-ir-inliner=full",
+                    )
+                }
+            }
+            build("linkDebugExecutableHost", "-Pkotlin.build.report.json.directory=${projectPath.resolve("report").pathString}") {
+
+                validateJsonReport(
+                    taskName = null,
+                    NATIVE_IN_PROCESS,
+                    CustomBuildTimeMetric.createIfDoesNotExistAndReturn("UpgradeCallableReferences", IR_PRE_LOWERING),
+                    CustomBuildTimeMetric.createIfDoesNotExistAndReturn("AssertionWrapperLowering", IR_PRE_LOWERING),
+                    CustomBuildTimeMetric.createIfDoesNotExistAndReturn("AvoidLocalFOsInInlineFunctionsLowering", IR_PRE_LOWERING),
+                    CustomBuildTimeMetric.createIfDoesNotExistAndReturn("LateinitLowering", IR_PRE_LOWERING)
+                ) { buildExecutionData ->
+                    val compilerMetrics = COMPILER_PERFORMANCE.getAllChildren()
+                    val reportedCompilerMetrics =
+                        buildExecutionData.aggregatedMetrics.buildTimes.buildTimesMapMs().keys.filter { it in compilerMetrics }
+
+                    // Recursively (only two levels) gather leaves of subtree under COMPILER_PERFORMANCE, excluding nodes like CODE_GENERATION
+                    val expected = compilerPerformanceMetrics()
+                    reportedCompilerMetrics.assertContainsValues(expected)
+                }
+
             }
         }
     }
 
     companion object {
         private const val CAN_NOT_ADD_CUSTOM_VALUES_TO_BUILD_SCAN_MESSAGE = "Can't add any more custom values into build scan"
+        private fun compilerPerformanceMetrics(): List<BuildTimeMetric> = allBuildTimeMetricsByParentMap[COMPILER_PERFORMANCE]!!
+            .flatMap { allBuildTimeMetricsByParentMap[it] ?: listOf(it) }
+            .filter { it !is CustomBuildTimeMetric }
+
+        private fun Collection<BuildPerformanceMetric>.assertContainsValues(vararg expectedValues: String) {
+            val missedKeys = expectedValues.filter { metricName -> find { it.name == metricName } == null }
+            assertTrue(
+                missedKeys.isEmpty(),
+                "${missedKeys.joinToString(prefix = "<", postfix = ">")} build metrics are missed in " +
+                        joinToString(prefix = "<", postfix = ">") { it.name }
+            )
+        }
+
+        private fun Collection<BuildPerformanceMetric>.assertContainsValues(expectedValues: Collection<BuildPerformanceMetric>) {
+            assertContainsValues(*expectedValues.map { it.name }.toTypedArray())
+        }
+
+        private fun BuildPerformanceMetric.getAllChildren(): List<BuildPerformanceMetric> =
+            allBuildTimeMetricsByParentMap[this]?.flatMap { it.getAllChildren() + it } ?: emptyList()
     }
 }

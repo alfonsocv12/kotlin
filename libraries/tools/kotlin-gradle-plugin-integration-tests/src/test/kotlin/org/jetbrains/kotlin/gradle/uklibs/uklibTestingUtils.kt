@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.gradle.uklibs
 
 import org.gradle.api.Project
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository
+import org.gradle.api.initialization.ConfigurableIncludedBuild
 import org.gradle.api.plugins.ExtraPropertiesExtension
 import org.gradle.api.publish.PublishingExtension
 import org.gradle.api.publish.maven.MavenPublication
@@ -25,6 +26,7 @@ import java.io.Serializable
 import java.net.URLClassLoader
 import java.nio.file.Files
 import java.util.*
+import kotlin.text.set
 
 fun Project.applyMultiplatform(
     configure: KotlinMultiplatformExtension.() -> Unit,
@@ -238,11 +240,14 @@ fun TestProject.include(
 
 fun TestProject.includeBuild(
     subproject: TestProject,
+    configure: ConfigurableIncludedBuild.() -> Unit = {},
 ) {
     val includeBuildIdentifier = "included_${generateIdentifier()}"
     Files.createSymbolicLink(projectPath.resolve(includeBuildIdentifier), subproject.projectPath)
     settingsBuildScriptInjection {
-        settings.includeBuild(includeBuildIdentifier)
+        settings.includeBuild(includeBuildIdentifier) {
+            it.configure()
+        }
     }
 }
 
@@ -254,8 +259,7 @@ fun TestProject.dumpKlibMetadataSignatures(klib: File): String {
     buildScriptInjection {
         project.tasks.register(dumpName) {
             val nativeCompilerClasspath = project.objects.nativeCompilerClasspath(
-                project.nativeProperties.actualNativeHomeDirectory,
-                project.nativeProperties.shouldUseEmbeddableCompilerJar,
+                project.nativeProperties.actualNativeHomeDirectory
             )
             it.inputs.files(nativeCompilerClasspath)
             it.doLast {
@@ -313,6 +317,13 @@ internal fun Project.setUklibResolutionStrategy(strategy: KmpResolutionStrategy 
     propertiesExtension.set(
         PropertiesProvider.PropertyNames.KOTLIN_KMP_RESOLUTION_STRATEGY,
         strategy.propertyName,
+    )
+}
+
+internal fun Project.enableCinteropCommonization() {
+    propertiesExtension.set(
+        PropertiesProvider.PropertyNames.KOTLIN_MPP_ENABLE_CINTEROP_COMMONIZATION,
+        true,
     )
 }
 

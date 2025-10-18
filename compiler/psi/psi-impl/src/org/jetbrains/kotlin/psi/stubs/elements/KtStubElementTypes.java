@@ -8,17 +8,18 @@ package org.jetbrains.kotlin.psi.stubs.elements;
 import org.jetbrains.kotlin.psi.*;
 
 public interface KtStubElementTypes {
-    KtClassElementType CLASS = new KtClassElementType("CLASS");
+    KtClassElementType CLASS = KtClassElementType.INSTANCE;
     KtFunctionElementType FUNCTION = new KtFunctionElementType("FUN");
     KtPropertyElementType PROPERTY = new KtPropertyElementType("PROPERTY");
     KtPropertyAccessorElementType PROPERTY_ACCESSOR = new KtPropertyAccessorElementType("PROPERTY_ACCESSOR");
     KtBackingFieldElementType BACKING_FIELD = new KtBackingFieldElementType("BACKING_FIELD");
     KtTypeAliasElementType TYPEALIAS = new KtTypeAliasElementType("TYPEALIAS");
 
-    KtClassElementType ENUM_ENTRY = new KtClassElementType("ENUM_ENTRY");
+    KtEnumEntryElementType ENUM_ENTRY = KtEnumEntryElementType.INSTANCE;
     KtObjectElementType OBJECT_DECLARATION = new KtObjectElementType("OBJECT_DECLARATION");
     KtPlaceHolderStubElementType<KtClassInitializer> CLASS_INITIALIZER =
             new KtPlaceHolderStubElementType<>("CLASS_INITIALIZER", KtClassInitializer.class);
+    KtPlaceHolderStubElementType<KtScriptInitializer> SCRIPT_INITIALIZER = KtScriptInitializerElementType.INSTANCE;
     KtSecondaryConstructorElementType SECONDARY_CONSTRUCTOR =
             new KtSecondaryConstructorElementType("SECONDARY_CONSTRUCTOR");
     KtPrimaryConstructorElementType PRIMARY_CONSTRUCTOR =
@@ -32,7 +33,7 @@ public interface KtStubElementTypes {
     KtPlaceHolderStubElementType<KtTypeParameterList> TYPE_PARAMETER_LIST =
             new KtPlaceHolderStubElementType<>("TYPE_PARAMETER_LIST", KtTypeParameterList.class);
 
-    KtAnnotationEntryElementType ANNOTATION_ENTRY = new KtAnnotationEntryElementType("ANNOTATION_ENTRY");
+    KtAnnotationEntryElementType ANNOTATION_ENTRY = KtAnnotationEntryElementType.INSTANCE;
     KtPlaceHolderStubElementType<KtAnnotation> ANNOTATION =
             new KtPlaceHolderStubElementType<>("ANNOTATION", KtAnnotation.class);
 
@@ -89,6 +90,7 @@ public interface KtStubElementTypes {
 
     KtNameReferenceExpressionElementType REFERENCE_EXPRESSION = new KtNameReferenceExpressionElementType("REFERENCE_EXPRESSION");
     KtDotQualifiedExpressionElementType DOT_QUALIFIED_EXPRESSION = new KtDotQualifiedExpressionElementType("DOT_QUALIFIED_EXPRESSION");
+    KtPlaceHolderStubElementType<KtCallExpression> CALL_EXPRESSION = KtCallExpressionElementType.INSTANCE;
     KtEnumEntrySuperClassReferenceExpressionElementType
             ENUM_ENTRY_SUPERCLASS_REFERENCE_EXPRESSION =
             new KtEnumEntrySuperClassReferenceExpressionElementType("ENUM_ENTRY_SUPERCLASS_REFERENCE_EXPRESSION");

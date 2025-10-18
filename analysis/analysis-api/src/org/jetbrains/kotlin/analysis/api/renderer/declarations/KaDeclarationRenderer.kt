@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.analysis.api.renderer.declarations
 
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
+import org.jetbrains.kotlin.analysis.api.KaExtensibleApi
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.renderer.base.KaKeywordsRenderer
 import org.jetbrains.kotlin.analysis.api.renderer.base.annotations.KaAnnotationRenderer
@@ -105,7 +106,7 @@ public class KaDeclarationRenderer private constructor(
             is KaEnumEntrySymbol -> enumEntryRenderer.renderSymbol(analysisSession, symbol, this, printer)
             is KaValueParameterSymbol -> valueParameterRenderer.renderSymbol(analysisSession, symbol, this, printer)
             is KaContextParameterSymbol -> contextParameterRenderer.renderSymbol(analysisSession, symbol, this, printer)
-            is KaReceiverParameterSymbol -> {}
+            is KaReceiverParameterSymbol -> callableReceiverRenderer.renderReceiver(analysisSession, symbol, this, printer)
             is KaJavaFieldSymbol -> javaFieldRenderer.renderSymbol(analysisSession, symbol, this, printer)
             is KaLocalVariableSymbol -> localVariableRenderer.renderSymbol(analysisSession, symbol, this, printer)
             is KaKotlinPropertySymbol -> kotlinPropertyRenderer.renderSymbol(analysisSession, symbol, this, printer)
@@ -191,6 +192,7 @@ public class KaDeclarationRenderer private constructor(
     }
 
     @KaExperimentalApi
+    @KaExtensibleApi
     public open class Builder {
         public lateinit var returnTypeFilter: KaCallableReturnTypeFilter
         public lateinit var nameRenderer: KaDeclarationNameRenderer

@@ -19,6 +19,12 @@ import java.util.regex.Pattern;
 @TestDataPath("$PROJECT_ROOT")
 public class CompilerFacilityTestForComposeCompilerPluginGenerated extends AbstractCompilerFacilityTestForComposeCompilerPlugin {
   @Test
+  @TestMetadata("abstractDefaults.kt")
+  public void testAbstractDefaults() {
+    runTest("plugins/compose/compiler-hosted/testData/codegen/abstractDefaults.kt");
+  }
+
+  @Test
   public void testAllFilesPresentInCodegen() {
     KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("plugins/compose/compiler-hosted/testData/codegen"), Pattern.compile("^(.+)\\.kt$"), null, true);
   }
@@ -69,6 +75,12 @@ public class CompilerFacilityTestForComposeCompilerPluginGenerated extends Abstr
   @TestMetadata("inlineFuncWithExposedComposableSingleton.kt")
   public void testInlineFuncWithExposedComposableSingleton() {
     runTest("plugins/compose/compiler-hosted/testData/codegen/inlineFuncWithExposedComposableSingleton.kt");
+  }
+
+  @Test
+  @TestMetadata("inlineFunctionReference.kt")
+  public void testInlineFunctionReference() {
+    runTest("plugins/compose/compiler-hosted/testData/codegen/inlineFunctionReference.kt");
   }
 
   @Test
@@ -177,6 +189,12 @@ public class CompilerFacilityTestForComposeCompilerPluginGenerated extends Abstr
   @TestMetadata("sourceLibModuleInlinePropertyGetter.kt")
   public void testSourceLibModuleInlinePropertyGetter() {
     runTest("plugins/compose/compiler-hosted/testData/codegen/sourceLibModuleInlinePropertyGetter.kt");
+  }
+
+  @Test
+  @TestMetadata("testOverrideLambda.kt")
+  public void testTestOverrideLambda() {
+    runTest("plugins/compose/compiler-hosted/testData/codegen/testOverrideLambda.kt");
   }
 
   @Test

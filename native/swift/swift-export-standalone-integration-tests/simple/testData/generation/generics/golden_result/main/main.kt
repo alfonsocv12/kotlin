@@ -4,6 +4,7 @@
 @file:kotlin.native.internal.objc.BindClassToObjCName(CPImpl::class, "4main6CPImplC")
 @file:kotlin.native.internal.objc.BindClassToObjCName(DefaultBox::class, "4main10DefaultBoxC")
 @file:kotlin.native.internal.objc.BindClassToObjCName(Demo::class, "4main4DemoC")
+@file:kotlin.native.internal.objc.BindClassToObjCName(GenericWithComparableUpperBound::class, "4main31GenericWithComparableUpperBoundC")
 @file:kotlin.native.internal.objc.BindClassToObjCName(IdentityProcessor::class, "4main17IdentityProcessorC")
 @file:kotlin.native.internal.objc.BindClassToObjCName(Pair::class, "4main4PairC")
 @file:kotlin.native.internal.objc.BindClassToObjCName(StringProducer::class, "4main14StringProducerC")
@@ -26,8 +27,8 @@ public fun A_foo_get(self: kotlin.native.internal.NativePtr): kotlin.native.inte
     return if (_result == null) kotlin.native.internal.NativePtr.NULL else kotlin.native.internal.ref.createRetainedExternalRCRef(_result)
 }
 
-@ExportedBridge("AnyConsumer_consume__TypesOfArguments__KotlinRuntime_KotlinBase__")
-public fun AnyConsumer_consume__TypesOfArguments__KotlinRuntime_KotlinBase__(self: kotlin.native.internal.NativePtr, item: kotlin.native.internal.NativePtr): Unit {
+@ExportedBridge("AnyConsumer_consume__TypesOfArguments__anyU20KotlinRuntimeSupport__KotlinBridgeable__")
+public fun AnyConsumer_consume__TypesOfArguments__anyU20KotlinRuntimeSupport__KotlinBridgeable__(self: kotlin.native.internal.NativePtr, item: kotlin.native.internal.NativePtr): Unit {
     val __self = kotlin.native.internal.ref.dereferenceExternalRCRef(self) as AnyConsumer
     val __item = kotlin.native.internal.ref.dereferenceExternalRCRef(item) as kotlin.Any
     __self.consume(__item)
@@ -54,8 +55,8 @@ public fun CPImpl_consume__TypesOfArguments__Swift_String__(self: kotlin.native.
     __self.consume(__item)
 }
 
-@ExportedBridge("Consumer_consume__TypesOfArguments__Swift_Optional_KotlinRuntime_KotlinBase___")
-public fun Consumer_consume__TypesOfArguments__Swift_Optional_KotlinRuntime_KotlinBase___(self: kotlin.native.internal.NativePtr, item: kotlin.native.internal.NativePtr): Unit {
+@ExportedBridge("Consumer_consume__TypesOfArguments__Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable___")
+public fun Consumer_consume__TypesOfArguments__Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable___(self: kotlin.native.internal.NativePtr, item: kotlin.native.internal.NativePtr): Unit {
     val __self = kotlin.native.internal.ref.dereferenceExternalRCRef(self) as Consumer<kotlin.Any?>
     val __item = if (item == kotlin.native.internal.NativePtr.NULL) null else kotlin.native.internal.ref.dereferenceExternalRCRef(item) as kotlin.Any
     __self.consume(__item)
@@ -68,8 +69,15 @@ public fun Demo_foo_get(self: kotlin.native.internal.NativePtr): Int {
     return _result
 }
 
-@ExportedBridge("IdentityProcessor_process__TypesOfArguments__Swift_Optional_KotlinRuntime_KotlinBase___")
-public fun IdentityProcessor_process__TypesOfArguments__Swift_Optional_KotlinRuntime_KotlinBase___(self: kotlin.native.internal.NativePtr, input: kotlin.native.internal.NativePtr): kotlin.native.internal.NativePtr {
+@ExportedBridge("GenericWithComparableUpperBound_t_get")
+public fun GenericWithComparableUpperBound_t_get(self: kotlin.native.internal.NativePtr): kotlin.native.internal.NativePtr {
+    val __self = kotlin.native.internal.ref.dereferenceExternalRCRef(self) as GenericWithComparableUpperBound<kotlin.Comparable<kotlin.Any?>>
+    val _result = __self.t
+    return kotlin.native.internal.ref.createRetainedExternalRCRef(_result)
+}
+
+@ExportedBridge("IdentityProcessor_process__TypesOfArguments__Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable___")
+public fun IdentityProcessor_process__TypesOfArguments__Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable___(self: kotlin.native.internal.NativePtr, input: kotlin.native.internal.NativePtr): kotlin.native.internal.NativePtr {
     val __self = kotlin.native.internal.ref.dereferenceExternalRCRef(self) as IdentityProcessor<kotlin.Any?>
     val __input = if (input == kotlin.native.internal.NativePtr.NULL) null else kotlin.native.internal.ref.dereferenceExternalRCRef(input) as kotlin.Any
     val _result = __self.process(__input)
@@ -90,8 +98,8 @@ public fun Pair_second_get(self: kotlin.native.internal.NativePtr): kotlin.nativ
     return if (_result == null) kotlin.native.internal.NativePtr.NULL else kotlin.native.internal.ref.createRetainedExternalRCRef(_result)
 }
 
-@ExportedBridge("Processor_process__TypesOfArguments__Swift_Optional_KotlinRuntime_KotlinBase___")
-public fun Processor_process__TypesOfArguments__Swift_Optional_KotlinRuntime_KotlinBase___(self: kotlin.native.internal.NativePtr, input: kotlin.native.internal.NativePtr): kotlin.native.internal.NativePtr {
+@ExportedBridge("Processor_process__TypesOfArguments__Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable___")
+public fun Processor_process__TypesOfArguments__Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable___(self: kotlin.native.internal.NativePtr, input: kotlin.native.internal.NativePtr): kotlin.native.internal.NativePtr {
     val __self = kotlin.native.internal.ref.dereferenceExternalRCRef(self) as Processor<kotlin.Any?, kotlin.Any?>
     val __input = if (input == kotlin.native.internal.NativePtr.NULL) null else kotlin.native.internal.ref.dereferenceExternalRCRef(input) as kotlin.Any
     val _result = __self.process(__input)
@@ -142,8 +150,8 @@ public fun __root___DefaultBox_init_allocate(): kotlin.native.internal.NativePtr
     return kotlin.native.internal.ref.createRetainedExternalRCRef(_result)
 }
 
-@ExportedBridge("__root___DefaultBox_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer_Swift_Optional_KotlinRuntime_KotlinBase___")
-public fun __root___DefaultBox_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer_Swift_Optional_KotlinRuntime_KotlinBase___(__kt: kotlin.native.internal.NativePtr, t: kotlin.native.internal.NativePtr): Unit {
+@ExportedBridge("__root___DefaultBox_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer_Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable___")
+public fun __root___DefaultBox_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer_Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable___(__kt: kotlin.native.internal.NativePtr, t: kotlin.native.internal.NativePtr): Unit {
     val ____kt = kotlin.native.internal.ref.dereferenceExternalRCRef(__kt)!!
     val __t = if (t == kotlin.native.internal.NativePtr.NULL) null else kotlin.native.internal.ref.dereferenceExternalRCRef(t) as kotlin.Any
     kotlin.native.internal.initInstance(____kt, DefaultBox<kotlin.Any?>(__t))
@@ -159,6 +167,19 @@ public fun __root___Demo_init_allocate(): kotlin.native.internal.NativePtr {
 public fun __root___Demo_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer__(__kt: kotlin.native.internal.NativePtr): Unit {
     val ____kt = kotlin.native.internal.ref.dereferenceExternalRCRef(__kt)!!
     kotlin.native.internal.initInstance(____kt, Demo())
+}
+
+@ExportedBridge("__root___GenericWithComparableUpperBound_init_allocate")
+public fun __root___GenericWithComparableUpperBound_init_allocate(): kotlin.native.internal.NativePtr {
+    val _result = kotlin.native.internal.createUninitializedInstance<GenericWithComparableUpperBound<kotlin.Comparable<kotlin.Any?>>>()
+    return kotlin.native.internal.ref.createRetainedExternalRCRef(_result)
+}
+
+@ExportedBridge("__root___GenericWithComparableUpperBound_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer_anyU20ExportedKotlinPackages_kotlin_Comparable__")
+public fun __root___GenericWithComparableUpperBound_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer_anyU20ExportedKotlinPackages_kotlin_Comparable__(__kt: kotlin.native.internal.NativePtr, t: kotlin.native.internal.NativePtr): Unit {
+    val ____kt = kotlin.native.internal.ref.dereferenceExternalRCRef(__kt)!!
+    val __t = kotlin.native.internal.ref.dereferenceExternalRCRef(t) as kotlin.Comparable<kotlin.Any?>
+    kotlin.native.internal.initInstance(____kt, GenericWithComparableUpperBound<kotlin.Comparable<kotlin.Any?>>(__t))
 }
 
 @ExportedBridge("__root___IdentityProcessor_init_allocate")
@@ -179,8 +200,8 @@ public fun __root___Pair_init_allocate(): kotlin.native.internal.NativePtr {
     return kotlin.native.internal.ref.createRetainedExternalRCRef(_result)
 }
 
-@ExportedBridge("__root___Pair_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer_Swift_Optional_KotlinRuntime_KotlinBase__Swift_Optional_KotlinRuntime_KotlinBase___")
-public fun __root___Pair_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer_Swift_Optional_KotlinRuntime_KotlinBase__Swift_Optional_KotlinRuntime_KotlinBase___(__kt: kotlin.native.internal.NativePtr, first: kotlin.native.internal.NativePtr, second: kotlin.native.internal.NativePtr): Unit {
+@ExportedBridge("__root___Pair_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer_Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable__Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable___")
+public fun __root___Pair_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer_Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable__Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable___(__kt: kotlin.native.internal.NativePtr, first: kotlin.native.internal.NativePtr, second: kotlin.native.internal.NativePtr): Unit {
     val ____kt = kotlin.native.internal.ref.dereferenceExternalRCRef(__kt)!!
     val __first = if (first == kotlin.native.internal.NativePtr.NULL) null else kotlin.native.internal.ref.dereferenceExternalRCRef(first) as kotlin.Any
     val __second = if (second == kotlin.native.internal.NativePtr.NULL) null else kotlin.native.internal.ref.dereferenceExternalRCRef(second) as kotlin.Any
@@ -218,21 +239,22 @@ public fun __root___createMap__TypesOfArguments__Swift_Array_main_Pair___(pairs:
     return _result.objcPtr()
 }
 
-@ExportedBridge("__root___customFilter__TypesOfArguments__Swift_Array_Swift_Optional_KotlinRuntime_KotlinBase___U28Swift_Optional_KotlinRuntime_KotlinBase_U29202D_U20Swift_Bool__")
-public fun __root___customFilter__TypesOfArguments__Swift_Array_Swift_Optional_KotlinRuntime_KotlinBase___U28Swift_Optional_KotlinRuntime_KotlinBase_U29202D_U20Swift_Bool__(`receiver`: kotlin.native.internal.NativePtr, predicate: kotlin.native.internal.NativePtr): kotlin.native.internal.NativePtr {
+@ExportedBridge("__root___customFilter__TypesOfArguments__Swift_Array_Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable___U28Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable_U29202D_U20Swift_Bool__")
+public fun __root___customFilter__TypesOfArguments__Swift_Array_Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable___U28Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable_U29202D_U20Swift_Bool__(`receiver`: kotlin.native.internal.NativePtr, predicate: kotlin.native.internal.NativePtr): kotlin.native.internal.NativePtr {
     val __receiver = interpretObjCPointer<kotlin.collections.List<kotlin.Any?>>(`receiver`)
     val __predicate = run {
         val kotlinFun = convertBlockPtrToKotlinFunction<(kotlin.native.internal.NativePtr)->Boolean>(predicate);
         { arg0: kotlin.Any? ->
-            kotlinFun(if (arg0 == null) kotlin.native.internal.NativePtr.NULL else kotlin.native.internal.ref.createRetainedExternalRCRef(arg0))
+            val _result = kotlinFun(if (arg0 == null) kotlin.native.internal.NativePtr.NULL else kotlin.native.internal.ref.createRetainedExternalRCRef(arg0))
+            _result
         }
     }
     val _result = __receiver.customFilter(__predicate)
     return _result.objcPtr()
 }
 
-@ExportedBridge("__root___foo__TypesOfArguments__Swift_Optional_KotlinRuntime_KotlinBase__Swift_Optional_KotlinRuntime_KotlinBase___")
-public fun __root___foo__TypesOfArguments__Swift_Optional_KotlinRuntime_KotlinBase__Swift_Optional_KotlinRuntime_KotlinBase___(param1: kotlin.native.internal.NativePtr, param2: kotlin.native.internal.NativePtr): Unit {
+@ExportedBridge("__root___foo__TypesOfArguments__Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable__Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable___")
+public fun __root___foo__TypesOfArguments__Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable__Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable___(param1: kotlin.native.internal.NativePtr, param2: kotlin.native.internal.NativePtr): Unit {
     val __param1 = if (param1 == kotlin.native.internal.NativePtr.NULL) null else kotlin.native.internal.ref.dereferenceExternalRCRef(param1) as kotlin.Any
     val __param2 = if (param2 == kotlin.native.internal.NativePtr.NULL) null else kotlin.native.internal.ref.dereferenceExternalRCRef(param2) as kotlin.Any
     foo(__param1, __param2)

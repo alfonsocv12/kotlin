@@ -102,7 +102,6 @@ internal fun generateTemporaryVariable(
         this.initializer = initializer
         symbol = FirLocalPropertySymbol()
         isVar = false
-        isLocal = true
         status = FirDeclarationStatusImpl(Visibilities.Local, Modality.FINAL)
         (source.psi as? KtAnnotated)?.extractAnnotationsTo(this)
     }
@@ -125,8 +124,8 @@ internal fun generateTemporaryVariable(
         extractAnnotationsTo,
     )
 
+context(c: DestructuringContext<KtDestructuringDeclarationEntry>)
 internal fun AbstractRawFirBuilder<*>.generateDestructuringBlock(
-    c: DestructuringContext<KtDestructuringDeclarationEntry>,
     moduleData: FirModuleData,
     multiDeclaration: KtDestructuringDeclaration,
     container: FirVariable,
@@ -136,7 +135,6 @@ internal fun AbstractRawFirBuilder<*>.generateDestructuringBlock(
         source = multiDeclaration.toKtPsiSourceElement(KtFakeSourceElementKind.DestructuringBlock)
         addDestructuringVariables(
             statements,
-            c,
             moduleData,
             multiDeclaration,
             container,
@@ -146,9 +144,9 @@ internal fun AbstractRawFirBuilder<*>.generateDestructuringBlock(
     }
 }
 
+context(c: DestructuringContext<KtDestructuringDeclarationEntry>)
 internal fun AbstractRawFirBuilder<*>.addDestructuringVariables(
     destination: MutableList<in FirVariable>,
-    c: DestructuringContext<KtDestructuringDeclarationEntry>,
     moduleData: FirModuleData,
     multiDeclaration: KtDestructuringDeclaration,
     container: FirVariable,
@@ -158,13 +156,12 @@ internal fun AbstractRawFirBuilder<*>.addDestructuringVariables(
 ) {
     addDestructuringVariables(
         destination,
-        c,
         moduleData,
         container,
         multiDeclaration.entries,
-        multiDeclaration.isVar,
-        tmpVariable,
-        forceLocal,
-        configure
+        isNameBased = !multiDeclaration.hasSquareBrackets() && (multiDeclaration.isFullForm || nameBasedDestructuringShortForm),
+        isTmpVariable = tmpVariable,
+        forceLocal = forceLocal,
+        configure,
     )
 }

@@ -22,8 +22,6 @@ open class CommonizerHierarchicalIT : KGPBaseTest() {
         nativeProject(
             "commonizeHierarchically",
             gradleVersion,
-            buildOptions = defaultBuildOptions
-                .disableKlibsCrossCompilation(),
         ) {
             if (HostManager.hostIsMac) {
                 build(":p1:compileIosMainKotlinMetadata") {
@@ -65,8 +63,6 @@ open class CommonizerHierarchicalIT : KGPBaseTest() {
         nativeProject(
             "commonizeHierarchically",
             gradleVersion,
-            buildOptions = defaultBuildOptions
-                .disableKlibsCrossCompilation()
         ) {
             if (HostManager.hostIsMac) {
                 build(":p1:iosArm64MainKlibrary", ":p1:iosX64MainKlibrary", ":p1:macosX64MainKlibrary", ":p1:macosArm64MainKLibrary") {
@@ -99,8 +95,7 @@ open class CommonizerHierarchicalIT : KGPBaseTest() {
                 "assemble",
                 // KT-75899 Support Gradle Project Isolation in KGP JS & Wasm
                 buildOptions = defaultBuildOptions
-                    .disableIsolatedProjects()
-                    .disableKlibsCrossCompilation(),
+                    .disableIsolatedProjects(),
             ) {
                 assertTasksExecuted(":p1:commonizeCInterop")
                 assertTasksExecuted(":p2:commonizeCInterop")
@@ -116,22 +111,8 @@ open class CommonizerHierarchicalIT : KGPBaseTest() {
         }
     }
 
-    @DisplayName("Platform dependencies on leaf source sets")
-    @GradleTest
-    fun testPlatformDependenciesOnLeafSourceSets(gradleVersion: GradleVersion) {
-        nativeProject("commonizeHierarchicallyPlatformDependencies", gradleVersion) {
-            build(":checkPlatformDependencies") {
-                val klibPlatform = "${File.separator}klib${File.separator}platform${File.separator}".replace("\\", "\\\\")
-
-                assertTasksExecuted(":commonizeNativeDistribution")
-                assertTasksExecuted(":checkLinuxX64MainPlatformDependencies")
-                assertTasksExecuted(":checkLinuxArm64MainPlatformDependencies")
-                assertOutputContains(Regex(""".*linuxX64Main.*$klibPlatform.*[Pp]osix.*"""))
-                assertOutputContains(Regex(""".*linuxArm64Main.*$klibPlatform.*[Pp]osix.*"""))
-            }
-        }
-    }
-
+    // FIXME: Does "testCommonizationOfNonPlatformShouldWorkOnlyForSupportedTargets" have the same coverage as
+    // "commonizeHierarchicallyPlatformDependencies"? Do we need to add a separate test with only 2 targets one of which is unsupported?
 
     @DisplayName("jvm subproject should not have commonization task")
     @GradleTest

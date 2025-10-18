@@ -5,8 +5,7 @@
 @file:kotlin.native.internal.objc.BindClassToObjCName(DATA_CLASS::class, "4main10DATA_CLASSC")
 @file:kotlin.native.internal.objc.BindClassToObjCName(DATA_CLASS_WITH_REF::class, "4main19DATA_CLASS_WITH_REFC")
 @file:kotlin.native.internal.objc.BindClassToObjCName(DATA_OBJECT_WITH_PACKAGE::class, "4main24DATA_OBJECT_WITH_PACKAGEC")
-@file:kotlin.native.internal.objc.BindClassToObjCName(ENUM::class, "4main4ENUMC")
-@file:kotlin.native.internal.objc.BindClassToObjCName(ENUM.INSIDE_ENUM::class, "4main4ENUMC11INSIDE_ENUMC")
+@file:kotlin.native.internal.objc.BindClassToObjCName(ENUM.INSIDE_ENUM::class, "4main4ENUMO11INSIDE_ENUMC")
 @file:kotlin.native.internal.objc.BindClassToObjCName(GENERIC_CLASS::class, "4main13GENERIC_CLASSC")
 @file:kotlin.native.internal.objc.BindClassToObjCName(INHERITANCE_SINGLE_CLASS::class, "4main24INHERITANCE_SINGLE_CLASSC")
 @file:kotlin.native.internal.objc.BindClassToObjCName(OBJECT_WITH_CLASS_INHERITANCE::class, "4main29OBJECT_WITH_CLASS_INHERITANCEC")
@@ -21,16 +20,16 @@ import kotlin.native.internal.ExportedBridge
 import kotlinx.cinterop.*
 import kotlinx.cinterop.internal.convertBlockPtrToKotlinFunction
 
-@ExportedBridge("DATA_CLASS_WITH_REF_copy__TypesOfArguments__KotlinRuntime_KotlinBase__")
-public fun DATA_CLASS_WITH_REF_copy__TypesOfArguments__KotlinRuntime_KotlinBase__(self: kotlin.native.internal.NativePtr, o: kotlin.native.internal.NativePtr): kotlin.native.internal.NativePtr {
+@ExportedBridge("DATA_CLASS_WITH_REF_copy__TypesOfArguments__anyU20KotlinRuntimeSupport__KotlinBridgeable__")
+public fun DATA_CLASS_WITH_REF_copy__TypesOfArguments__anyU20KotlinRuntimeSupport__KotlinBridgeable__(self: kotlin.native.internal.NativePtr, o: kotlin.native.internal.NativePtr): kotlin.native.internal.NativePtr {
     val __self = kotlin.native.internal.ref.dereferenceExternalRCRef(self) as DATA_CLASS_WITH_REF
     val __o = kotlin.native.internal.ref.dereferenceExternalRCRef(o) as kotlin.Any
     val _result = __self.copy(__o)
     return kotlin.native.internal.ref.createRetainedExternalRCRef(_result)
 }
 
-@ExportedBridge("DATA_CLASS_WITH_REF_equals__TypesOfArguments__Swift_Optional_KotlinRuntime_KotlinBase___")
-public fun DATA_CLASS_WITH_REF_equals__TypesOfArguments__Swift_Optional_KotlinRuntime_KotlinBase___(self: kotlin.native.internal.NativePtr, other: kotlin.native.internal.NativePtr): Boolean {
+@ExportedBridge("DATA_CLASS_WITH_REF_equals__TypesOfArguments__Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable___")
+public fun DATA_CLASS_WITH_REF_equals__TypesOfArguments__Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable___(self: kotlin.native.internal.NativePtr, other: kotlin.native.internal.NativePtr): Boolean {
     val __self = kotlin.native.internal.ref.dereferenceExternalRCRef(self) as DATA_CLASS_WITH_REF
     val __other = if (other == kotlin.native.internal.NativePtr.NULL) null else kotlin.native.internal.ref.dereferenceExternalRCRef(other) as kotlin.Any
     val _result = __self.equals(__other)
@@ -73,8 +72,8 @@ public fun DATA_CLASS_copy__TypesOfArguments__Swift_Int32__(self: kotlin.native.
     return kotlin.native.internal.ref.createRetainedExternalRCRef(_result)
 }
 
-@ExportedBridge("DATA_CLASS_equals__TypesOfArguments__Swift_Optional_KotlinRuntime_KotlinBase___")
-public fun DATA_CLASS_equals__TypesOfArguments__Swift_Optional_KotlinRuntime_KotlinBase___(self: kotlin.native.internal.NativePtr, other: kotlin.native.internal.NativePtr): Boolean {
+@ExportedBridge("DATA_CLASS_equals__TypesOfArguments__Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable___")
+public fun DATA_CLASS_equals__TypesOfArguments__Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable___(self: kotlin.native.internal.NativePtr, other: kotlin.native.internal.NativePtr): Boolean {
     val __self = kotlin.native.internal.ref.dereferenceExternalRCRef(self) as DATA_CLASS
     val __other = if (other == kotlin.native.internal.NativePtr.NULL) null else kotlin.native.internal.ref.dereferenceExternalRCRef(other) as kotlin.Any
     val _result = __self.equals(__other)
@@ -95,8 +94,8 @@ public fun DATA_CLASS_toString(self: kotlin.native.internal.NativePtr): kotlin.n
     return _result.objcPtr()
 }
 
-@ExportedBridge("DATA_OBJECT_WITH_PACKAGE_equals__TypesOfArguments__Swift_Optional_KotlinRuntime_KotlinBase___")
-public fun DATA_OBJECT_WITH_PACKAGE_equals__TypesOfArguments__Swift_Optional_KotlinRuntime_KotlinBase___(self: kotlin.native.internal.NativePtr, other: kotlin.native.internal.NativePtr): Boolean {
+@ExportedBridge("DATA_OBJECT_WITH_PACKAGE_equals__TypesOfArguments__Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable___")
+public fun DATA_OBJECT_WITH_PACKAGE_equals__TypesOfArguments__Swift_Optional_anyU20KotlinRuntimeSupport__KotlinBridgeable___(self: kotlin.native.internal.NativePtr, other: kotlin.native.internal.NativePtr): Boolean {
     val __self = kotlin.native.internal.ref.dereferenceExternalRCRef(self) as DATA_OBJECT_WITH_PACKAGE
     val __other = if (other == kotlin.native.internal.NativePtr.NULL) null else kotlin.native.internal.ref.dereferenceExternalRCRef(other) as kotlin.Any
     val _result = __self.equals(__other)
@@ -145,20 +144,20 @@ public fun DATA_OBJECT_WITH_PACKAGE_variable_set__TypesOfArguments__Swift_Int32_
     __self.variable = __newValue
 }
 
-@ExportedBridge("ENUM_A_get")
-public fun ENUM_A_get(): kotlin.native.internal.NativePtr {
+@ExportedBridge("ENUM_A")
+public fun ENUM_A(): kotlin.native.internal.NativePtr {
     val _result = ENUM.A
     return kotlin.native.internal.ref.createRetainedExternalRCRef(_result)
 }
 
-@ExportedBridge("ENUM_B_get")
-public fun ENUM_B_get(): kotlin.native.internal.NativePtr {
+@ExportedBridge("ENUM_B")
+public fun ENUM_B(): kotlin.native.internal.NativePtr {
     val _result = ENUM.B
     return kotlin.native.internal.ref.createRetainedExternalRCRef(_result)
 }
 
-@ExportedBridge("ENUM_C_get")
-public fun ENUM_C_get(): kotlin.native.internal.NativePtr {
+@ExportedBridge("ENUM_C")
+public fun ENUM_C(): kotlin.native.internal.NativePtr {
     val _result = ENUM.C
     return kotlin.native.internal.ref.createRetainedExternalRCRef(_result)
 }
@@ -173,19 +172,6 @@ public fun ENUM_INSIDE_ENUM_init_allocate(): kotlin.native.internal.NativePtr {
 public fun ENUM_INSIDE_ENUM_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer__(__kt: kotlin.native.internal.NativePtr): Unit {
     val ____kt = kotlin.native.internal.ref.dereferenceExternalRCRef(__kt)!!
     kotlin.native.internal.initInstance(____kt, ENUM.INSIDE_ENUM())
-}
-
-@ExportedBridge("ENUM_entries_get")
-public fun ENUM_entries_get(): kotlin.native.internal.NativePtr {
-    val _result = ENUM.entries
-    return _result.objcPtr()
-}
-
-@ExportedBridge("ENUM_valueOf__TypesOfArguments__Swift_String__")
-public fun ENUM_valueOf__TypesOfArguments__Swift_String__(value: kotlin.native.internal.NativePtr): kotlin.native.internal.NativePtr {
-    val __value = interpretObjCPointer<kotlin.String>(value)
-    val _result = ENUM.valueOf(__value)
-    return kotlin.native.internal.ref.createRetainedExternalRCRef(_result)
 }
 
 @ExportedBridge("OBJECT_WITH_GENERIC_INHERITANCE_hasNext")
@@ -242,8 +228,8 @@ public fun __root___DATA_CLASS_WITH_REF_init_allocate(): kotlin.native.internal.
     return kotlin.native.internal.ref.createRetainedExternalRCRef(_result)
 }
 
-@ExportedBridge("__root___DATA_CLASS_WITH_REF_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer_KotlinRuntime_KotlinBase__")
-public fun __root___DATA_CLASS_WITH_REF_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer_KotlinRuntime_KotlinBase__(__kt: kotlin.native.internal.NativePtr, o: kotlin.native.internal.NativePtr): Unit {
+@ExportedBridge("__root___DATA_CLASS_WITH_REF_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer_anyU20KotlinRuntimeSupport__KotlinBridgeable__")
+public fun __root___DATA_CLASS_WITH_REF_init_initialize__TypesOfArguments__Swift_UnsafeMutableRawPointer_anyU20KotlinRuntimeSupport__KotlinBridgeable__(__kt: kotlin.native.internal.NativePtr, o: kotlin.native.internal.NativePtr): Unit {
     val ____kt = kotlin.native.internal.ref.dereferenceExternalRCRef(__kt)!!
     val __o = kotlin.native.internal.ref.dereferenceExternalRCRef(o) as kotlin.Any
     kotlin.native.internal.initInstance(____kt, DATA_CLASS_WITH_REF(__o))
@@ -322,50 +308,16 @@ public fun __root___OPEN_CLASS_init_initialize__TypesOfArguments__Swift_UnsafeMu
     kotlin.native.internal.initInstance(____kt, OPEN_CLASS())
 }
 
-@ExportedBridge("__root___block_get")
-public fun __root___block_get(): kotlin.native.internal.NativePtr {
-    val _result = block
-    return run {
-        val newClosure = { kotlin.native.internal.ref.createRetainedExternalRCRef(_result()).toLong() }
-        newClosure.objcPtr()
-    }
-}
-
-@ExportedBridge("__root___block_set__TypesOfArguments__U2829202D_U20Swift_Void__")
-public fun __root___block_set__TypesOfArguments__U2829202D_U20Swift_Void__(newValue: kotlin.native.internal.NativePtr): Unit {
-    val __newValue = run {
-        val kotlinFun = convertBlockPtrToKotlinFunction<()->Unit>(newValue);
-        {
-            kotlinFun()
-        }
-    }
-    block = __newValue
-}
-
 @ExportedBridge("__root___consume_closure__TypesOfArguments__U2829202D_U20Swift_Void__")
 public fun __root___consume_closure__TypesOfArguments__U2829202D_U20Swift_Void__(block: kotlin.native.internal.NativePtr): Unit {
     val __block = run {
         val kotlinFun = convertBlockPtrToKotlinFunction<()->Unit>(block);
         {
-            kotlinFun()
+            val _result = kotlinFun()
+            Unit
         }
     }
     consume_closure(__block)
-}
-
-@ExportedBridge("__root___deeper_closure_typealiase__TypesOfArguments__U2829202D_U20Swift_Void__")
-public fun __root___deeper_closure_typealiase__TypesOfArguments__U2829202D_U20Swift_Void__(block: kotlin.native.internal.NativePtr): kotlin.native.internal.NativePtr {
-    val __block = run {
-        val kotlinFun = convertBlockPtrToKotlinFunction<()->Unit>(block);
-        {
-            kotlinFun()
-        }
-    }
-    val _result = deeper_closure_typealiase(__block)
-    return run {
-        val newClosure = { kotlin.native.internal.ref.createRetainedExternalRCRef(_result()).toLong() }
-        newClosure.objcPtr()
-    }
 }
 
 @ExportedBridge("__root___increment__TypesOfArguments__Swift_Int32__")
@@ -373,15 +325,6 @@ public fun __root___increment__TypesOfArguments__Swift_Int32__(integer: Int): In
     val __integer = integer
     val _result = increment(__integer)
     return _result
-}
-
-@ExportedBridge("__root___produce_closure")
-public fun __root___produce_closure(): kotlin.native.internal.NativePtr {
-    val _result = produce_closure()
-    return run {
-        val newClosure = { kotlin.native.internal.ref.createRetainedExternalRCRef(_result()).toLong() }
-        newClosure.objcPtr()
-    }
 }
 
 @ExportedBridge("typealiases_Foo_init_allocate")

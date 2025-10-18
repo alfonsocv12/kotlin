@@ -7,16 +7,17 @@ package org.jetbrains.kotlin.ir.backend.js.utils
 
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.IrFileEntry
+import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.getJsCode
 import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.getSourceLocation
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.IrLoop
 import org.jetbrains.kotlin.ir.expressions.IrReturnableBlock
 import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
 import org.jetbrains.kotlin.ir.util.irError
-import org.jetbrains.kotlin.ir.util.originalFunction
 import org.jetbrains.kotlin.js.backend.ast.JsLocation
 import org.jetbrains.kotlin.js.backend.ast.JsName
 import org.jetbrains.kotlin.js.backend.ast.JsScope
+import org.jetbrains.kotlin.js.common.makeValidES5Identifier
 
 val emptyScope: JsScope = object : JsScope("nil") {
     override fun doCreateName(ident: String): JsName {
@@ -55,9 +56,9 @@ class JsGenerationContext(
         )
     }
 
-    fun newDeclaration(func: IrFunction? = null, localNames: LocalNameGenerator? = null): JsGenerationContext {
+    fun newDeclaration(func: IrFunction? = null, localNames: LocalNameGenerator? = null, fileEntry: IrFileEntry = currentFileEntry): JsGenerationContext {
         return JsGenerationContext(
-            currentFileEntry = currentFileEntry,
+            currentFileEntry = fileEntry,
             currentFunction = func,
             currentInlineFunction = currentInlineFunction,
             staticContext = staticContext,
@@ -70,7 +71,7 @@ class JsGenerationContext(
     fun getNameForValueDeclaration(declaration: IrDeclarationWithName): JsName {
         return nameCache.getOrPut(declaration) {
             if (useBareParameterNames) {
-                JsName(sanitizeName(declaration.name.asString()), true)
+                JsName(makeValidES5Identifier(declaration.name.asString()), true)
             } else {
                 val name = localNames!!.variableNames.names[declaration]
                     ?: irError("Variable name is not found") {
@@ -95,11 +96,10 @@ class JsGenerationContext(
         }
     }
 
-    fun checkIfJsCode(symbol: IrFunctionSymbol): Boolean = symbol == staticContext.backendContext.intrinsics.jsCode
+    fun checkIfJsCode(symbol: IrFunctionSymbol): Boolean = symbol == staticContext.backendContext.symbols.jsCode
 
     fun checkIfHasAssociatedJsCode(symbol: IrFunctionSymbol): Boolean {
-        val originalSymbol = symbol.owner.originalFunction.symbol
-        return staticContext.backendContext.getJsCodeForFunction(originalSymbol) != null
+        return with(staticContext.backendContext) { symbol.owner.getJsCode() != null }
     }
 
     fun getStartLocationForIrElement(irElement: IrElement, originalName: String? = null) =

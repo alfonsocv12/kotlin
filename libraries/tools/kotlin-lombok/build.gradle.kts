@@ -7,10 +7,7 @@ plugins {
 
 dependencies {
     commonApi(platform(project(":kotlin-gradle-plugins-bom")))
-    commonApi(project(":kotlin-gradle-plugin-model"))
 }
-
-projectTest(parallel = true)
 
 gradlePlugin {
     plugins {

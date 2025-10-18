@@ -8,8 +8,8 @@ package org.jetbrains.kotlin.internal.compilerRunner.native
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Provider
 import org.jetbrains.kotlin.build.report.metrics.BuildMetricsReporter
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildPerformanceMetric
-import org.jetbrains.kotlin.build.report.metrics.GradleBuildTime
+import org.jetbrains.kotlin.build.report.metrics.BuildPerformanceMetric
+import org.jetbrains.kotlin.build.report.metrics.BuildTimeMetric
 import org.jetbrains.kotlin.gradle.internal.ClassLoadersCachingBuildService
 import org.jetbrains.kotlin.gradle.plugin.statistics.BuildFusService
 import org.jetbrains.kotlin.gradle.targets.native.KonanPropertiesBuildService
@@ -19,9 +19,8 @@ import org.jetbrains.kotlin.gradle.utils.newInstance
 import java.io.File
 
 internal fun ObjectFactory.KotlinNativeCInteropRunner(
-    metricsReporter: Provider<BuildMetricsReporter<GradleBuildTime, GradleBuildPerformanceMetric>>,
+    metricsReporter: Provider<BuildMetricsReporter<BuildTimeMetric, BuildPerformanceMetric>>,
     classLoadersCachingBuildService: Provider<ClassLoadersCachingBuildService>,
-    isUseEmbeddableCompilerJar: Provider<Boolean>,
     actualNativeHomeDirectory: Provider<File>,
     jvmArgs: Provider<List<String>>,
     useXcodeMessageStyle: Provider<Boolean>,
@@ -29,12 +28,11 @@ internal fun ObjectFactory.KotlinNativeCInteropRunner(
 ): KotlinNativeToolRunner = newInstance(
     metricsReporter,
     classLoadersCachingBuildService,
-    kotlinToolSpec(isUseEmbeddableCompilerJar, actualNativeHomeDirectory, jvmArgs, useXcodeMessageStyle, konanPropertiesBuildService),
+    kotlinToolSpec(actualNativeHomeDirectory, jvmArgs, useXcodeMessageStyle, konanPropertiesBuildService),
     property(BuildFusService::class.java)
 )
 
 private fun ObjectFactory.kotlinToolSpec(
-    isUseEmbeddableCompilerJar: Provider<Boolean>,
     actualNativeHomeDirectory: Provider<File>,
     jvmArgs: Provider<List<String>>,
     useXcodeMessageStyle: Provider<Boolean>,
@@ -44,7 +42,7 @@ private fun ObjectFactory.kotlinToolSpec(
     optionalToolName = property("cinterop"),
     mainClass = nativeMainClass,
     daemonEntryPoint = useXcodeMessageStyle.nativeDaemonEntryPoint(),
-    classpath = nativeCompilerClasspath(actualNativeHomeDirectory, isUseEmbeddableCompilerJar),
+    classpath = nativeCompilerClasspath(actualNativeHomeDirectory),
     jvmArgs = listProperty<String>().value(jvmArgs),
     shouldPassArgumentsViaArgFile = property(false),
     systemProperties = nativeExecSystemProperties(useXcodeMessageStyle),

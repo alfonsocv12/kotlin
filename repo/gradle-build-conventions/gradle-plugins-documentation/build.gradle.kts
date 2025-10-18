@@ -1,9 +1,14 @@
+import org.jetbrains.kotlin.buildtools.api.ExperimentalBuildToolsApi
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+
 plugins {
     `kotlin-dsl`
     id("org.jetbrains.kotlin.jvm")
 }
 
 kotlin {
+    @OptIn(ExperimentalKotlinGradlePluginApi::class, ExperimentalBuildToolsApi::class)
+    compilerVersion = libs.versions.kotlin.`for`.gradle.plugins.compilation
     jvmToolchain(11)
 
     compilerOptions {
@@ -29,6 +34,10 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-build-gradle-plugin:${kotlinBuildProperties.buildGradlePluginVersion}")
     implementation(libs.dokka.gradlePlugin)
     implementation(libs.downloadTask.gradlePlugin)
+
+    constraints {
+        api(libs.apache.commons.lang)
+    }
 }
 
 /**
@@ -55,7 +64,7 @@ configurations.all {
         }
 
         if (requested.group.startsWith("com.fasterxml.jackson")) {
-            useVersion("2.15.0")
+            useVersion("2.16.0")
             because("CVE-2025-49128, CVE-2025-52999")
         }
     }

@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm")
     id("jps-compatible")
+    id("java-test-fixtures")
 }
 
 dependencies {
@@ -14,25 +15,13 @@ dependencies {
 
     api(intellijCore())
 
-    testImplementation(projectTests(":compiler:tests-common"))
-    testImplementation(projectTests(":compiler:tests-common-new"))
-    testImplementation(projectTests(":analysis:analysis-test-framework"))
-    testImplementation(libs.junit.jupiter.api)
-    testRuntimeOnly(libs.junit.jupiter.engine)
+    testFixturesApi(testFixtures(project(":compiler:tests-common")))
+    testFixturesApi(testFixtures(project(":compiler:tests-common-new")))
+    testFixturesApi(testFixtures(project(":analysis:analysis-test-framework")))
+    testFixturesApi(libs.junit.jupiter.api)
+    testRuntimeOnly(libs.junit.vintage.engine)
 }
 
 sourceSets {
     "main" { projectDefault() }
-    "test" {
-        projectDefault()
-        generatedTestDir()
-    }
 }
-
-projectTest(jUnitMode = JUnitMode.JUnit5) {
-    dependsOn(":dist")
-    workingDir = rootDir
-}
-
-
-testsJar()

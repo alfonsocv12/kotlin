@@ -18,6 +18,9 @@ import org.jetbrains.kotlin.backend.konan.ir.*
 import org.jetbrains.kotlin.backend.konan.llvm.objc.processBindClassToObjCNameAnnotations
 import org.jetbrains.kotlin.backend.konan.lower.*
 import org.jetbrains.kotlin.builtins.UnsignedType
+import org.jetbrains.kotlin.config.nativeBinaryOptions.AndroidProgramType
+import org.jetbrains.kotlin.config.nativeBinaryOptions.BinaryOptions
+import org.jetbrains.kotlin.config.nativeBinaryOptions.SourceInfoType
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.ir.*
 import org.jetbrains.kotlin.ir.declarations.*
@@ -723,9 +726,11 @@ internal class CodeGeneratorVisitor(
 
 
         private val scope by lazy {
-            if (!context.shouldContainLocationDebugInfo() || declaration == null)
-                return@lazy null
-            declaration.scope() ?: llvmFunction.scope(0, debugInfo.subroutineType(codegen.llvmTargetData, listOf(context.irBuiltIns.intType)), false)
+            if (context.shouldContainLocationDebugInfo()) {
+                declaration?.scope()
+            } else {
+                null
+            }
         }
 
         private val fileEntry = fileEntry()
@@ -2267,16 +2272,6 @@ internal class CodeGeneratorVisitor(
 
     }
 
-    @Suppress("UNCHECKED_CAST")
-    private fun LlvmCallable.scope(startLine: Int, subroutineType: DISubroutineTypeRef, nodebug: Boolean) =
-            with(debugInfo) {
-                subprograms.getOrPut(this@scope) {
-                    diFunctionScope(fileEntry(), name!!, name!!, startLine, subroutineType, nodebug).also {
-                        this@scope.addDebugInfoSubprogram(it)
-                    }
-                } as DIScopeOpaqueRef
-            }
-
     private fun IrSimpleFunction.returnsUnit() = returnType.isUnit().also {
         require(!isSuspend) { "Suspend functions should be lowered out at this point"}
     }
@@ -2597,15 +2592,41 @@ internal class CodeGeneratorVisitor(
                      resultLifetime: Lifetime, resultSlot: LLVMValueRef?): LLVMValueRef {
         check(!function.isTypedIntrinsic)
 
-        val needsNativeThreadState = function.needsNativeThreadState
-        val exceptionHandler = function.annotations.findAnnotation(RuntimeNames.filterExceptions)?.let {
-            val foreignExceptionMode = ForeignExceptionMode.byValue(it.getAnnotationValueOrNull<String>("mode"))
+        val foreignExceptionModeFromAnnotation = function.annotations.findAnnotation(RuntimeNames.filterExceptions)?.let {
+            ForeignExceptionMode.byValue(it.getAnnotationValueOrNull<String>("mode"))
+        }
+
+        val needsNativeThreadState: Boolean
+        val filterExceptionWith: ForeignExceptionMode.Mode?
+
+        if (llvmCallable.name in context.config.forceNativeThreadStateForFunctions) {
+            // This is a quick hack for functions that break the contract of `SymbolName` by being blocking,
+            // and therefore need the native thread state.
+            // See e.g., KT-75895 and KT-79384.
+            needsNativeThreadState = true
+
+            // Switching to the native thread state requires a filteringExceptionHandler,
+            // so we enforce one here.
+            // Otherwise, nothing will switch the state back to runnable in case of exception.
+            // A more flexible approach can be implemented but is not necessary for this quick hack.
+            filterExceptionWith = foreignExceptionModeFromAnnotation ?: ForeignExceptionMode.Mode.TERMINATE
+        } else {
+            needsNativeThreadState = function.needsNativeThreadState
+            filterExceptionWith = foreignExceptionModeFromAnnotation
+        }
+
+        val exceptionHandler = if (filterExceptionWith != null) {
             functionGenerationContext.filteringExceptionHandler(
                     currentCodeContext.exceptionHandler,
-                    foreignExceptionMode,
+                    filterExceptionWith,
                     needsNativeThreadState
             )
-        } ?: currentCodeContext.exceptionHandler
+        } else {
+            check(!needsNativeThreadState) {
+                "${llvmCallable.name} needs native thread state, but doesn't have a filtering exception handler"
+            }
+            currentCodeContext.exceptionHandler
+        }
 
         if (needsNativeThreadState) {
             functionGenerationContext.switchThreadState(ThreadState.Native)
@@ -2684,6 +2705,10 @@ internal class CodeGeneratorVisitor(
         overrideRuntimeGlobal("Kotlin_swiftExport", llvm.constInt32(if (context.config.swiftExport) 1 else 0))
         overrideRuntimeGlobal("Kotlin_latin1Strings", llvm.constInt32(if (context.config.latin1Strings) 1 else 0))
         overrideRuntimeGlobal("Kotlin_mmapTag", llvm.constUInt8(context.config.mmapTag))
+        val minidumpLocation = context.config.minidumpLocation?.let {
+            llvm.staticData.cStringLiteral(it)
+        } ?: constValue(llvm.kNullInt8Ptr)
+        overrideRuntimeGlobal("Kotlin_minidumpLocation", minidumpLocation)
     }
 
     //-------------------------------------------------------------------------//
@@ -2774,7 +2799,7 @@ internal class CodeGeneratorVisitor(
                                 fileIdProvider.sortedFileIds
                             }
                             is DependenciesTracker.DependencyKind.CertainFiles ->
-                                dependency.kind.files
+                                dependency.kind.files.map { it.name }
                         }
                         files.map { ctorProto(fileCtorName(library.uniqueName, it)) }
                     }

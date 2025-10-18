@@ -21,7 +21,8 @@ import org.junit.jupiter.api.condition.OS
 import java.io.File
 import java.nio.file.Path
 import java.util.*
-import kotlin.io.path.absolutePathString
+import kotlin.io.path.absolute
+import kotlin.io.path.invariantSeparatorsPathString
 
 val DEFAULT_LOG_LEVEL = LogLevel.INFO
 
@@ -56,8 +57,6 @@ data class BuildOptions(
     val languageApiVersion: String? = null,
     val freeArgs: List<String> = emptyList(),
     val statisticsForceValidation: Boolean = true,
-    val usePreciseOutputsBackup: Boolean? = null,
-    val keepIncrementalCompilationCachesInMemory: Boolean? = null,
     val enableUnsafeIncrementalCompilationForMultiplatform: Boolean? = null,
     val enableMonotonousIncrementalCompileSetExpansion: Boolean? = null,
     val useDaemonFallbackStrategy: Boolean = false,
@@ -280,18 +279,11 @@ data class BuildOptions(
             arguments.add("-Pkotlin_performance_profile_force_validation=true")
         }
 
-        if (usePreciseOutputsBackup != null) {
-            arguments.add("-Pkotlin.compiler.preciseCompilationResultsBackup=$usePreciseOutputsBackup")
-        }
         if (languageApiVersion != null) {
             arguments.add("-Pkotlin.test.apiVersion=$languageApiVersion")
         }
         if (languageVersion != null) {
             arguments.add("-Pkotlin.test.languageVersion=$languageVersion")
-        }
-
-        if (keepIncrementalCompilationCachesInMemory != null) {
-            arguments.add("-Pkotlin.compiler.keepIncrementalCompilationCachesInMemory=$keepIncrementalCompilationCachesInMemory")
         }
 
         if (enableUnsafeIncrementalCompilationForMultiplatform != null) {
@@ -329,11 +321,11 @@ data class BuildOptions(
         }
 
         konanDataDir?.let {
-            arguments.add("-Pkonan.data.dir=${konanDataDir.toAbsolutePath().normalize()}")
+            arguments.add("-Pkonan.data.dir=${konanDataDir.normalize().absolute().invariantSeparatorsPathString}")
         }
 
         if (kotlinUserHome != null) {
-            arguments.add("-Pkotlin.user.home=${kotlinUserHome.absolutePathString()}")
+            arguments.add("-Pkotlin.user.home=${kotlinUserHome.normalize().absolute().invariantSeparatorsPathString}")
         }
 
         if (compilerArgumentsLogLevel != null) {
@@ -442,9 +434,6 @@ fun BuildOptions.disableConfigurationCacheForGradle7(
     this
 }
 
-// TODO: KT-70416 :resolveIdeDependencies doesn't support Configuration Cache & Project Isolation
-fun BuildOptions.disableConfigurationCache_KT70416() = copy(configurationCache = BuildOptions.ConfigurationCacheValue.DISABLED)
-
 fun BuildOptions.disableKlibsCrossCompilation() = copy(
     nativeOptions = nativeOptions.copy(enableKlibsCrossCompilation = false)
 )
@@ -465,22 +454,8 @@ fun BuildOptions.disableIsolatedProjectsBecauseOfSubprojectGroupAccessInPublicat
         else IsolatedProjectsMode.DISABLED
 )
 
-fun BuildOptions.suppressWarningFromAgpWithGradle813(
-    currentGradleVersion: GradleVersion
-) = suppressDeprecationWarningsSinceGradleVersion(
-    gradleVersion = TestVersions.Gradle.G_8_13,
-    currentGradleVersion = currentGradleVersion,
-    reason =
-        """
-        AGP <8.11.0-alpha01 produced is* Groovy property deprecations warning. Remove this once AGP versions in tests is bump to those
-        containing the fix.
-        AGP issue: https://issuetracker.google.com/399393875
-        Relevant our issue: https://youtrack.jetbrains.com/issue/KT-71879 
-        """.trimIndent()
-)
-
 fun BuildOptions.suppressWarningForOldKotlinVersion(
-    currentGradleVersion: GradleVersion
+    currentGradleVersion: GradleVersion,
 ) = suppressDeprecationWarningsSinceGradleVersion(
     gradleVersion = TestVersions.Gradle.G_8_14,
     currentGradleVersion = currentGradleVersion,
@@ -492,6 +467,7 @@ fun BuildOptions.suppressWarningForOldKotlinVersion(
 
 // Lint tasks produces deprecation warning since Gradle 8.14: https://issuetracker.google.com/issues/408334529
 // On a non-first run if WarningMode was not changed, the Lint task does not produce a deprecation warning!
+// Fixed in AGP 8.12-alpha06
 fun BuildOptions.suppressAgpWarningSinceGradle814(
     currentGradleVersion: GradleVersion,
     warningMode: WarningMode = WarningMode.Summary,

@@ -8,7 +8,9 @@ package org.jetbrains.kotlin.fir.analysis.checkers.expression
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
 import org.jetbrains.kotlin.fir.analysis.checkers.MppCheckerKind
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
+import org.jetbrains.kotlin.fir.analysis.checkers.isDispatchReceiver
 import org.jetbrains.kotlin.fir.analysis.checkers.isExplicitParentOfResolvedQualifier
+import org.jetbrains.kotlin.fir.analysis.checkers.resolvedSymbolOrCompanionSymbol
 import org.jetbrains.kotlin.fir.analysis.checkers.type.FirInlineExposedLessVisibleTypeChecker
 import org.jetbrains.kotlin.fir.declarations.utils.isCompanion
 import org.jetbrains.kotlin.fir.expressions.FirResolvedQualifier
@@ -19,7 +21,8 @@ object FirInlineBodyResolvedQualifierChecker : FirResolvedQualifierChecker(MppCh
     override fun check(expression: FirResolvedQualifier) {
         val inlineFunctionBodyContext = context.inlineFunctionBodyContext ?: return
         if (expression.isExplicitParentOfResolvedQualifier()) return
-        val accessedClass = expression.symbol ?: return
+        val accessedClass = expression.resolvedSymbolOrCompanionSymbol()
+            ?: return
         val source = expression.source ?: return
 
         if (accessedClass.isCompanion) {
@@ -28,6 +31,9 @@ object FirInlineBodyResolvedQualifierChecker : FirResolvedQualifierChecker(MppCh
             )
         }
 
-        FirInlineExposedLessVisibleTypeChecker.check(accessedClass.defaultType(), source, inlineFunctionBodyContext)
+        // Dispatch receivers are already checked in FirInlineExposedLessVisibleTypeQualifiedAccessChecker
+        if (!expression.isDispatchReceiver()) {
+            FirInlineExposedLessVisibleTypeChecker.check(accessedClass.defaultType(), source, inlineFunctionBodyContext)
+        }
     }
 }

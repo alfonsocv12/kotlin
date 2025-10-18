@@ -30,6 +30,7 @@ import org.jetbrains.kotlin.protobuf.GeneratedMessageLite.GeneratedExtension
 import org.jetbrains.kotlin.resolve.KlibCompilerDeserializationConfiguration
 import org.jetbrains.kotlin.serialization.deserialization.descriptors.DeserializedContainerSource
 import org.jetbrains.kotlin.serialization.deserialization.getClassId
+import java.util.IdentityHashMap
 
 abstract class MetadataLibraryBasedSymbolProvider<L : MetadataLibrary>(
     session: FirSession,
@@ -40,7 +41,7 @@ abstract class MetadataLibraryBasedSymbolProvider<L : MetadataLibrary>(
 ) : AbstractFirDeserializedSymbolProvider(
     session, moduleDataProvider, kotlinScopeProvider, defaultDeserializationOrigin, KlibMetadataSerializerProtocol
 ) {
-    private class MetadataLibraryPackagePartCacheDataExtra(val library: MetadataLibrary) : PackagePartsCacheData.Extra
+    private class MetadataLibraryPackagePartCacheDataExtra(val library: KotlinLibrary) : PackagePartsCacheData.Extra
 
     protected abstract fun moduleData(library: L): FirModuleData?
 
@@ -53,6 +54,8 @@ abstract class MetadataLibraryBasedSymbolProvider<L : MetadataLibrary>(
     protected val deserializationConfiguration: KlibCompilerDeserializationConfiguration =
         KlibCompilerDeserializationConfiguration(session.languageVersionSettings)
     private val cachedFragments: MutableMap<L, MutableMap<Pair<String, String>, ProtoBuf.PackageFragment>> = mutableMapOf()
+    private val fragmentToNameResolver = IdentityHashMap<ProtoBuf.PackageFragment, NameResolver>()
+    private val fragmentToKlibMetadataClassDataFinder = IdentityHashMap<ProtoBuf.PackageFragment, KlibMetadataClassDataFinder>()
 
     private fun getPackageFragment(
         resolvedLibrary: L, packageStringName: String, packageMetadataPart: String
@@ -61,6 +64,22 @@ abstract class MetadataLibraryBasedSymbolProvider<L : MetadataLibrary>(
             mutableMapOf()
         }.getOrPut(packageStringName to packageMetadataPart) {
             parsePackageFragment(resolvedLibrary.packageMetadata(packageStringName, packageMetadataPart))
+        }
+    }
+
+    private fun getNameResolver(fragment: ProtoBuf.PackageFragment): NameResolver {
+        return fragmentToNameResolver.getOrPut(fragment) {
+            NameResolverImpl(
+                fragment.strings,
+                fragment.qualifiedNames,
+            )
+        }
+    }
+
+    private fun getFinder(fragment: ProtoBuf.PackageFragment, resolver: NameResolver): KlibMetadataClassDataFinder {
+        return fragmentToKlibMetadataClassDataFinder.getOrPut(fragment) {
+            // Assumes the fact that the nameResolver depends only on the fragment.
+            KlibMetadataClassDataFinder(fragment, resolver)
         }
     }
 
@@ -78,10 +97,7 @@ abstract class MetadataLibraryBasedSymbolProvider<L : MetadataLibrary>(
 
                 val packageProto = fragment.`package`
 
-                val nameResolver = NameResolverImpl(
-                    fragment.strings,
-                    fragment.qualifiedNames,
-                )
+                val nameResolver = getNameResolver(fragment)
 
                 PackagePartsCacheData(
                     packageProto,
@@ -92,7 +108,7 @@ abstract class MetadataLibraryBasedSymbolProvider<L : MetadataLibrary>(
                         constDeserializer,
                         createDeserializedContainerSource(resolvedLibrary, packageFqName),
                     ),
-                    MetadataLibraryPackagePartCacheDataExtra(resolvedLibrary)
+                    (resolvedLibrary as? KotlinLibrary)?.let(::MetadataLibraryPackagePartCacheDataExtra)
                 )
             }
         }
@@ -112,7 +128,7 @@ abstract class MetadataLibraryBasedSymbolProvider<L : MetadataLibrary>(
     @OptIn(SymbolInternals::class)
     override fun extractClassMetadata(classId: ClassId, parentContext: FirDeserializationContext?): ClassMetadataFindResult? {
         forEachFragmentInPackage(classId.packageFqName) { resolvedLibrary, fragment, nameResolver ->
-            val finder = KlibMetadataClassDataFinder(fragment, nameResolver)
+            val finder = getFinder(fragment, nameResolver)
             val classProto = finder.findClassData(classId)?.classProto ?: return@forEachFragmentInPackage
 
             val moduleData = moduleData(resolvedLibrary) ?: return null
@@ -138,6 +154,7 @@ abstract class MetadataLibraryBasedSymbolProvider<L : MetadataLibrary>(
                     source,
                     origin = defaultDeserializationOrigin,
                     deserializeNestedClass = this::getClass,
+                    deserializeNestedTypeAlias = this::getTypeAlias,
                 )
 
                 if (resolvedLibrary is KotlinLibrary) {
@@ -166,10 +183,7 @@ abstract class MetadataLibraryBasedSymbolProvider<L : MetadataLibrary>(
 
                 val fragment = getPackageFragment(resolvedLibrary, packageStringName, packageMetadataPart)
 
-                val nameResolver = NameResolverImpl(
-                    fragment.strings,
-                    fragment.qualifiedNames,
-                )
+                val nameResolver = getNameResolver(fragment)
 
                 f(resolvedLibrary, fragment, nameResolver)
             }
@@ -187,7 +201,7 @@ abstract class MetadataLibraryBasedSymbolProvider<L : MetadataLibrary>(
     private fun <T : GeneratedMessageLite.ExtendableMessage<T>> loadKlibSourceFileExtensionOrNull(
         packagePart: PackagePartsCacheData, proto: T, sourceFileExtension: GeneratedExtension<T, Int>,
     ): DeserializedSourceFile? {
-        val library = (packagePart.extra as? MetadataLibraryPackagePartCacheDataExtra)?.library as? KotlinLibrary ?: return null
+        val library = (packagePart.extra as? MetadataLibraryPackagePartCacheDataExtra)?.library ?: return null
         return loadKlibSourceFileExtensionOrNull(library, packagePart.context.nameResolver, proto, sourceFileExtension)
     }
 

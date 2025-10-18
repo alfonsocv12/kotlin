@@ -10,18 +10,13 @@ dependencies {
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
 
-    testImplementation(projectTests(":native:native.tests"))
+    testImplementation(testFixtures(project(":native:native.tests")))
 }
 
 sourceSets {
     "main" { none() }
-    "test" {
-        projectDefault()
-        generatedTestDir()
-    }
+    "test" { none() }
 }
-
-testsJar {}
 
 val customCompilerVersion = findProperty("kotlin.internal.native.test.compat.customCompilerVersion") as String
 val hostSpecificArtifact = "${HostManager.platformName()}@${if (HostManager.hostIsMingw) "zip" else "tar.gz"}"
@@ -45,17 +40,4 @@ val downloadCustomCompilerDist: TaskProvider<Sync> by tasks.registering(Sync::cl
     val unarchive = { archive: File -> if (HostManager.hostIsMingw) zipTree(archive) else tarTree(archive) }
     from(unarchive(customCompilerDist.singleFile))
     into(layout.buildDirectory.dir("customCompiler$customCompilerVersion"))
-}
-
-val testTags = findProperty("kotlin.native.tests.tags")?.toString()
-nativeTest(
-    "test",
-    testTags,
-    customCompilerDist = downloadCustomCompilerDist,
-    maxMetaspaceSizeMb = 1024 // to handle two compilers in classloader
-) {
-    // To workaround KTI-2421, we make these tests run on JDK 11 instead of the project-default JDK 8.
-    // Kotlin test infra uses reflection to access JDK internals.
-    // With JDK 11, some JVM args are required to silence the warnings caused by that:
-    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
 }

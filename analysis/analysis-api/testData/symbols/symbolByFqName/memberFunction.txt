@@ -34,6 +34,7 @@ KaNamedFunctionSymbol:
       compilerVisibility: Public
       contextReceivers: []
       generatedPrimaryConstructorProperty: null
+      hasDeclaredDefaultValue: false
       hasDefaultValue: false
       isActual: false
       isCrossinline: false
@@ -55,8 +56,9 @@ KaNamedFunctionSymbol:
       visibility: PUBLIC
       getContainingFileSymbol: null
       getContainingJvmClassName: kotlin.collections.List
-      getContainingModule: KaBuiltinsModule "Builtins for JVM (1.8)"
+      getContainingModule: KaLibraryModule "Library kotlin-stdlib"
       deprecationStatus: null
+      importableFqName: null
   ]
   visibility: PUBLIC
   getDispatchReceiver(): KaUsualClassType:
@@ -70,5 +72,6 @@ KaNamedFunctionSymbol:
   getContainingFileSymbol: null
   getContainingJvmClassName: kotlin.collections.List
   canBeOperator: true
-  getContainingModule: KaBuiltinsModule "Builtins for JVM (1.8)"
+  getContainingModule: KaLibraryModule "Library kotlin-stdlib"
   deprecationStatus: null
+  importableFqName: null

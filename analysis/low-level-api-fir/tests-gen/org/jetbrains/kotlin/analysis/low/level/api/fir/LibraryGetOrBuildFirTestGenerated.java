@@ -25,6 +25,12 @@ public class LibraryGetOrBuildFirTestGenerated extends AbstractLibraryGetOrBuild
   }
 
   @Test
+  @TestMetadata("annotatedContextParameterType.kt")
+  public void testAnnotatedContextParameterType() {
+    runTest("analysis/low-level-api-fir/testData/getOrBuildFirBinary/annotatedContextParameterType.kt");
+  }
+
+  @Test
   @TestMetadata("annotatedProperties.kt")
   public void testAnnotatedProperties() {
     runTest("analysis/low-level-api-fir/testData/getOrBuildFirBinary/annotatedProperties.kt");
@@ -265,6 +271,12 @@ public class LibraryGetOrBuildFirTestGenerated extends AbstractLibraryGetOrBuild
   }
 
   @Test
+  @TestMetadata("nestedTypeAlias.kt")
+  public void testNestedTypeAlias() {
+    runTest("analysis/low-level-api-fir/testData/getOrBuildFirBinary/nestedTypeAlias.kt");
+  }
+
+  @Test
   @TestMetadata("nestedValueClass.kt")
   public void testNestedValueClass() {
     runTest("analysis/low-level-api-fir/testData/getOrBuildFirBinary/nestedValueClass.kt");
@@ -406,6 +418,12 @@ public class LibraryGetOrBuildFirTestGenerated extends AbstractLibraryGetOrBuild
   @TestMetadata("typeParameter.kt")
   public void testTypeParameter() {
     runTest("analysis/low-level-api-fir/testData/getOrBuildFirBinary/typeParameter.kt");
+  }
+
+  @Test
+  @TestMetadata("typeParameterNameClash.kt")
+  public void testTypeParameterNameClash() {
+    runTest("analysis/low-level-api-fir/testData/getOrBuildFirBinary/typeParameterNameClash.kt");
   }
 
   @Test
@@ -963,6 +981,30 @@ public class LibraryGetOrBuildFirTestGenerated extends AbstractLibraryGetOrBuild
     @Test
     public void testAllFilesPresentInMustUseReturnValue() {
       KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("analysis/low-level-api-fir/testData/getOrBuildFirBinary/mustUseReturnValue"), Pattern.compile("^(.+)\\.kt$"), null, true);
+    }
+
+    @Test
+    @TestMetadata("ignorableFunctionsChecker.kt")
+    public void testIgnorableFunctionsChecker() {
+      runTest("analysis/low-level-api-fir/testData/getOrBuildFirBinary/mustUseReturnValue/ignorableFunctionsChecker.kt");
+    }
+
+    @Test
+    @TestMetadata("ignorableFunctionsCheckerOverriding.kt")
+    public void testIgnorableFunctionsCheckerOverriding() {
+      runTest("analysis/low-level-api-fir/testData/getOrBuildFirBinary/mustUseReturnValue/ignorableFunctionsCheckerOverriding.kt");
+    }
+
+    @Test
+    @TestMetadata("ignorableFunctionsFull.kt")
+    public void testIgnorableFunctionsFull() {
+      runTest("analysis/low-level-api-fir/testData/getOrBuildFirBinary/mustUseReturnValue/ignorableFunctionsFull.kt");
+    }
+
+    @Test
+    @TestMetadata("ignorableFunctionsFullOverriding.kt")
+    public void testIgnorableFunctionsFullOverriding() {
+      runTest("analysis/low-level-api-fir/testData/getOrBuildFirBinary/mustUseReturnValue/ignorableFunctionsFullOverriding.kt");
     }
 
     @Test

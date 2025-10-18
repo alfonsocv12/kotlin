@@ -299,6 +299,18 @@ public class FirIdeNormalAnalysisSourceModuleSingleSymbolByPsiTestGenerated exte
   }
 
   @Test
+  @TestMetadata("parameterWithImplicitDefaultValueInActual.kt")
+  public void testParameterWithImplicitDefaultValueInActual() {
+    runTest("analysis/analysis-api/testData/symbols/singleSymbolByPsi/parameterWithImplicitDefaultValueInActual.kt");
+  }
+
+  @Test
+  @TestMetadata("parameterWithImplicitDefaultValueInOverride.kt")
+  public void testParameterWithImplicitDefaultValueInOverride() {
+    runTest("analysis/analysis-api/testData/symbols/singleSymbolByPsi/parameterWithImplicitDefaultValueInOverride.kt");
+  }
+
+  @Test
   @TestMetadata("propertyFromInitBlock.kt")
   public void testPropertyFromInitBlock() {
     runTest("analysis/analysis-api/testData/symbols/singleSymbolByPsi/propertyFromInitBlock.kt");
@@ -884,6 +896,12 @@ public class FirIdeNormalAnalysisSourceModuleSingleSymbolByPsiTestGenerated exte
     }
 
     @Test
+    @TestMetadata("inheritedSuspend.kt")
+    public void testInheritedSuspend() {
+      runTest("analysis/analysis-api/testData/symbols/singleSymbolByPsi/errors/inheritedSuspend.kt");
+    }
+
+    @Test
     @TestMetadata("initWithAnnotations.kt")
     public void testInitWithAnnotations() {
       runTest("analysis/analysis-api/testData/symbols/singleSymbolByPsi/errors/initWithAnnotations.kt");
@@ -993,6 +1011,12 @@ public class FirIdeNormalAnalysisSourceModuleSingleSymbolByPsiTestGenerated exte
     @TestMetadata("companionObjectCompilerPlugin.kt")
     public void testCompanionObjectCompilerPlugin() {
       runTest("analysis/analysis-api/testData/symbols/singleSymbolByPsi/withTestCompilerPluginEnabled/companionObjectCompilerPlugin.kt");
+    }
+
+    @Test
+    @TestMetadata("missingOverride.kt")
+    public void testMissingOverride() {
+      runTest("analysis/analysis-api/testData/symbols/singleSymbolByPsi/withTestCompilerPluginEnabled/missingOverride.kt");
     }
 
     @Test

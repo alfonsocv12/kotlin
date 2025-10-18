@@ -25,20 +25,11 @@ dependencies {
     compileOnly(intellijAnalysis())
 
     runtimeOnly(commonDependency("org.jetbrains.kotlin:kotlin-reflect")) { isTransitive = false }
-
-    testApi(project(":compiler:frontend"))
-    testApi(project(":compiler:plugin-api"))
-    testApi(project(":compiler:util"))
-    testApi(project(":compiler:cli"))
-    testApi(project(":compiler:cli-common"))
-    testApi(project(":compiler:frontend.java"))
-    testApi(projectTests(":compiler:tests-common"))
-    testImplementation(libs.junit4)
 }
 
 sourceSets {
     "main" { projectDefault() }
-    "test" { projectDefault() }
+    "test" { none() }
 }
 
 tasks.withType<KotlinJvmCompile>().configureEach {
@@ -50,7 +41,3 @@ publish()
 runtimeJar()
 sourcesJar()
 javadocJar()
-
-projectTest {
-    workingDir = rootDir
-}

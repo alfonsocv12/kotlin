@@ -384,8 +384,7 @@ class ComposableFunctionBodyTransformer(
     stabilityInferencer: StabilityInferencer,
     private val collectSourceInformation: Boolean,
     private val traceMarkersEnabled: Boolean,
-    private val indyEnabled: Boolean,
-    private val targetRuntimeVersion: ComposeRuntimeVersion?,
+    targetRuntimeVersion: ComposeRuntimeVersion?,
     featureFlags: FeatureFlags,
 ) :
     AbstractComposeLowering(context, metrics, stabilityInferencer, featureFlags),
@@ -586,8 +585,9 @@ class ComposableFunctionBodyTransformer(
             }
     }
 
-    private val emitParameterNames
-        get() = indyEnabled &&
+    private val emitParameterNames =
+        context.languageVersionSettings.languageVersion.usesK2 &&
+                context.platform.isJvm() &&
                 targetRuntimeVersion.supportsFeature(ComposeRuntimeFeature.SourceInfoParameterNames) {
                     context.referenceClass(ComposeClassIds.SourceInformation) != null
                 }
@@ -815,7 +815,11 @@ class ComposableFunctionBodyTransformer(
                 irComposite(
                     statements = listOfNotNull(
                         if (emitTraceMarkers) irTraceEventEnd() else null,
-                        irEndReplaceGroup(scope = scope)
+                        irEndReplaceGroup(
+                            scope = scope,
+                            startOffset = body.endOffset,
+                            endOffset = body.endOffset
+                        )
                     )
                 )
             }
@@ -832,7 +836,9 @@ class ComposableFunctionBodyTransformer(
                             irStartReplaceGroup(
                                 body,
                                 scope,
-                                irFunctionSourceKey()
+                                irFunctionSourceKey(),
+                                startOffset = body.startOffset,
+                                endOffset = body.startOffset
                             )
                         collectSourceInformation ->
                             irSourceInformationMarkerStart(
@@ -846,7 +852,13 @@ class ComposableFunctionBodyTransformer(
                     *bodyPreamble.statements.toTypedArray(),
                     *transformed.statements.toTypedArray(),
                     when {
-                        outerGroupRequired -> irEndReplaceGroup(scope = scope)
+                        outerGroupRequired -> {
+                            irEndReplaceGroup(
+                                scope = scope,
+                                startOffset = body.endOffset,
+                                endOffset = body.endOffset
+                            )
+                        }
                         collectSourceInformation ->
                             irSourceInformationMarkerEnd(body, scope)
                         else -> null
@@ -2359,9 +2371,9 @@ class ComposableFunctionBodyTransformer(
                         this,
                         scope,
                         startOffset = startOffset,
-                        endOffset = endOffset
+                        endOffset = startOffset
                     )
-                ) + suffix + listOf(irEndReplaceGroup(startOffset, endOffset, scope))
+                ) + suffix + listOf(irEndReplaceGroup(endOffset, endOffset, scope))
             )
         }
     }
@@ -2379,9 +2391,9 @@ class ComposableFunctionBodyTransformer(
                         this,
                         scope,
                         startOffset = startOffset,
-                        endOffset = endOffset,
+                        endOffset = startOffset,
                     ),
-                    irEndReplaceGroup(startOffset, endOffset, scope)
+                    irEndReplaceGroup(endOffset, endOffset, scope)
                 )
             )
         }
@@ -2453,8 +2465,8 @@ class ComposableFunctionBodyTransformer(
             realizeGroup = {
                 if (before.statements.isEmpty()) {
                     metrics.recordGroup()
-                    before.statements.add(irStartReplaceGroup(this, scope))
-                    after.statements.add(irEndReplaceGroup(scope = scope))
+                    before.statements.add(irStartReplaceGroup(this, scope, startOffset = startOffset, endOffset = startOffset))
+                    after.statements.add(irEndReplaceGroup(scope = scope, startOffset = endOffset, endOffset = endOffset))
                 }
             },
             makeEnd = {
@@ -2487,12 +2499,12 @@ class ComposableFunctionBodyTransformer(
                 this,
                 scope,
                 startOffset = startOffset,
-                endOffset = endOffset
+                endOffset = startOffset
             )
             else irSourceInformationMarkerStart(this, scope)
         }
         val makeEnd = {
-            if (needsGroup) irEndReplaceGroup(scope = scope)
+            if (needsGroup) irEndReplaceGroup(scope = scope, startOffset = endOffset, endOffset = endOffset)
             else irSourceInformationMarkerEnd(this, scope)
         }
         if (!scope.hasComposableCalls && !scope.hasReturn && !scope.hasJump) {
@@ -3081,7 +3093,7 @@ class ComposableFunctionBodyTransformer(
                     // ComposerParamTransformer should not allow for any null arguments on a composable
                     // invocation unless the parameter is vararg. If this is null here, we have
                     // missed something.
-                    error("Unexpected null argument for composable call")
+                    error("Unexpected null argument for composable call: ${expression.dump()}")
                 } else {
                     argsMeta.add(CallArgumentMeta(isVararg = true))
                     continue
@@ -3895,6 +3907,8 @@ class ComposableFunctionBodyTransformer(
             transformed.branches.add(
                 irElseBranch(
                     expression = irBlock(
+                        startOffset = expression.endOffset,
+                        endOffset = expression.endOffset,
                         type = context.irBuiltIns.unitType,
                         statements = emptyList()
                     )
@@ -4065,7 +4079,7 @@ class ComposableFunctionBodyTransformer(
             }
 
             private fun parameterInformation(): String =
-                if (!transformer.emitParameterNames ) {
+                if (!transformer.emitParameterNames) {
                     function.parameterInformation()
                 } else {
                     // D8 removes all parameter information when processing invokedynamic.

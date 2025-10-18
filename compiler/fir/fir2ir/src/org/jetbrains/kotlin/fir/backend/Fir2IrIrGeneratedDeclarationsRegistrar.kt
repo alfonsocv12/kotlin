@@ -14,6 +14,7 @@ import org.jetbrains.kotlin.fir.declarations.builder.*
 import org.jetbrains.kotlin.fir.declarations.impl.FirResolvedDeclarationStatusImpl
 import org.jetbrains.kotlin.fir.declarations.utils.classId
 import org.jetbrains.kotlin.fir.declarations.utils.compilerPluginMetadata
+import org.jetbrains.kotlin.fir.deserialization.toResolvedQualifier
 import org.jetbrains.kotlin.fir.expressions.FirAnnotation
 import org.jetbrains.kotlin.fir.expressions.FirExpression
 import org.jetbrains.kotlin.fir.expressions.buildUnaryArgumentList
@@ -23,7 +24,6 @@ import org.jetbrains.kotlin.fir.references.builder.buildResolvedNamedReference
 import org.jetbrains.kotlin.fir.resolve.defaultType
 import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
 import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
-import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.serialization.FirAdditionalMetadataProvider
 import org.jetbrains.kotlin.fir.serialization.providedDeclarationsForMetadataService
 import org.jetbrains.kotlin.fir.symbols.impl.*
@@ -56,25 +56,28 @@ class Fir2IrIrGeneratedDeclarationsRegistrar(private val components: Fir2IrCompo
         data class TypeParameter(val name: Name) : ChildDeclarationKind()
     }
 
-    override fun addMetadataVisibleAnnotationsToElement(declaration: IrDeclaration, annotations: List<IrConstructorCall>) {
+    override fun getMetadataVisibleAnnotationsForElement(declaration: IrDeclaration): MutableList<IrConstructorCall> {
         require(declaration.origin != IrDeclarationOrigin.FAKE_OVERRIDE) {
             "FAKE_OVERRIDE declarations are not preserved in metadata and should not be marked with annotations: ${declaration.render()}"
         }
+        val (firDeclaration, kind) = findFirDeclaration(declaration)
+        return when (kind) {
+            null -> annotationsStorage.getOrPut(firDeclaration) { mutableListOf() }
+            else -> {
+                val storageForDeclaration = annotationsOnParametersStorage.getOrPut(firDeclaration) { mutableMapOf() }
+                storageForDeclaration.getOrPut(kind) { mutableListOf() }
+            }
+        }
+    }
+
+    override fun addMetadataVisibleAnnotationsToElement(declaration: IrDeclaration, annotations: List<IrConstructorCall>) {
         require(annotations.all { it.typeArguments.isEmpty() }) {
             "Saving annotations with type arguments from IR to metadata is not supported: ${declaration.render()}"
         }
         annotations.forEach {
             require(it.symbol.owner.constructedClass.isAnnotationClass) { "${it.render()} is not an annotation constructor call" }
         }
-        val (firDeclaration, kind) = findFirDeclaration(declaration)
-
-        when (kind) {
-            null -> annotationsStorage.getOrPut(firDeclaration) { mutableListOf() } += annotations
-            else -> {
-                val storageForDeclaration = annotationsOnParametersStorage.getOrPut(firDeclaration) { mutableMapOf() }
-                storageForDeclaration.getOrPut(kind) { mutableListOf() } += annotations
-            }
-        }
+        getMetadataVisibleAnnotationsForElement(declaration) += annotations
         declaration.annotations += annotations
     }
 
@@ -369,9 +372,7 @@ class Fir2IrIrGeneratedDeclarationsRegistrar(private val components: Fir2IrCompo
                 }
             }
             is IrGetEnumValue -> {
-                val enumClassType: ConeKotlinType = with(emptyTypeConverter) { this@toFirExpression.type.toConeType() }
                 val enumClassId = (this.symbol.owner.parent as IrClass).classId!!
-                val enumClassLookupTag = enumClassId.toLookupTag()
                 val enumVariantName = this.symbol.owner.name
                 val enumEntrySymbol = session.symbolProvider.getClassLikeSymbolByClassId(enumClassId)?.let { classSymbol ->
                     (classSymbol as? FirRegularClassSymbol)?.declarationSymbols
@@ -380,13 +381,8 @@ class Fir2IrIrGeneratedDeclarationsRegistrar(private val components: Fir2IrCompo
                 } ?: error("Could not resolve FirEnumEntry for $enumClassId.$enumVariantName")
 
                 buildPropertyAccessExpression {
-                    val receiver = buildResolvedQualifier {
-                        coneTypeOrNull = enumClassType
-                        packageFqName = enumClassId.packageFqName
-                        relativeClassFqName = enumClassId.relativeClassName
-                        symbol = enumClassLookupTag.toSymbol(session)
-                    }
-                    coneTypeOrNull = enumClassType
+                    val receiver = enumClassId.toResolvedQualifier(session)
+                    coneTypeOrNull = receiver.resolvedType
                     calleeReference = buildResolvedNamedReference {
                         name = enumVariantName
                         resolvedSymbol = enumEntrySymbol

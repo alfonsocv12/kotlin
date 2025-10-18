@@ -318,28 +318,20 @@ abstract class TypeCheckerStateForConstraintSystem(
                 when (subType) {
                     is RigidTypeMarker ->
                         when {
-                            useRefinedBoundsForTypeVariableInFlexiblePosition() ->
+                            usePreciseSimplificationToFlexibleLowerConstraint() ->
                                 // Foo <: T! -- (Foo!! .. Foo) <: T
+                                // Foo? <: T! -- (Foo!! .. Foo?) <: T
                                 createTrivialFlexibleTypeOrSelf(
                                     subType.makeDefinitelyNotNullOrNotNull(),
                                 )
-                            // In K1 (FE1.0), there is an obsolete behavior
-                            subType.isMarkedNullable() -> subType
-                            else -> createTrivialFlexibleTypeOrSelf(subType)
+                            // Obsolete behavior in 2.2 and earlier versions
+                            !subType.isMarkedNullable() -> createTrivialFlexibleTypeOrSelf(subType)
+                            else -> subType
                         }
 
                     is FlexibleTypeMarker ->
-                        when {
-                            useRefinedBoundsForTypeVariableInFlexiblePosition() ->
-                                // (Foo..Bar) <: T! -- (Foo!! .. Bar?) <: T
-                                createFlexibleType(
-                                    subType.lowerBound().makeDefinitelyNotNullOrNotNull(),
-                                    subType.upperBound().withNullability(true)
-                                )
-                            else ->
-                                // (Foo..Bar) <: T! -- (Foo!! .. Bar) <: T
-                                makeLowerBoundDefinitelyNotNullOrNotNull(subType)
-                        }
+                        // (Foo..Bar) <: T! -- (Foo!! .. Bar) <: T
+                        makeLowerBoundDefinitelyNotNullOrNotNull(subType)
 
                     else -> error("sealed")
                 }
@@ -416,8 +408,11 @@ abstract class TypeCheckerStateForConstraintSystem(
         }
     }
 
+    private val simplifyFlexibleUpperConstraintWithDnnBoundToNullable: Boolean =
+        extensionTypeContext.simplifyFlexibleUpperConstraintWithDnnBoundToNullable()
+
     /**
-     * T! <: Foo <=> T <: Foo & Any..Foo?
+     * T! <: Foo <=> T <: Foo!
      * T? <: Foo <=> T <: Foo && Nothing? <: Foo
      * T  <: Foo -- leave as is
      * T & Any <: Foo <=> T <: Foo?
@@ -429,21 +424,19 @@ abstract class TypeCheckerStateForConstraintSystem(
     ): Boolean = with(extensionTypeContext) {
         val typeVariableLowerBound = typeVariable.lowerBoundIfFlexible()
 
-        val simplifiedSuperType = when {
-            typeVariable.isFlexible() && useRefinedBoundsForTypeVariableInFlexiblePosition() ->
-                createFlexibleType(
-                    superType.lowerBoundIfFlexible().makeDefinitelyNotNullOrNotNull(),
-                    superType.upperBoundIfFlexible().withNullability(true)
-                )
-
-            typeVariableLowerBound.isDefinitelyNotNullType() -> {
+        val simplifiedSuperType = if (typeVariable.isFlexible()) {
+            if (typeVariableLowerBound.isDefinitelyNotNullType() && simplifyFlexibleUpperConstraintWithDnnBoundToNullable) {
+                // This is the legacy behavior typically disabled in K2 because the LF is turned off and has no sinceVersion.
                 superType.withNullability(true)
-            }
-
-            typeVariable.isFlexible() && superType is RigidTypeMarker ->
+            } else if (superType.isRigidType()) {
                 createTrivialFlexibleTypeOrSelf(superType)
-
-            else -> superType
+            } else {
+                superType
+            }
+        } else if (typeVariableLowerBound.isDefinitelyNotNullType()) {
+            superType.withNullability(true)
+        } else {
+            superType
         }
 
         addUpperConstraint(typeVariableLowerBound.typeConstructor(), simplifiedSuperType, isNoInfer)
@@ -508,7 +501,7 @@ abstract class TypeCheckerStateForConstraintSystem(
     private fun isSubtypeOfByTypeChecker(subType: KotlinTypeMarker, superType: KotlinTypeMarker) =
         AbstractTypeChecker.isSubtypeOf(this as TypeCheckerState, subType, superType)
 
-    private fun assertInputTypes(subType: KotlinTypeMarker, superType: KotlinTypeMarker) = with(typeSystemContext) {
+    private fun assertInputTypes(subType: KotlinTypeMarker, superType: KotlinTypeMarker): Unit = with(typeSystemContext) {
         if (!AbstractTypeChecker.RUN_SLOW_ASSERTIONS) return
         fun correctSubType(subType: RigidTypeMarker) =
             subType.isSingleClassifierType() || subType.typeConstructor()

@@ -12,7 +12,7 @@ class KClassTestJs {
     @Test
     fun testQualifiedName() {
         @Suppress("UNSUPPORTED", "UNSUPPORTED_REFLECTION_API")
-        assertFailsWith<NotImplementedError> { KClassTestJs::class.qualifiedName }
+        assertNull(KClassTestJs::class.qualifiedName)
     }
 
     @Test
@@ -23,7 +23,6 @@ class KClassTestJs {
     private interface I
 
     @Test
-    @Suppress("UNSUPPORTED") // TODO: Remove this suppression after bootstrap advance
     fun testIsInterface() {
         assertTrue(I::class.isInterface)
         assertFalse(KClassTestJs::class.isInterface)

@@ -13,20 +13,21 @@ import org.jetbrains.kotlin.analysis.low.level.api.fir.api.targets.LLPartialBody
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.targets.partialBodyAnalysisState
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.withFirDesignationEntry
 import org.jetbrains.kotlin.analysis.low.level.api.fir.element.builder.getNonLocalContainingOrThisDeclaration
+import org.jetbrains.kotlin.analysis.low.level.api.fir.element.builder.isAutonomousElement
+import org.jetbrains.kotlin.analysis.low.level.api.fir.file.structure.FirElementsRecorder.Companion.anchorPsi
 import org.jetbrains.kotlin.analysis.low.level.api.fir.file.structure.LLPartialBodyElementMapper
 import org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.llFirSession
-import org.jetbrains.kotlin.analysis.low.level.api.fir.element.builder.isAutonomousElement
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.ContextCollector.Context
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.ContextCollector.ContextKind
 import org.jetbrains.kotlin.analysis.low.level.api.fir.util.ContextCollector.FilterResponse
 import org.jetbrains.kotlin.fir.FirElement
+import org.jetbrains.kotlin.fir.SessionAndScopeSessionHolder
 import org.jetbrains.kotlin.fir.declarations.*
-import org.jetbrains.kotlin.fir.declarations.utils.isLocal
+import org.jetbrains.kotlin.fir.declarations.utils.isScriptTopLevelDeclaration
 import org.jetbrains.kotlin.fir.declarations.utils.memberDeclarationNameOrNull
 import org.jetbrains.kotlin.fir.expressions.*
-import org.jetbrains.kotlin.fir.psi
+import org.jetbrains.kotlin.fir.extensions.scriptResolutionHacksComponent
 import org.jetbrains.kotlin.fir.realPsi
-import org.jetbrains.kotlin.fir.SessionAndScopeSessionHolder
 import org.jetbrains.kotlin.fir.resolve.SessionHolderImpl
 import org.jetbrains.kotlin.fir.resolve.calls.ImplicitValue
 import org.jetbrains.kotlin.fir.resolve.dfa.DataFlowAnalyzerContext
@@ -141,7 +142,7 @@ object ContextCollector {
     private fun partiallyResolveTargetElementIfPossible(
         resolutionFacade: LLResolutionFacade,
         designation: FirDesignation?,
-        targetElement: PsiElement
+        targetElement: PsiElement,
     ): Boolean {
         val declaration = designation?.target?.realPsi as? KtDeclaration ?: return false
 
@@ -260,7 +261,8 @@ private class ContextCollectorVisitor(
 
     private val context = BodyResolveContext(
         returnTypeCalculator = ReturnTypeCalculatorForFullBodyResolve.Default,
-        dataFlowAnalyzerContext = DataFlowAnalyzerContext(bodyHolder.session)
+        dataFlowAnalyzerContext = DataFlowAnalyzerContext(bodyHolder.session),
+        isContextCollectorMode = true,
     )
 
     private val result = HashMap<ContextKey, Context>()
@@ -289,7 +291,7 @@ private class ContextCollectorVisitor(
             return
         }
 
-        val psi = fir.psi ?: return
+        val psi = fir.anchorPsi ?: return
 
         val key = ContextKey(psi, kind)
         if (key in result) {
@@ -622,13 +624,17 @@ private class ContextCollectorVisitor(
         }
 
         if (regularClass.isLocal) {
-            context.storeClassIfNotNested(regularClass, regularClass.moduleData.session)
+            context.storeClassOrTypealiasIfNotNested(regularClass, regularClass.moduleData.session)
         }
     }
 
     override fun visitTypeAlias(typeAlias: FirTypeAlias) {
         context.forTypeAlias(typeAlias) {
             super.visitTypeAlias(typeAlias)
+        }
+
+        if (typeAlias.isLocal) {
+            context.storeClassOrTypealiasIfNotNested(typeAlias, typeAlias.moduleData.session)
         }
     }
 
@@ -828,7 +834,8 @@ private class ContextCollectorVisitor(
 
     /**
      * Executes [f] wrapped with [BodyResolveContext.forPropertyInitializer] if the [property] is not local.
-     * Note that [BodyResolveContext.forPropertyInitializer] performs the tower data cleanup in the [BodyResolveContext].
+     * Note that [BodyResolveContext.forPropertyInitializer] performs the tower data cleanup in the [BodyResolveContext], unless
+     * the [skipCleanup] is set to `true`.
      *
      * Otherwise, just calls [f] with no the cleanup.
      *
@@ -837,7 +844,10 @@ private class ContextCollectorVisitor(
      */
     private fun BodyResolveContext.forPropertyInitializerIfNonLocal(property: FirProperty, f: () -> Unit) {
         if (!property.isLocal) {
-            forPropertyInitializer(f)
+            // TODO: the [skipCleanup] hack should be reverted on fixing KT-79107
+            val skipCleanup = property.isScriptTopLevelDeclaration == true &&
+                    getSessionHolder(property).session.scriptResolutionHacksComponent?.skipTowerDataCleanupForTopLevelInitializers == true
+            forPropertyInitializer(skipCleanup, f)
         } else {
             f()
         }
@@ -1008,7 +1018,6 @@ private class ContextCollectorVisitor(
      *
      * @see processAnnotations
      */
-    @ContextCollectorDsl
     private fun Processor.processRawAnnotations(declaration: FirDeclaration) {
         for (annotation in declaration.annotations) {
             process(annotation)
@@ -1020,7 +1029,6 @@ private class ContextCollectorVisitor(
      *
      * @see org.jetbrains.kotlin.fir.resolve.transformers.plugin.FirAnnotationArgumentsTransformer
      */
-    @ContextCollectorDsl
     private fun Processor.processAnnotations(declaration: FirDeclaration) {
         @OptIn(PrivateForInline::class)
         context.withContainer(declaration) {
@@ -1037,7 +1045,6 @@ private class ContextCollectorVisitor(
     private inner class Processor(private val delegate: FirVisitorVoid) {
         private val elementsToSkip = HashSet<FirElement>()
 
-        @ContextCollectorDsl
         fun process(element: FirElement?) {
             if (isActive && element != null) {
                 element.accept(delegate)
@@ -1045,7 +1052,6 @@ private class ContextCollectorVisitor(
             }
         }
 
-        @ContextCollectorDsl
         fun <T : FirElement?> process(element: T?, customVisit: (T & Any) -> Unit) {
             if (element != null) {
                 customVisit(element)
@@ -1053,7 +1059,6 @@ private class ContextCollectorVisitor(
             }
         }
 
-        @ContextCollectorDsl
         fun processList(elements: Collection<FirElement>) {
             for (element in elements) {
                 if (!isActive) {
@@ -1064,7 +1069,6 @@ private class ContextCollectorVisitor(
             }
         }
 
-        @ContextCollectorDsl
         fun processChildren(element: FirElement, checkIsActive: Boolean = true) {
             if (checkIsActive && !isActive) {
                 return
@@ -1077,7 +1081,7 @@ private class ContextCollectorVisitor(
     private inner class FilteringVisitor(
         val delegate: FirVisitorVoid,
         val elementsToSkip: Set<FirElement>,
-        val checkIsActive: Boolean
+        val checkIsActive: Boolean,
     ) : FirVisitorVoid() {
         override fun visitElement(element: FirElement) {
             if (checkIsActive && !isActive) {
@@ -1158,5 +1162,3 @@ private class ContextCollectorVisitor(
     }
 }
 
-@DslMarker
-private annotation class ContextCollectorDsl

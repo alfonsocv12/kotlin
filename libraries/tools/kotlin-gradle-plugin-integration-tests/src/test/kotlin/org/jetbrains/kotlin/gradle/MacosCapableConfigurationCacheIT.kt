@@ -44,17 +44,14 @@ class MacosCapableConfigurationCacheIT : AbstractConfigurationCacheIT() {
                 ":lib:transformCommonMainCInteropDependenciesMetadata",
                 ":lib:linkDebugFrameworkIosArm64",
                 ":lib:linkDebugFrameworkIosX64",
-                ":lib:linkDebugFrameworkIosFat",
                 ":lib:linkReleaseFrameworkIosArm64",
                 ":lib:linkReleaseFrameworkIosX64",
-                ":lib:linkReleaseFrameworkIosFat",
             )
         }
 
         project(
             "native-configuration-cache",
             gradleVersion,
-            buildOptions = defaultBuildOptions.disableKlibsCrossCompilation()
         ) {
             testConfigurationCacheOf(
                 "build",

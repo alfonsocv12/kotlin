@@ -140,7 +140,8 @@ fun <F> prepareNativeSessions(
     fileBelongsToModule: (F, String) -> Boolean,
 ): List<SessionWithSources<F>> {
     return prepareKlibSessions(
-        FirNativeSessionFactory, NativePlatforms.unspecifiedNativePlatform, files, configuration, rootModuleName, resolvedLibraries,
+        if (metadataCompilationMode) FirNativeSessionFactory.ForMetadata else FirNativeSessionFactory,
+        NativePlatforms.unspecifiedNativePlatform, files, configuration, rootModuleName, resolvedLibraries,
         libraryList, extensionRegistrars, isCommonSource, fileBelongsToModule, metadataCompilationMode, icData = null
     )
 }
@@ -556,13 +557,16 @@ object SessionConstructionUtils {
                     libPaths -= hmppModuleStructure.moduleDependencies[dependency].orEmpty()
                 }
 
+                val friendLibPaths = hmppModuleStructure.friendDependencies[module].orEmpty().toMutableSet()
+
                 val klibs: List<KotlinLibrary> = loadMetadataKlibs(
-                    libraryPaths = libPaths.toList(),
+                    libraryPaths = libPaths.toList() + friendLibPaths,
                     configuration = configuration
                 ).all
 
                 DependencyListForCliModule.build(moduleName) {
                     dependencies(libPaths)
+                    friendDependencies(friendLibPaths)
                 }.also { libraryList ->
                     FirMetadataSessionFactoryForHmppCompilation.createLibrarySession(
                         sharedLibrarySession,
@@ -579,7 +583,7 @@ object SessionConstructionUtils {
                 moduleName,
                 dependencies = libraryList.regularDependencies,
                 dependsOnDependencies = dependencies,
-                friendDependencies = libraryListForLeafModule.friendDependencies,
+                friendDependencies = libraryList.friendDependencies,
                 targetPlatform,
                 isCommon = !isLeaf
             )

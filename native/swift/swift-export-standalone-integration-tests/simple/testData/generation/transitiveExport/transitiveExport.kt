@@ -12,6 +12,9 @@ import oh.my.state.inner.*
 
 class State(val innerState: InnerState? = null)
 
+class ExtractedByTypealias
+typealias ToExtract = ExtractedByTypealias
+
 // MODULE: feature
 // FILE: features.kt
 package oh.my.kotlin
@@ -25,6 +28,8 @@ class FeatureB
 
 class FeatureC() {
     val state: oh.my.state.State = TODO()
+
+    fun baz(): oh.my.state.ToExtract = TODO()
 }
 
 // MODULE: main(feature,anotherFeature)
@@ -49,4 +54,8 @@ import oh.my.kotlin.FeatureB
 
 fun foo(): FeatureB {
     return FeatureB()
+}
+
+fun bar(): Array<String> {
+    return TODO()
 }

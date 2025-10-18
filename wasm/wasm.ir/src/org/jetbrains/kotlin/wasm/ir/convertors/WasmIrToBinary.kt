@@ -63,6 +63,7 @@ class WasmIrToBinary(
 ) : DebugInformationConsumer {
     private var b: ByteWriter = ByteWriter.OutputStream(outputStream)
     private var codeSectionOffset: Int = 0
+    private val codeSectionOffsetDelegate = ::codeSectionOffset
 
     // "Stack" of offsets waiting initialization. 
     // Since blocks have as a prefix variable length number encoding its size, we can't calculate absolute offsets inside those blocks
@@ -285,7 +286,7 @@ class WasmIrToBinary(
     }
 
     private fun getCurrentSourceLocationMapping(sourceLocation: SourceLocation): SourceLocationMappingToBinary =
-        SourceLocationMappingToBinary(sourceLocation, offsets + Box(b.written), ::codeSectionOffset)
+        SourceLocationMappingToBinary(sourceLocation, offsets + Box(b.written), codeSectionOffsetDelegate)
 
     private fun appendImmediate(x: WasmImmediate) {
         when (x) {
@@ -335,12 +336,12 @@ class WasmIrToBinary(
         }
     }
 
-    private fun appendSection(section: WasmBinary.Section, beforeContentWrite: () -> Unit = {}, content: () -> Unit) {
+    private inline fun appendSection(section: WasmBinary.Section, beforeContentWrite: () -> Unit = {}, content: () -> Unit) {
         b.writeVarUInt7(section.id)
-        withVarUInt32PayloadSizePrepended(beforeContentWrite, { content() })
+        withVarUInt32PayloadSizePrepended(beforeContentWrite, content)
     }
 
-    private fun withVarUInt32PayloadSizePrepended(beforeContentWrite: () -> Unit = {}, fn: () -> Unit) {
+    private inline fun withVarUInt32PayloadSizePrepended(beforeContentWrite: () -> Unit = {}, fn: () -> Unit) {
         val box = Box(-1)
         val previousOffsets = offsets
         offsets += box
@@ -386,7 +387,7 @@ class WasmIrToBinary(
         }
     }
 
-    private fun appendFiledType(field: WasmStructFieldDeclaration) {
+    private fun appendFieldType(field: WasmStructFieldDeclaration) {
         appendType(field.type)
         b.writeVarUInt1(field.isMutable)
     }
@@ -417,13 +418,13 @@ class WasmIrToBinary(
         b.writeVarInt7(WasmBinary.STRUCT_TYPE)
         b.writeVarUInt32(type.fields.size)
         type.fields.forEach {
-            appendFiledType(it)
+            appendFieldType(it)
         }
     }
 
     private fun appendArrayTypeDeclaration(type: WasmArrayDeclaration) {
         b.writeVarInt7(WasmBinary.ARRAY_TYPE)
-        appendFiledType(type.field)
+        appendFieldType(type.field)
     }
 
     val WasmFunctionType.index: Int
@@ -676,7 +677,6 @@ class WasmIrToBinary(
     ) : SourceLocationMapping() {
         override val generatedLocation by lazy {
             SourceLocation.DefinedLocation(
-                module = "",
                 file = "",
                 line = 0,
                 column = offsets.sumOf {

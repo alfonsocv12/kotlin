@@ -26,10 +26,12 @@ import org.jetbrains.kotlin.fir.resolve.fullyExpandedType
 import org.jetbrains.kotlin.fir.resolve.substitution.substitutorByMap
 import org.jetbrains.kotlin.fir.resolve.substitution.wrapProjection
 import org.jetbrains.kotlin.fir.resolve.toClassSymbol
+import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.resolvedTypeFromPrototype
 import org.jetbrains.kotlin.fir.symbols.ConeTypeParameterLookupTag
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
+import org.jetbrains.kotlin.fir.symbols.asCone
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassLikeSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirFileSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol
@@ -57,7 +59,7 @@ fun ConeInferenceContext.commonSuperTypeOrNull(types: List<ConeKotlinType>): Con
         0 -> null
         1 -> types.first()
         else -> with(NewCommonSuperTypeCalculator) {
-            commonSuperType(types) as ConeKotlinType
+            commonSuperType(types).asCone()
         }
     }
 }
@@ -144,6 +146,15 @@ fun ConeKotlinType.makeConeTypeDefinitelyNotNullOrNotNull(
         ?: this.withNullability(nullable = false, typeContext, preserveAttributes = preserveAttributes)
 }
 
+@Suppress("NOTHING_TO_INLINE")
+inline fun ConeRigidType.makeConeTypeDefinitelyNotNullOrNotNull(
+    typeContext: ConeTypeContext,
+    avoidComprehensiveCheck: Boolean = false,
+    preserveAttributes: Boolean = false,
+): ConeRigidType = (this as ConeKotlinType).makeConeTypeDefinitelyNotNullOrNotNull(
+    typeContext, avoidComprehensiveCheck, preserveAttributes
+) as ConeRigidType
+
 fun <T : ConeKotlinType> T.withArguments(arguments: Array<out ConeTypeProjection>): T {
     if (this.typeArguments === arguments) {
         /**
@@ -209,6 +220,10 @@ fun <T : ConeKotlinType> T.withAttributes(attributes: ConeAttributes): T {
             withConeTypeEntry("type", this@withAttributes)
         }
     } as T
+}
+
+fun <T : ConeKotlinType> T.removeAnnotations(): T {
+    return withAttributes(attributes.remove(CustomAnnotationTypeAttribute::class))
 }
 
 /**
@@ -536,7 +551,7 @@ fun ConeTypeContext.captureArguments(type: ConeKotlinType, status: CaptureStatus
     }
 
     val substitution = (0 until argumentsCount).associate { index ->
-        (typeConstructor.getParameter(index) as ConeTypeParameterLookupTag).symbol to (newArguments[index])
+        typeConstructor.getParameter(index).asCone().symbol to (newArguments[index])
     }
     val substitutor = substitutorByMap(substitution, session)
 
@@ -648,7 +663,7 @@ internal fun ConeTypeContext.captureFromExpressionInternal(type: ConeKotlinType)
             capturedArgumentsByComponents = captureArgumentsForIntersectionType(type) ?: return null
             intersectTypes(
                 replaceArgumentsWithCapturedArgumentsByIntersectionComponents(type) ?: return null
-            ).withNullability(type.canBeNull(session)) as ConeKotlinType
+            ).withNullability(type.canBeNull(session)).asCone()
         }
         is ConeSimpleKotlinType -> {
             captureFromArgumentsInternal(type, CaptureStatus.FROM_EXPRESSION)
@@ -930,7 +945,7 @@ private fun SimpleTypeMarker.eraseArgumentsDeeply(
             erasedType
         else
             erasedType.toTypeProjection(ProjectionKind.OUT)
-    } as ConeKotlinType
+    }.asCone()
 }
 
 private fun ConeKotlinType.eraseAsUpperBound(
@@ -989,16 +1004,21 @@ fun ConeKotlinType.convertToNonRawVersion(): ConeKotlinType {
  * Returns true if this type can be `null`.
  * This function expands typealiases, checks upper bounds of type parameters, the components of intersection types, etc.
  */
-fun ConeKotlinType.canBeNull(session: FirSession, considerTypeVariableBounds: Boolean = true): Boolean {
+fun ConeKotlinType.canBeNull(
+    session: FirSession,
+    considerTypeVariableBounds: Boolean = true,
+    visited: MutableSet<ConeKotlinType> = mutableSetOf(),
+): Boolean {
+    if (!visited.add(this)) return false
     return when (this) {
-        is ConeFlexibleType -> upperBound.canBeNull(session, considerTypeVariableBounds)
+        is ConeFlexibleType -> upperBound.canBeNull(session, considerTypeVariableBounds, visited)
         is ConeDefinitelyNotNullType -> false
         is ConeTypeParameterType -> isMarkedNullable || this.lookupTag.typeParameterSymbol.resolvedBounds.all {
-            it.coneType.canBeNull(session, considerTypeVariableBounds)
+            it.coneType.canBeNull(session, considerTypeVariableBounds, visited)
         }
-        is ConeStubType -> isMarkedNullable || constructor.variable.defaultType.canBeNull(session, considerTypeVariableBounds)
-        is ConeIntersectionType -> intersectedTypes.all { it.canBeNull(session, considerTypeVariableBounds) }
-        is ConeCapturedType -> isMarkedNullable || constructor.supertypes?.all { it.canBeNull(session, considerTypeVariableBounds) } == true
+        is ConeStubType -> isMarkedNullable || constructor.variable.defaultType.canBeNull(session, considerTypeVariableBounds, visited)
+        is ConeIntersectionType -> intersectedTypes.all { it.canBeNull(session, considerTypeVariableBounds, visited) }
+        is ConeCapturedType -> isMarkedNullable || constructor.supertypes?.all { it.canBeNull(session, considerTypeVariableBounds, visited) } == true
         is ConeErrorType -> nullable != false
         is ConeLookupTagBasedType -> isMarkedNullable || fullyExpandedType(session).isMarkedNullable
         is ConeIntegerLiteralType -> isMarkedNullable
@@ -1034,10 +1054,6 @@ val ConeKotlinType.isUnitOrFlexibleUnit: Boolean
         return classId == StandardClassIds.Unit
     }
 
-fun ConeClassLikeLookupTag.isLocalClass(): Boolean {
-    return classId.isLocal
-}
-
 fun ConeClassLikeLookupTag.isAnonymousClass(): Boolean {
     return name == SpecialNames.ANONYMOUS
 }
@@ -1066,4 +1082,12 @@ inline fun outerType(
     return containingSymbol.constructType(
         fullyExpandedType.typeArguments.drop(currentTypeArgumentsNumber).toTypedArray(),
     )
+}
+
+/**
+ * Returns the FirRegularClass associated with this
+ * or null of something goes wrong.
+ */
+fun FirTypeRef.toRegularClassSymbol(session: FirSession): FirRegularClassSymbol? {
+    return coneType.toRegularClassSymbol(session)
 }

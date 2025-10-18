@@ -5,26 +5,33 @@
 
 package org.jetbrains.kotlin.psi.stubs.impl
 
-import com.intellij.psi.PsiElement
 import com.intellij.psi.stubs.StubElement
 import com.intellij.util.io.StringRef
 import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.psi.KtImplementationDetail
 import org.jetbrains.kotlin.psi.KtPrimaryConstructor
 import org.jetbrains.kotlin.psi.stubs.KotlinConstructorStub
 import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes
 
+@OptIn(KtImplementationDetail::class)
 class KotlinPrimaryConstructorStubImpl(
-    parent: StubElement<out PsiElement>?,
+    parent: StubElement<*>?,
     private val containingClassName: StringRef?,
 ) : KotlinStubBaseImpl<KtPrimaryConstructor>(parent, KtStubElementTypes.PRIMARY_CONSTRUCTOR),
     KotlinConstructorStub<KtPrimaryConstructor> {
-    override fun getFqName(): FqName? = null
+    override val fqName: FqName? get() = null
     override fun getName(): String? = StringRef.toString(containingClassName)
-    override fun isTopLevel(): Boolean = false
-    override fun isExtension(): Boolean = false
-    override fun mayHaveContract(): Boolean = false
-    override fun hasNoExpressionBody(): Boolean = true
-    override fun hasBody(): Boolean = false
-    override fun isDelegatedCallToThis(): Boolean = false
-    override fun isExplicitDelegationCall(): Boolean = false
+    override val isTopLevel: Boolean get() = false
+    override val isExtension: Boolean get() = false
+    override val mayHaveContract: Boolean get() = false
+    override val hasNoExpressionBody: Boolean get() = true
+    override val hasBody: Boolean get() = false
+    override val isDelegatedCallToThis: Boolean get() = false
+    override val isExplicitDelegationCall: Boolean get() = false
+
+    @KtImplementationDetail
+    override fun copyInto(newParent: StubElement<*>?): KotlinPrimaryConstructorStubImpl = KotlinPrimaryConstructorStubImpl(
+        parent = newParent,
+        containingClassName = containingClassName,
+    )
 }

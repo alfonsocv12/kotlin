@@ -531,7 +531,8 @@ interface ClassicTypeSystemContext : TypeSystemInferenceExtensionContext, TypeSy
 
     override fun CapturedTypeMarker.isOldCapturedType(): Boolean = this is CapturedType
 
-    override fun CapturedTypeMarker.hasRawSuperType(): Boolean {
+    @K2Only
+    override fun CapturedTypeMarker.hasRawSuperTypeRecursive(): Boolean {
         error("Is not expected to be called in K1")
     }
 
@@ -902,7 +903,9 @@ interface ClassicTypeSystemContext : TypeSystemInferenceExtensionContext, TypeSy
         return (baseType.memberScope as? SubstitutingScope)?.substitutor
     }
 
-    override fun useRefinedBoundsForTypeVariableInFlexiblePosition(): Boolean = false
+    override fun usePreciseSimplificationToFlexibleLowerConstraint(): Boolean = false
+
+    override fun simplifyFlexibleUpperConstraintWithDnnBoundToNullable(): Boolean = true
 
     override fun substitutionSupertypePolicy(type: RigidTypeMarker): TypeCheckerState.SupertypesPolicy {
         require(type is SimpleType, type::errorMessage)

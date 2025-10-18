@@ -9,8 +9,8 @@ import llvm.*
 import org.jetbrains.kotlin.backend.common.phaser.BackendContextHolder
 import org.jetbrains.kotlin.backend.common.serialization.FingerprintHash
 import org.jetbrains.kotlin.backend.common.serialization.Hash128Bits
-import org.jetbrains.kotlin.backend.konan.driver.BasicPhaseContext
-import org.jetbrains.kotlin.backend.konan.driver.PhaseContext
+import org.jetbrains.kotlin.backend.konan.driver.BasicNativeBackendPhaseContext
+import org.jetbrains.kotlin.backend.konan.driver.NativeBackendPhaseContext
 import org.jetbrains.kotlin.backend.konan.driver.utilities.LlvmIrHolder
 import org.jetbrains.kotlin.backend.konan.llvm.*
 import org.jetbrains.kotlin.backend.konan.llvm.runtime.RuntimeModule
@@ -21,6 +21,7 @@ import org.jetbrains.kotlin.backend.konan.serialization.SerializedClassFields
 import org.jetbrains.kotlin.backend.konan.serialization.SerializedEagerInitializedFile
 import org.jetbrains.kotlin.backend.konan.serialization.SerializedInlineFunctionReference
 import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.util.PerformanceManager
 
 internal class FileLowerState {
     private var functionReferenceCount = 0
@@ -33,11 +34,10 @@ internal class FileLowerState {
     fun getFunctionReferenceImplUniqueName(prefix: String) =
             "$prefix${functionReferenceCount++}"
 
-    fun getCStubUniqueName(prefix: String) =
-            "$prefix${cStubCount++}"
+    fun getCStubIndex() = cStubCount++
 }
 
-internal interface BitcodePostProcessingContext : PhaseContext, LlvmIrHolder {
+internal interface BitcodePostProcessingContext : NativeBackendPhaseContext, LlvmIrHolder {
     val llvm: BasicLlvmHelpers
     val llvmContext: LLVMContextRef
 }
@@ -46,7 +46,7 @@ internal class BitcodePostProcessingContextImpl(
         config: KonanConfig,
         override val llvmModule: LLVMModuleRef,
         override val llvmContext: LLVMContextRef
-) : BitcodePostProcessingContext, BasicPhaseContext(config) {
+) : BitcodePostProcessingContext, BasicNativeBackendPhaseContext(config) {
     override val llvm: BasicLlvmHelpers = BasicLlvmHelpers(this, llvmModule)
 }
 
@@ -60,7 +60,8 @@ internal class NativeGenerationState(
     val llvmModuleSpecification: LlvmModuleSpecification,
     val outputFiles: OutputFiles,
     val llvmModuleName: String,
-) : BasicPhaseContext(config), BackendContextHolder, LlvmIrHolder, BitcodePostProcessingContext {
+    override val performanceManager: PerformanceManager?,
+) : BasicNativeBackendPhaseContext(config), BackendContextHolder, LlvmIrHolder, BitcodePostProcessingContext {
     val outputFile = outputFiles.mainFileName
 
     var klibHash: FingerprintHash = FingerprintHash(Hash128Bits(0U, 0U))

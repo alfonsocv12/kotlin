@@ -23,12 +23,6 @@ class K2HierarchicalMppIT : HierarchicalMppIT() {
     override val defaultBuildOptions: BuildOptions get() = super.defaultBuildOptions.copy(languageVersion = "2.0")
 }
 
-@MppGradlePluginTests
-@DisplayName("KLibs in K2")
-class K2KlibBasedMppIT : KlibBasedMppIT() {
-    override val defaultBuildOptions: BuildOptions = super.defaultBuildOptions.copyEnsuringK2()
-}
-
 @Disabled("Used for local testing only")
 class K2CommonizerIT : CommonizerIT() {
     override val defaultBuildOptions: BuildOptions get() = super.defaultBuildOptions.copy(languageVersion = "2.0")
@@ -65,24 +59,6 @@ class CustomK2Tests : KGPBaseTest() {
     fun testHmppCompilationWithoutJsTarget(gradleVersion: GradleVersion) {
         with(project("k2-mpp-without-js", gradleVersion)) {
             val taskToExecute = ":compileIntermediateMainKotlinMetadata"
-            build(taskToExecute) {
-                assertTasksExecuted(taskToExecute)
-            }
-        }
-    }
-
-    @GradleTest
-    @DisplayName("HMPP compilation with JS target and old stdlib. KT-59151")
-    fun testHmppCompilationWithJsAndOldStdlib(gradleVersion: GradleVersion) {
-        with(
-            project(
-                "k2-mpp-js-old-stdlib",
-                gradleVersion,
-                // KT-75899 Support Gradle Project Isolation in KGP JS & Wasm
-                buildOptions = defaultBuildOptions.copy(isolatedProjects = BuildOptions.IsolatedProjectsMode.DISABLED),
-            )
-        ) {
-            val taskToExecute = ":compileKotlinJs"
             build(taskToExecute) {
                 assertTasksExecuted(taskToExecute)
             }

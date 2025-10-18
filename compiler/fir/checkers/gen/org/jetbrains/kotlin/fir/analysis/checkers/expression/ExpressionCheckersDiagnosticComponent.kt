@@ -155,8 +155,8 @@ class ExpressionCheckersDiagnosticComponent(
         checkers.allDoWhileLoopCheckers.check(doWhileLoop, data)
     }
 
-    override fun visitArrayLiteral(arrayLiteral: FirArrayLiteral, data: CheckerContext) {
-        checkers.allArrayLiteralCheckers.check(arrayLiteral, data)
+    override fun visitCollectionLiteral(collectionLiteral: FirCollectionLiteral, data: CheckerContext) {
+        checkers.allCollectionLiteralCheckers.check(collectionLiteral, data)
     }
 
     override fun visitClassReferenceExpression(classReferenceExpression: FirClassReferenceExpression, data: CheckerContext) {
@@ -265,10 +265,8 @@ class ExpressionCheckersDiagnosticComponent(
     ) {
         for (checker in this) {
             try {
-                with(context) {
-                    with(reporter) {
-                        checker.check(element)
-                    }
+                context(context, reporter) {
+                    checker.check(element)
                 }
             } catch (e: Exception) {
                 rethrowExceptionWithDetails("Exception in expression checkers", e) {

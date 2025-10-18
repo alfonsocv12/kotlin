@@ -67,7 +67,7 @@ object FirTree : AbstractFirTreeBuilder() {
 
         +field("resolvePhase", resolvePhaseType) { isParameter = true; }
         +field("resolveState", resolveStateType) {
-            isMutable = true; isVolatile = true; isFinal = true;
+            isMutable = true; isVolatile = true; isFinal = true
             implementationDefaultStrategy = AbstractField.ImplementationDefaultStrategy.Lateinit
             customInitializationCall = "resolvePhase.asResolveState()"
             arbitraryImportables += phaseAsResolveStateExtentionImport
@@ -323,7 +323,7 @@ object FirTree : AbstractFirTreeBuilder() {
         +field("extensionReceiver", expression, nullable = true, withReplace = true, withTransform = true)
     }
 
-    val arrayLiteral: Element by element(Expression) {
+    val collectionLiteral: Element by element(Expression) {
         parent(expression)
         parent(call)
     }
@@ -401,6 +401,7 @@ object FirTree : AbstractFirTreeBuilder() {
             isMutable = true
         }
         +field("scopeProvider", firScopeProviderType)
+        +field("isLocal", boolean)
     }
 
     val klass: Element by sealedElement(Declaration, name = "Class") {
@@ -525,7 +526,6 @@ object FirTree : AbstractFirTreeBuilder() {
 
         +declaredSymbol(propertySymbolType)
         +referencedSymbol("delegateFieldSymbol", delegateFieldSymbolType, nullable = true)
-        +field("isLocal", boolean)
         +field("bodyResolveState", propertyBodyResolveStateType, withReplace = true)
         +typeParameters
     }
@@ -566,8 +566,9 @@ object FirTree : AbstractFirTreeBuilder() {
         generateBooleanFields(
             "expect", "actual", "override", "operator", "infix", "inline", "value", "tailRec",
             "external", "const", "lateInit", "inner", "companion", "data", "suspend", "static",
-            "fromSealedClass", "fromEnumClass", "fun", "hasStableParameterNames", "hasMustUseReturnValue"
+            "fromSealedClass", "fromEnumClass", "fun", "hasStableParameterNames"
         )
+        +field("returnValueStatus", returnValueStatusType, nullable = false)
         +field("defaultVisibility", visibilityType, nullable = false)
         +field("defaultModality", modalityType, nullable = false)
     }
@@ -1001,9 +1002,12 @@ object FirTree : AbstractFirTreeBuilder() {
         +field("explicitParent", resolvedQualifier, nullable = true)
         +field("isNullableLHSForCallableReference", boolean, withReplace = true)
         +field("resolvedToCompanionObject", boolean, withReplace = true)
-        +field("canBeValue", boolean, withReplace = true)
+        +field("canBeValue", boolean, withReplace = true) {
+            kDoc = "If true, the qualifier is resolved to an object or companion object and can be used as an expression."
+        }
         +field("isFullyQualified", boolean)
         +listField("nonFatalDiagnostics", coneDiagnosticType, useMutableOrEmpty = true)
+        +field("resolvedSymbolOrigin", resolvedSymbolOrigin, nullable = true, withReplace = true)
         +typeArguments {
             withTransform = true
         }
@@ -1090,6 +1094,13 @@ object FirTree : AbstractFirTreeBuilder() {
         parent(namedReference)
 
         +referencedSymbol("resolvedSymbol", firBasedSymbolType.withArgs(TypeRef.Star))
+        +field("resolvedSymbolOrigin", resolvedSymbolOrigin, nullable = true, withReplace = true)
+    }
+
+    val propertyWithExplicitBackingFieldResolvedNamedReference: Element by element(Reference) {
+        parent(resolvedNamedReference)
+
+        +field("hasVisibleBackingField", boolean)
     }
 
     val resolvedCallableReference: Element by element(Reference) {
@@ -1144,6 +1155,7 @@ object FirTree : AbstractFirTreeBuilder() {
 
         +field("coneType", coneKotlinTypeType)
         +field("delegatedTypeRef", typeRef, nullable = true, isChild = false)
+        +field("resolvedSymbolOrigin", resolvedSymbolOrigin, nullable = true, withReplace = true)
     }
 
     val unresolvedTypeRef: Element by sealedElement(TypeRefElement) {
@@ -1226,6 +1238,7 @@ object FirTree : AbstractFirTreeBuilder() {
         parent(resolvable)
 
         +field("calleeReference", thisReference)
+        +field("kind", inaccessibleReceiverKindType)
     }
 
     val whenExpression: Element by element(Expression) {
@@ -1288,6 +1301,19 @@ object FirTree : AbstractFirTreeBuilder() {
 
         +field("contractCall", functionCall)
         +field("diagnostic", coneDiagnosticType, nullable = true)
+    }
+
+    val lazyContractDescription: Element by element(Contracts) {
+        kDoc = """
+            A contract description in the psi2fir lazy mode.
+            
+            The description might represent [FirLegacyRawContractDescription] or **null** contract.
+            The description has to be unwrapped before the contract phase.
+            
+            @see org.jetbrains.kotlin.fir.expressions.FirLazyBlock
+            @see org.jetbrains.kotlin.fir.expressions.FirLazyExpression
+        """.trimIndent()
+        parent(legacyRawContractDescription)
     }
 
     val errorContractDescription: Element by element(Contracts) {

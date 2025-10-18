@@ -7,15 +7,21 @@ package org.jetbrains.kotlin.psi.stubs.impl
 
 import com.intellij.psi.stubs.StubElement
 import org.jetbrains.kotlin.psi.KtBlockStringTemplateEntry
+import org.jetbrains.kotlin.psi.KtImplementationDetail
 import org.jetbrains.kotlin.psi.stubs.KotlinBlockStringTemplateEntryStub
 import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes
 
+@OptIn(KtImplementationDetail::class)
 class KotlinBlockStringTemplateEntryStubImpl(
     parent: StubElement<*>?,
     override val hasMultipleExpressions: Boolean,
-    private val text: String,
+    override val text: String,
 ) : KotlinStubBaseImpl<KtBlockStringTemplateEntry>(parent, KtStubElementTypes.LONG_STRING_TEMPLATE_ENTRY),
     KotlinBlockStringTemplateEntryStub {
-
-    override fun text(): String = text
+    @KtImplementationDetail
+    override fun copyInto(newParent: StubElement<*>?): KotlinBlockStringTemplateEntryStubImpl = KotlinBlockStringTemplateEntryStubImpl(
+        parent = newParent,
+        hasMultipleExpressions = hasMultipleExpressions,
+        text = text,
+    )
 }

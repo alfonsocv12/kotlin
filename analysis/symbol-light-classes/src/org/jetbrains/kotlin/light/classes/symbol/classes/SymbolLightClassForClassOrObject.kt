@@ -27,6 +27,7 @@ import org.jetbrains.kotlin.light.classes.symbol.cachedValue
 import org.jetbrains.kotlin.light.classes.symbol.fields.SymbolLightField
 import org.jetbrains.kotlin.light.classes.symbol.fields.SymbolLightFieldForEnumEntry
 import org.jetbrains.kotlin.light.classes.symbol.fields.SymbolLightFieldForObject
+import org.jetbrains.kotlin.light.classes.symbol.methods.SymbolLightAccessorMethod.Companion.createPropertyAccessors
 import org.jetbrains.kotlin.light.classes.symbol.methods.SymbolLightConstructor.Companion.createConstructors
 import org.jetbrains.kotlin.light.classes.symbol.methods.SymbolLightSimpleMethod.Companion.createSimpleMethods
 import org.jetbrains.kotlin.light.classes.symbol.modifierLists.GranularModifiersBox
@@ -44,7 +45,8 @@ import org.jetbrains.kotlin.util.OperatorNameConventions.TO_STRING
 import org.jetbrains.kotlin.utils.addToStdlib.applyIf
 
 internal class SymbolLightClassForClassOrObject : SymbolLightClassForNamedClassLike {
-    val isValueClass: Boolean
+    private val isValueClass: Boolean
+    override fun isValueClass() = isValueClass
 
     constructor(
         ktModule: KaModule,
@@ -88,7 +90,7 @@ internal class SymbolLightClassForClassOrObject : SymbolLightClassForNamedClassL
         this.isValueClass = isValueClass
     }
 
-    private val _modifierList: PsiModifierList by lazyPub {
+    override fun getModifierList(): PsiModifierList = cachedValue {
         SymbolLightClassModifierList(
             containingDeclaration = this,
             modifiersBox = GranularModifiersBox(computer = ::computeModifiers),
@@ -99,7 +101,6 @@ internal class SymbolLightClassForClassOrObject : SymbolLightClassForNamedClassL
         )
     }
 
-    override fun getModifierList(): PsiModifierList = _modifierList
     override fun getExtendsList(): PsiReferenceList = _extendsList
     override fun getImplementsList(): PsiReferenceList = _implementsList
 
@@ -220,9 +221,20 @@ internal class SymbolLightClassForClassOrObject : SymbolLightClassForNamedClassL
             )
         }
 
-        classSymbol.delegatedMemberScope.callables.forEach { functionSymbol ->
-            if (functionSymbol is KaNamedFunctionSymbol) {
-                createDelegateMethod(functionSymbol)
+        classSymbol.delegatedMemberScope.callables.forEach { callableSymbol ->
+            when (callableSymbol) {
+                is KaNamedFunctionSymbol -> {
+                    createDelegateMethod(functionSymbol = callableSymbol)
+                }
+                is KaKotlinPropertySymbol -> {
+                    createPropertyAccessors(
+                        lightClass = this@SymbolLightClassForClassOrObject,
+                        result = result,
+                        declaration = callableSymbol,
+                        isTopLevel = false
+                    )
+                }
+                else -> {}
             }
         }
     }
@@ -283,7 +295,7 @@ internal class SymbolLightClassForClassOrObject : SymbolLightClassForNamedClassL
     override fun isAnnotationType(): Boolean = false
     override fun classKind(): KaClassKind = withClassSymbol { it.classKind }
     override fun isRecord(): Boolean {
-        return _modifierList.hasAnnotation(JvmStandardClassIds.Annotations.JvmRecord.asFqNameString())
+        return modifierList.hasAnnotation(JvmStandardClassIds.Annotations.JvmRecord.asFqNameString())
     }
 
     override fun copy(): SymbolLightClassForClassOrObject = SymbolLightClassForClassOrObject(

@@ -1,49 +1,55 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.psi.stubs.impl
 
-import com.intellij.psi.PsiElement
 import com.intellij.psi.stubs.StubElement
 import com.intellij.util.io.StringRef
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtClass
+import org.jetbrains.kotlin.psi.KtImplementationDetail
 import org.jetbrains.kotlin.psi.stubs.KotlinClassStub
 import org.jetbrains.kotlin.psi.stubs.elements.KotlinValueClassRepresentation
-import org.jetbrains.kotlin.psi.stubs.elements.KtClassElementType
+import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes
 
+@OptIn(KtImplementationDetail::class)
 class KotlinClassStubImpl(
-    type: KtClassElementType,
-    parent: StubElement<out PsiElement>?,
+    parent: StubElement<*>?,
     private val qualifiedName: StringRef?,
-    private val classId: ClassId?,
+    override val classId: ClassId?,
     private val name: StringRef?,
-    private val superNames: Array<StringRef>,
-    private val isInterface: Boolean,
-    private val isEnumEntry: Boolean,
-    private val isClsStubCompiledToJvmDefaultImplementation: Boolean,
-    private val isLocal: Boolean,
-    private val isTopLevel: Boolean,
+    private val superNameRefs: Array<StringRef>,
+    override val isInterface: Boolean,
+    override val isClsStubCompiledToJvmDefaultImplementation: Boolean,
+    override val isLocal: Boolean,
+    override val isTopLevel: Boolean,
     val valueClassRepresentation: KotlinValueClassRepresentation?,
-) : KotlinStubBaseImpl<KtClass>(parent, type), KotlinClassStub {
+) : KotlinStubBaseImpl<KtClass>(
+    parent = parent,
+    elementType = KtStubElementTypes.CLASS,
+), KotlinClassStub {
+    override val fqName: FqName?
+        get() = qualifiedName?.string?.let(::FqName)
 
-    override fun getFqName(): FqName? {
-        val stringRef = StringRef.toString(qualifiedName) ?: return null
-        return FqName(stringRef)
-    }
-
-    override fun isInterface(): Boolean = isInterface
-    override fun isEnumEntry(): Boolean = isEnumEntry
-    override fun isClsStubCompiledToJvmDefaultImplementation(): Boolean = isClsStubCompiledToJvmDefaultImplementation
-    override fun isLocal(): Boolean = isLocal
     override fun getName(): String? = StringRef.toString(name)
 
-    override fun getSuperNames(): List<String> = superNames.map(StringRef::toString)
+    override val superNames: List<String>
+        get() = superNameRefs.map(StringRef::toString)
 
-    override fun getClassId(): ClassId? = classId
-
-    override fun isTopLevel() = isTopLevel
+    @KtImplementationDetail
+    override fun copyInto(newParent: StubElement<*>?): KotlinClassStubImpl = KotlinClassStubImpl(
+        parent = newParent,
+        qualifiedName = qualifiedName,
+        classId = classId,
+        name = name,
+        superNameRefs = superNameRefs,
+        isInterface = isInterface,
+        isClsStubCompiledToJvmDefaultImplementation = isClsStubCompiledToJvmDefaultImplementation,
+        isLocal = isLocal,
+        isTopLevel = isTopLevel,
+        valueClassRepresentation = valueClassRepresentation,
+    )
 }

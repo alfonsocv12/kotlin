@@ -22,7 +22,6 @@ import androidx.compose.compiler.plugins.kotlin.analysis.StabilityInferencer
 import androidx.compose.compiler.plugins.kotlin.k1.*
 import androidx.compose.compiler.plugins.kotlin.k2.ComposeFirExtensionRegistrar
 import androidx.compose.compiler.plugins.kotlin.lower.ClassStabilityFieldSerializationPlugin
-import androidx.compose.compiler.plugins.kotlin.lower.ComposeRuntimeVersion
 import androidx.compose.compiler.plugins.kotlin.lower.hiddenfromobjc.AddHiddenFromObjCSerializationPlugin
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
@@ -578,6 +577,8 @@ fun validateFeatureFlag(
 
 @OptIn(ExperimentalCompilerApi::class)
 class ComposePluginRegistrar : CompilerPluginRegistrar() {
+    override val pluginId: String get() = COMPOSE_PLUGIN_ID
+
     override val supportsK2: Boolean
         get() = true
 
@@ -763,13 +764,6 @@ class ComposePluginRegistrar : CompilerPluginRegistrar() {
                 ?: emptySet()
             stableTypeMatchers.addAll(testingMatchers)
 
-            val jvmLambdaScheme = configuration.get(JVMConfigurationKeys.LAMBDAS)
-                ?: if (configuration.languageVersionSettings.supportsFeature(LanguageFeature.LightweightLambdas)) {
-                    JvmClosureGenerationScheme.INDY
-                } else {
-                    JvmClosureGenerationScheme.CLASS
-                }
-
             return ComposeIrGenerationExtension(
                 liveLiteralsEnabled = liveLiteralsEnabled,
                 liveLiteralsV2Enabled = liveLiteralsV2Enabled,
@@ -785,7 +779,6 @@ class ComposePluginRegistrar : CompilerPluginRegistrar() {
                 featureFlags = featureFlags,
                 skipIfRuntimeNotFound = skipIrLoweringIfRuntimeNotFound,
                 messageCollector = configuration.messageCollector,
-                indyJvmLambdasEnabled = jvmLambdaScheme == JvmClosureGenerationScheme.INDY,
                 targetRuntimeVersion = targetRuntimeVersion,
             )
         }

@@ -5,9 +5,7 @@
 
 package org.jetbrains.kotlin.backend.jvm.lower
 
-import org.jetbrains.kotlin.backend.common.ir.BuiltinSymbolsBase
 import org.jetbrains.kotlin.backend.common.lower.*
-import org.jetbrains.kotlin.backend.common.phaser.PhaseDescription
 import org.jetbrains.kotlin.backend.jvm.JvmBackendContext
 import org.jetbrains.kotlin.backend.jvm.ir.createJvmIrBuilder
 import org.jetbrains.kotlin.backend.jvm.ir.isInPublicInlineScope
@@ -31,7 +29,6 @@ import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 import org.jetbrains.kotlin.util.OperatorNameConventions
 
-@PhaseDescription(name = "AnnotationImplementation")
 internal class JvmAnnotationImplementationLowering(context: JvmBackendContext) : AnnotationImplementationLowering(
     { JvmAnnotationImplementationTransformer(context, it) }
 )
@@ -47,7 +44,6 @@ class JvmAnnotationImplementationTransformer(private val jvmContext: JvmBackendC
     private val implementor = AnnotationPropertyImplementor(
         jvmContext.irFactory,
         jvmContext.irBuiltIns,
-        jvmContext.symbols,
         jvmContext.symbols.javaLangClass,
         jvmContext.symbols.kClassJavaPropertyGetter.symbol,
         ANNOTATION_IMPLEMENTATION
@@ -141,7 +137,6 @@ class JvmAnnotationImplementationTransformer(private val jvmContext: JvmBackendC
     class AnnotationPropertyImplementor(
         val irFactory: IrFactory,
         val irBuiltIns: IrBuiltIns,
-        val symbols: BuiltinSymbolsBase,
         val javaLangClassSymbol: IrClassSymbol,
         val kClassJavaPropertyGetterSymbol: IrSimpleFunctionSymbol,
         val originForProp: IrDeclarationOrigin
@@ -160,9 +155,9 @@ class JvmAnnotationImplementationTransformer(private val jvmContext: JvmBackendC
          */
         private fun IrBuilderWithScope.kClassArrayToJClassArray(kClassArray: IrExpression): IrExpression {
             val javaLangClassType = javaLangClassSymbol.starProjectedType
-            val jlcArray = symbols.array.typeWith(javaLangClassType)
-            val arrayClass = symbols.array.owner
-            val arrayOfNulls = symbols.arrayOfNulls
+            val jlcArray = irBuiltIns.arrayClass.typeWith(javaLangClassType)
+            val arrayClass = irBuiltIns.arrayClass.owner
+            val arrayOfNulls = irBuiltIns.arrayOfNulls
             val arraySizeSymbol = arrayClass.findDeclaration<IrProperty> { it.name.asString() == "size" }!!.getter!!
 
             val block = irBlock {
@@ -210,7 +205,7 @@ class JvmAnnotationImplementationTransformer(private val jvmContext: JvmBackendC
 
         private fun IrType.kClassToJClassIfNeeded(): IrType = when {
             this.isKClass() -> javaLangClassSymbol.starProjectedType
-            this.isKClassArray() -> symbols.array.typeWith(
+            this.isKClassArray() -> irBuiltIns.arrayClass.typeWith(
                 javaLangClassSymbol.starProjectedType
             )
 

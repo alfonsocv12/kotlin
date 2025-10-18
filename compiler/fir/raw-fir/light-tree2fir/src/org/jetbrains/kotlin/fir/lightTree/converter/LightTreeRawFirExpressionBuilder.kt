@@ -49,6 +49,7 @@ import org.jetbrains.kotlin.fir.types.builder.buildErrorTypeRef
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitTypeRefImplWithoutSource
 import org.jetbrains.kotlin.lexer.KtTokens.*
 import org.jetbrains.kotlin.name.SpecialNames
+import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.psi.psiUtil.UNWRAPPABLE_TOKEN_TYPES
 import org.jetbrains.kotlin.psi.stubs.elements.KtConstantExpressionElementType
 import org.jetbrains.kotlin.psi.stubs.elements.KtNameReferenceExpressionElementType
@@ -94,16 +95,23 @@ class LightTreeRawFirExpressionBuilder(
             converted is R -> when {
                 isValidExpression(converted) -> converted
                 else -> buildErrorExpression(
-                    converted.source?.realElement() ?: expression?.toFirSourceElement() ?: sourceWhenInvalidExpression.toFirSourceElement(),
-                    ConeSimpleDiagnostic(errorReason, DiagnosticKind.ExpressionExpected),
-                    converted,
+                    source = converted.source?.realElement()
+                        ?: expression?.toFirSourceElement()
+                        ?: sourceWhenInvalidExpression.toFirSourceElement(kind = KtFakeSourceElementKind.ErrorExpression),
+                    diagnostic = ConeSimpleDiagnostic(errorReason, DiagnosticKind.ExpressionExpected),
+                    element = converted,
                 )
             }
             else -> buildErrorExpression(
-                converted?.source?.realElement() ?: expression?.toFirSourceElement() ?: sourceWhenInvalidExpression.toFirSourceElement(),
-                if (expression == null) ConeSyntaxDiagnostic(errorReason)
-                else ConeSimpleDiagnostic(errorReason, DiagnosticKind.ExpressionExpected),
-                converted,
+                source = converted?.source?.realElement()
+                    ?: expression?.toFirSourceElement()
+                    ?: sourceWhenInvalidExpression.toFirSourceElement(kind = KtFakeSourceElementKind.ErrorExpression),
+                diagnostic = if (expression == null) {
+                    ConeSyntaxDiagnostic(errorReason)
+                } else {
+                    ConeSimpleDiagnostic(errorReason, DiagnosticKind.ExpressionExpected)
+                },
+                element = converted,
             )
         } as R
     }
@@ -231,7 +239,7 @@ class LightTreeRawFirExpressionBuilder(
                         baseModuleData,
                         multiDeclaration,
                         multiParameter,
-                        tmpVariable = false,
+                        isTmpVariable = false,
                         forceLocal = true,
                     )
                     multiParameter
@@ -309,10 +317,6 @@ class LightTreeRawFirExpressionBuilder(
 
                     input.add(leftNode)
                     input.add(rightNode)
-                }
-                PARENTHESIZED -> {
-                    val content = node.getExpressionInParentheses()
-                    input.add(content)
                 }
                 else -> {
                     if (node?.tokenType != STRING_TEMPLATE) {
@@ -754,6 +758,20 @@ class LightTreeRawFirExpressionBuilder(
 
         val source = callSuffix.toFirSourceElement()
 
+        // TODO(KT-22765) drop workaround when suspend modifier for lambdas is implemented
+        if (imitateLambdaSuspendModifier &&
+            name == StandardClassIds.Callables.suspend.callableName.identifier &&
+            !callSuffix.getParent().let { it.selectorExpression == callSuffix && it.receiverExpression != null } &&
+            valueArguments.singleOrNull()?.tokenType == LAMBDA_ARGUMENT &&
+            firTypeArguments.isEmpty()
+        ) {
+            valueArguments.single().getFirstChild()?.let {
+                return getAsFirExpression<FirAnonymousFunctionExpression>(it).apply {
+                    anonymousFunction.replaceStatus(anonymousFunction.status.copy(isSuspend = true))
+                }
+            }
+        }
+
         val (calleeReference, receiverForInvoke) = when {
             name != null -> CalleeAndReceiver(
                 buildSimpleNamedReference {
@@ -862,7 +880,6 @@ class LightTreeRawFirExpressionBuilder(
                         initializer = variable.initializer
                         isVar = false
                         symbol = FirLocalPropertySymbol()
-                        isLocal = true
                         status = FirDeclarationStatusImpl(Visibilities.Local, Modality.FINAL)
                         receiverParameter = variable.receiverParameter?.let { receiverParameter ->
                             buildReceiverParameterCopy(receiverParameter) {
@@ -894,7 +911,6 @@ class LightTreeRawFirExpressionBuilder(
                 initializer = subjectExpression
                 isVar = false
                 symbol = FirLocalPropertySymbol()
-                isLocal = true
                 status = FirDeclarationStatusImpl(Visibilities.Local, Modality.FINAL)
             }
         }
@@ -1144,12 +1160,12 @@ class LightTreeRawFirExpressionBuilder(
         expression.forEachChildren {
             if (it.isExpression()) firExpressionList += getAsFirExpression<FirExpression>(it, "Incorrect collection literal argument")
         }
-
-        return buildArrayLiteral {
+        val arguments = buildArgumentList {
+            arguments += firExpressionList
+        }
+        return buildCollectionLiteral {
             source = expression.toFirSourceElement()
-            argumentList = buildArgumentList {
-                arguments += firExpressionList
-            }
+            argumentList = arguments
         }
     }
 
@@ -1331,7 +1347,7 @@ class LightTreeRawFirExpressionBuilder(
                             baseModuleData,
                             multiDeclaration,
                             firLoopParameter,
-                            tmpVariable = true,
+                            isTmpVariable = true,
                             forceLocal = true,
                         )
                     } else {
@@ -1400,7 +1416,6 @@ class LightTreeRawFirExpressionBuilder(
                         returnTypeRef = parameter.returnTypeRef
                         isVar = false
                         status = FirResolvedDeclarationStatusImpl(Visibilities.Local, Modality.FINAL, EffectiveVisibility.Local)
-                        isLocal = true
                         this.name = parameter.name
                         symbol = FirLocalPropertySymbol()
                         annotations += parameter.annotations

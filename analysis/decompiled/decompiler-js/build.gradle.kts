@@ -5,11 +5,6 @@ plugins {
 
 sourceSets {
     "main" { projectDefault() }
-    "test" { projectDefault() }
-}
-
-projectTest {
-    workingDir = rootDir
 }
 
 dependencies {
@@ -21,9 +16,4 @@ dependencies {
     implementation(project(":js:js.serializer"))
 
     compileOnly(intellijCore())
-
-    testImplementation(projectTests(":compiler:tests-common"))
-    testImplementation(projectTests(":compiler:tests-common-new"))
 }
-
-testsJar()

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -256,14 +256,19 @@ object SourceElementPositioningStrategies {
         PositioningStrategies.USELESS_ELVIS
     )
 
+    val USELESS_ELVIS_LEFT = SourceElementPositioningStrategy(
+        LightTreePositioningStrategies.USELESS_ELVIS_LEFT,
+        PositioningStrategies.USELESS_ELVIS_LEFT
+    )
+
     val RETURN_WITH_LABEL = SourceElementPositioningStrategy(
         LightTreePositioningStrategies.RETURN_WITH_LABEL,
         PositioningStrategies.RETURN_WITH_LABEL
     )
 
-    val PROPERTY_INITIALIZER = SourceElementPositioningStrategy(
-        LightTreePositioningStrategies.LAST_CHILD,
-        PositioningStrategies.PROPERTY_INITIALIZER
+    val VARIABLE_INITIALIZER = SourceElementPositioningStrategy(
+        LightTreePositioningStrategies.VARIABLE_INITIALIZER,
+        PositioningStrategies.VARIABLE_INITIALIZER
     )
 
     val WHOLE_ELEMENT = SourceElementPositioningStrategy(
@@ -284,6 +289,11 @@ object SourceElementPositioningStrategies {
     val TYPE_PARAMETERS_LIST = SourceElementPositioningStrategy(
         LightTreePositioningStrategies.TYPE_PARAMETERS_LIST,
         PositioningStrategies.TYPE_PARAMETERS_LIST
+    )
+
+    val FUNCTION_TYPE_RECEIVER = SourceElementPositioningStrategy(
+        LightTreePositioningStrategies.FUNCTION_TYPE_RECEIVER,
+        PositioningStrategies.FUNCTION_TYPE_RECEIVER
     )
 
     val NAME_IDENTIFIER = SourceElementPositioningStrategy(

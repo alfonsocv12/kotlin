@@ -10,6 +10,7 @@ import org.jetbrains.kotlin.ir.backend.js.JsLoweredDeclarationOrigin
 import org.jetbrains.kotlin.ir.backend.js.ir.JsIrArithBuilder
 import org.jetbrains.kotlin.ir.backend.js.utils.hasStableJsName
 import org.jetbrains.kotlin.ir.backend.js.utils.jsFunctionSignature
+import org.jetbrains.kotlin.ir.backend.js.utils.realOverrideTarget
 import org.jetbrains.kotlin.ir.builders.*
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
@@ -19,27 +20,29 @@ import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.types.classifierOrNull
 import org.jetbrains.kotlin.ir.util.isEffectivelyExternal
 import org.jetbrains.kotlin.ir.util.isVararg
-import org.jetbrains.kotlin.ir.util.nonDispatchParameters
 import org.jetbrains.kotlin.utils.addToStdlib.assignFrom
 
-class JsBridgesConstruction(context: JsIrBackendContext) : BridgesConstruction<JsIrBackendContext>(context) {
+class JsBridgesConstruction(val context: JsIrBackendContext) : BridgesConstruction(context) {
 
     private val calculator = JsIrArithBuilder(context)
 
-    private val jsArguments = context.intrinsics.jsArguments
-    private val jsArrayGet = context.intrinsics.jsArrayGet
-    private val jsArrayLength = context.intrinsics.jsArrayLength
-    private val jsArrayLike2Array = context.intrinsics.jsArrayLike2Array
-    private val jsSliceArrayLikeFromIndex = context.intrinsics.jsSliceArrayLikeFromIndex
-    private val jsSliceArrayLikeFromIndexToIndex = context.intrinsics.jsSliceArrayLikeFromIndexToIndex
-    private val primitiveArrays = context.intrinsics.primitiveArrays
-    private val primitiveToLiteralConstructor = context.intrinsics.primitiveToLiteralConstructor
+    private val jsArguments = context.symbols.jsArguments
+    private val jsArrayGet = context.symbols.jsArrayGet
+    private val jsArrayLength = context.symbols.jsArrayLength
+    private val jsArrayLike2Array = context.symbols.jsArrayLike2Array
+    private val jsSliceArrayLikeFromIndex = context.symbols.jsSliceArrayLikeFromIndex
+    private val jsSliceArrayLikeFromIndexToIndex = context.symbols.jsSliceArrayLikeFromIndexToIndex
+    private val primitiveArrays = context.symbols.primitiveArrays
+    private val primitiveToLiteralConstructor = context.symbols.primitiveToLiteralConstructor
 
     override fun getFunctionSignature(function: IrSimpleFunction) =
         jsFunctionSignature(
             function,
             context
         )
+
+    override fun findConcreteSuperDeclaration(function: IrSimpleFunction): IrSimpleFunction =
+        if (function.isRealOrOverridesInterface) function else function.realOverrideTarget
 
     override fun getBridgeOrigin(bridge: IrSimpleFunction): IrDeclarationOrigin =
         when {

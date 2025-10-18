@@ -11,6 +11,8 @@ import org.jetbrains.kotlin.backend.konan.objcexport.ObjCExportLazy
 import org.jetbrains.kotlin.backend.konan.objcexport.ObjCExportLazyImpl
 import org.jetbrains.kotlin.backend.konan.objcexport.ObjCExportProblemCollector
 import org.jetbrains.kotlin.backend.konan.objcexport.dumpObjCHeader
+import org.jetbrains.kotlin.config.nativeBinaryOptions.BinaryOptions
+import org.jetbrains.kotlin.config.nativeBinaryOptions.UnitSuspendFunctionObjCExport
 import org.jetbrains.kotlin.container.*
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.psi.KtFile
@@ -43,7 +45,7 @@ internal fun StorageComponentContainer.initContainer(config: KonanConfig) {
                 get() = config.configuration.getBoolean(KonanConfigKeys.OBJC_GENERICS)
 
             override val objcExportBlockExplicitParameterNames: Boolean
-                get() = config.configuration.getBoolean(BinaryOptions.objcExportBlockExplicitParameterNames)
+                get() = config.configuration.get(BinaryOptions.objcExportBlockExplicitParameterNames, true)
 
             override val disableSwiftMemberNameMangling: Boolean
                 get() = config.configuration.getBoolean(BinaryOptions.objcExportDisableSwiftMemberNameMangling)

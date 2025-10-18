@@ -41,6 +41,7 @@ public class KtParameter extends KtNamedDeclarationStub<KotlinParameterStub> imp
 
     @Override
     @Nullable
+    @SuppressWarnings("deprecation") // KT-78356
     public KtTypeReference getTypeReference() {
         return getStubOrPsiChild(KtStubBasedElementTypes.TYPE_REFERENCE);
     }
@@ -65,21 +66,16 @@ public class KtParameter extends KtNamedDeclarationStub<KotlinParameterStub> imp
     public boolean hasDefaultValue() {
         KotlinParameterStub stub = getGreenStub();
         if (stub != null) {
-            return stub.hasDefaultValue();
+            return stub.getHasDefaultValue();
         }
         return getDefaultValue() != null;
     }
 
     @Nullable
     public KtExpression getDefaultValue() {
-        KotlinParameterStub stub = getStub();
+        KotlinParameterStub stub = getGreenStub();
         if (stub != null) {
-            if (!stub.hasDefaultValue()) {
-                return null;
-            }
-
-            if (getContainingKtFile().isCompiled()) {
-                //don't load ast
+            if (!stub.getHasDefaultValue()) {
                 return null;
             }
         }
@@ -105,7 +101,7 @@ public class KtParameter extends KtNamedDeclarationStub<KotlinParameterStub> imp
     public boolean hasValOrVar() {
         KotlinParameterStub stub = getGreenStub();
         if (stub != null) {
-            return stub.hasValOrVar();
+            return stub.getHasValOrVar();
         }
         return getValOrVarKeyword() != null;
     }
@@ -114,10 +110,10 @@ public class KtParameter extends KtNamedDeclarationStub<KotlinParameterStub> imp
     @Nullable
     public PsiElement getValOrVarKeyword() {
         KotlinParameterStub stub = getStub();
-        if (stub != null && !stub.hasValOrVar()) {
+        if (stub != null && !stub.getHasValOrVar()) {
             return null;
         }
-        return findChildByType(VAL_VAR_TOKEN_SET);
+        return findChildByType(KtTokens.VAL_VAR);
     }
 
     @Nullable
@@ -128,7 +124,11 @@ public class KtParameter extends KtNamedDeclarationStub<KotlinParameterStub> imp
         return findChildByType(KtNodeTypes.DESTRUCTURING_DECLARATION);
     }
 
-    public static final TokenSet VAL_VAR_TOKEN_SET = TokenSet.create(KtTokens.VAL_KEYWORD, KtTokens.VAR_KEYWORD);
+    /**
+     * @deprecated use {@link KtTokens#VAL_VAR} instead.
+     */
+    @Deprecated
+    public static final TokenSet VAL_VAR_TOKEN_SET = KtTokens.VAL_VAR;
 
     @Override
     public ItemPresentation getPresentation() {

@@ -6,7 +6,9 @@
 package org.jetbrains.kotlin.stats
 
 import org.jetbrains.kotlin.util.CompilerType
+import org.jetbrains.kotlin.util.DynamicStats
 import org.jetbrains.kotlin.util.GarbageCollectionStats
+import org.jetbrains.kotlin.util.PhaseType
 import org.jetbrains.kotlin.util.PlatformType
 import org.jetbrains.kotlin.util.SideStats
 import org.jetbrains.kotlin.util.Time
@@ -86,6 +88,7 @@ class StatsCalculator(val reportsData: ReportsData) {
         if (size == 1) return first().let { AggregatedStats(it, it) }
 
         var name: String? = null
+        var outputKind: String? = null
         var latestCurrentTimeMs: Long? = null
         var platform: PlatformType? = null
         var compilerType: CompilerType? = null
@@ -100,6 +103,7 @@ class StatsCalculator(val reportsData: ReportsData) {
         var klibWritingStats: Time = Time.ZERO
         var irLoweringStats: Time = Time.ZERO
         var backendStats: Time = Time.ZERO
+        val dynamicStats: LinkedHashMap<Pair<PhaseType, String>, Time> = LinkedHashMap()
         var findJavaClassStats: SideStats = SideStats.EMPTY
         var findKotlinClassStats: SideStats = SideStats.EMPTY
         val gcStats = mutableMapOf<String, Pair<GarbageCollectionStats, Long>>()
@@ -109,6 +113,11 @@ class StatsCalculator(val reportsData: ReportsData) {
             if (name == null) {
                 name = moduleStats.name
             } else if (name != moduleStats.name) {
+                name = "Aggregate"
+            }
+            if (outputKind == null) {
+                outputKind = moduleStats.name
+            } else if (outputKind != moduleStats.outputKind) {
                 name = "Aggregate"
             }
             if (latestCurrentTimeMs == null || latestCurrentTimeMs < moduleStats.timeStampMs) {
@@ -131,6 +140,9 @@ class StatsCalculator(val reportsData: ReportsData) {
             klibWritingStats += moduleStats.klibWritingStats
             irLoweringStats += moduleStats.irLoweringStats
             backendStats += moduleStats.backendStats
+            moduleStats.dynamicStats?.forEach { (parentPhase, name, time) ->
+                dynamicStats[parentPhase to name] = (dynamicStats[parentPhase to name] ?: Time.ZERO) + time
+            }
             findJavaClassStats += moduleStats.findJavaClassStats
             findKotlinClassStats += moduleStats.findKotlinClassStats
             for (gcInfo in moduleStats.gcStats) {
@@ -149,6 +161,7 @@ class StatsCalculator(val reportsData: ReportsData) {
         fun getStats(total: Boolean): UnitStats {
             return UnitStats(
                 name = name,
+                outputKind = outputKind,
                 timeStampMs = latestCurrentTimeMs ?: System.currentTimeMillis(),
                 platform = platform!!,
                 compilerType = compilerType ?: CompilerType.K1andK2,
@@ -163,6 +176,10 @@ class StatsCalculator(val reportsData: ReportsData) {
                 klibWritingStats = klibWritingStats.let { if (total) it else it / size },
                 irLoweringStats = irLoweringStats.let { if (total) it else it / size },
                 backendStats = backendStats.let { if (total) it else it / size },
+                dynamicStats = dynamicStats.map { (key, time) ->
+                    val (phaseType, name) = key
+                    DynamicStats(phaseType, name, if (total) time else time / size)
+                },
                 findJavaClassStats = findJavaClassStats.let { if (total) it else it / size },
                 findKotlinClassStats = findKotlinClassStats.let { if (total) it else it / size },
                 gcStats = gcStats.values.map { gcStatsToCount ->

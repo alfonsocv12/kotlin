@@ -1,9 +1,9 @@
-PsiJetFileStubImpl[package=]
+FILE[kind=File[packageFqName=<root>]]
   PACKAGE_DIRECTIVE
   IMPORT_LIST
-  CLASS[classId=/BinaryTree, fqName=BinaryTree, isClsStubCompiledToJvmDefaultImplementation=false, isEnumEntry=false, isInterface=false, isLocal=false, isTopLevel=true, name=BinaryTree, superNames=[IMutableSet]]
+  CLASS[classId=/BinaryTree, fqName=BinaryTree, isClsStubCompiledToJvmDefaultImplementation=false, isInterface=false, isLocal=false, isTopLevel=true, name=BinaryTree, superNames=[IMutableSet]]
     TYPE_PARAMETER_LIST
-      TYPE_PARAMETER[fqName=null, isInVariance=false, isOutVariance=false, name=T]
+      TYPE_PARAMETER[fqName=null, name=T]
     SUPER_TYPE_LIST
       SUPER_TYPE_ENTRY
         TYPE_REFERENCE
@@ -15,7 +15,7 @@ PsiJetFileStubImpl[package=]
                   USER_TYPE
                     REFERENCE_EXPRESSION[referencedName=T]
     CLASS_BODY
-      CLASS[classId=/BinaryTree.TreeNode, fqName=BinaryTree.TreeNode, isClsStubCompiledToJvmDefaultImplementation=false, isEnumEntry=false, isInterface=false, isLocal=false, isTopLevel=false, name=TreeNode, superNames=[]]
+      CLASS[classId=/BinaryTree.TreeNode, fqName=BinaryTree.TreeNode, isClsStubCompiledToJvmDefaultImplementation=false, isInterface=false, isLocal=false, isTopLevel=false, name=TreeNode, superNames=[]]
         MODIFIER_LIST[private]
         PRIMARY_CONSTRUCTOR[fqName=null, hasBody=false, hasNoExpressionBody=true, isDelegatedCallToThis=false, isExplicitDelegationCall=false, isExtension=false, isTopLevel=false, mayHaveContract=false, name=TreeNode]
           VALUE_PARAMETER_LIST
@@ -211,7 +211,7 @@ PsiJetFileStubImpl[package=]
                 TYPE_REFERENCE
                   USER_TYPE
                     REFERENCE_EXPRESSION[referencedName=T]
-        OBJECT_DECLARATION[classId=null, fqName=null, isCompanion=false, isLocal=true, isObjectLiteral=true, isTopLevel=false, name=null, superNames=[IMutableIterator]]
+        OBJECT_DECLARATION[classId=null, fqName=null, isLocal=true, isObjectLiteral=true, isTopLevel=false, name=null, superNames=[IMutableIterator]]
           SUPER_TYPE_LIST
             SUPER_TYPE_ENTRY
               TYPE_REFERENCE

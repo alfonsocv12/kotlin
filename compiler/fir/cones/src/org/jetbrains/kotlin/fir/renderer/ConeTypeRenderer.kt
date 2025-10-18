@@ -6,12 +6,14 @@
 package org.jetbrains.kotlin.fir.renderer
 
 import org.jetbrains.kotlin.builtins.functions.FunctionTypeKind
+import org.jetbrains.kotlin.fir.diagnostics.ConeDiagnostic
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.types.model.TypeConstructorMarker
 import org.jetbrains.kotlin.utils.addToStdlib.ifNotEmpty
 
 open class ConeTypeRenderer(
-    private val attributeRenderer: ConeAttributeRenderer = ConeAttributeRenderer.ToString
+    private val attributeRenderer: ConeAttributeRenderer = ConeAttributeRenderer.ToString,
+    private var renderCapturedDetails: Boolean = false,
 ) {
     lateinit var builder: StringBuilder
     lateinit var idRenderer: ConeIdRenderer
@@ -136,9 +138,19 @@ open class ConeTypeRenderer(
                 builder.append("CapturedType(")
                 constructor.projection.render()
                 builder.append(")")
+                if (renderCapturedDetails) {
+                    builder.append(
+                        " with lowerType=${constructor.lowerType?.let(::render)}, supertypes=["
+                    )
+                    // To prevent recursion
+                    renderCapturedDetails = false
+                    constructor.supertypes?.forEach(::render)
+                    renderCapturedDetails = true
+                    builder.append("]")
+                }
             }
 
-            is ConeClassLikeErrorLookupTag -> builder.append("ERROR CLASS: ${constructor.diagnostic?.reason}")
+            is ConeClassLikeErrorLookupTag -> builder.append(renderDiagnostic(constructor.diagnostic, prefix = "ERROR CLASS: "))
 
             is ConeClassLikeLookupTag -> idRenderer.renderClassId(constructor.classId)
             is ConeClassifierLookupTag -> builder.append(constructor.name.asString())
@@ -154,6 +166,10 @@ open class ConeTypeRenderer(
         builder.append(nullabilityMarker)
     }
 
+    open fun renderDiagnostic(diagnostic: ConeDiagnostic, prefix: String = "", suffix: String = ""): String {
+        return "$prefix${diagnostic.reason}$suffix"
+    }
+
     private fun ConeClassLikeType.renderTypeArguments() {
         if (typeArguments.isEmpty()) return
         builder.append("<")
@@ -167,6 +183,11 @@ open class ConeTypeRenderer(
     }
 
     private fun ConeFlexibleType.renderForSameLookupTags(): Boolean {
+        if (isTrivial && lowerBound !is ConeDefinitelyNotNullType) {
+            render(lowerBound, nullabilityMarker = "!")
+            return true
+        }
+
         if (lowerBound is ConeLookupTagBasedType && upperBound is ConeLookupTagBasedType &&
             lowerBound.lookupTag == upperBound.lookupTag &&
             !lowerBound.isMarkedNullable && upperBound.isMarkedNullable

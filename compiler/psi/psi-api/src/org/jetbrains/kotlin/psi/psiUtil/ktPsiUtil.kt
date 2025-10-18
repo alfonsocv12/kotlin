@@ -192,7 +192,7 @@ fun StubBasedPsiElementBase<out KotlinClassOrObjectStub<out KtClassOrObject>>.ge
 
     val stub = greenStub
     if (stub != null) {
-        return stub.getSuperNames()
+        return stub.superNames
     }
 
     val specifiers = this.superTypeListEntries
@@ -233,7 +233,9 @@ fun KtAnnotationsContainer.collectAnnotationEntriesFromStubOrPsi(): List<KtAnnot
 
 private fun StubElement<*>.collectAnnotationEntriesFromStubElement(): List<KtAnnotationEntry> {
     return childrenStubs.flatMap { child ->
-        when (child.stubType) {
+        @Suppress("DEPRECATION") // KT-78356
+        val stubType = child.stubType
+        when (stubType) {
             KtNodeTypes.ANNOTATION_ENTRY -> listOf(child.psi as KtAnnotationEntry)
             KtNodeTypes.ANNOTATION -> (child.psi as KtAnnotation).entries
             else -> emptyList()
@@ -282,9 +284,9 @@ inline fun <reified T : KtElement, R> flatMapDescendantsOfTypeVisitor(
  */
 @KtImplementationDetail
 fun KtDeclarationWithBody.isLegacyContractPresentPsiCheck(): Boolean {
-    if (hasModifier(KtTokens.OPERATOR_KEYWORD)) return false
-
-    return bodyBlockExpression?.firstStatement?.isContractDescriptionCallPsiCheck() == true
+    val statement = bodyBlockExpression?.firstStatement ?: return false
+    val unwrappedExpression = statement.unwrapParenthesesLabelsAndAnnotations() as? KtExpression ?: return false
+    return unwrappedExpression.isContractDescriptionCallPsiCheck()
 }
 
 fun KtNamedFunction.isContractPresentPsiCheck(isAllowedOnMembers: Boolean): Boolean {
@@ -343,6 +345,21 @@ fun KtDeclaration.isExpectDeclaration(): Boolean = when {
     this is KtParameter -> ownerDeclaration?.isExpectDeclaration() == true
     else -> containingClassOrObject?.isExpectDeclaration() == true
 }
+
+/**
+ * Checks if this declaration is an `actual`. This is the case if the declaration either has an explicit `actual` modifier, or if
+ * it is a constructor of an annotation, value, or inline class
+ */
+fun KtDeclaration.isActualDeclaration(): Boolean = hasActualModifier() || isImplicitlyActualDeclaration()
+
+internal fun KtDeclaration.isImplicitlyActualDeclaration(): Boolean = when (this) {
+    is KtConstructor<*> -> (containingClassOrObject as? KtClass)?.let { klass ->
+        klass.hasActualModifier() && klass.allowsImplicitlyActualConstructor()
+    } == true
+    else -> false
+}
+
+internal fun KtClass.allowsImplicitlyActualConstructor() = isAnnotation() || isValue() || isInline()
 
 fun KtElement.isContextualDeclaration(): Boolean {
     val contextReceivers = when (this) {

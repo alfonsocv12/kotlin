@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2015 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2025 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.psi;
@@ -20,7 +9,7 @@ import com.intellij.lang.ASTNode;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.search.LocalSearchScope;
 import com.intellij.psi.search.SearchScope;
-import com.intellij.psi.tree.TokenSet;
+import com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.KtNodeTypes;
@@ -31,13 +20,10 @@ import org.jetbrains.kotlin.psi.typeRefHelpers.TypeRefHelpersKt;
 import java.util.Collections;
 import java.util.List;
 
-import static org.jetbrains.kotlin.lexer.KtTokens.VAL_KEYWORD;
-import static org.jetbrains.kotlin.lexer.KtTokens.VAR_KEYWORD;
+import static org.jetbrains.kotlin.lexer.KtTokens.EQ;
 
 @SuppressWarnings("deprecation")
 public class KtDestructuringDeclarationEntry extends KtNamedDeclarationNotStubbed implements KtVariableDeclaration {
-
-    private static final TokenSet VAL_VAR_KEYWORDS = TokenSet.create(VAL_KEYWORD, VAR_KEYWORD);
 
     public KtDestructuringDeclarationEntry(@NotNull ASTNode node) {
         super(node);
@@ -109,18 +95,26 @@ public class KtDestructuringDeclarationEntry extends KtNamedDeclarationNotStubbe
 
     @Override
     public boolean isVar() {
-        return getParentNode().findChildByType(KtTokens.VAR_KEYWORD) != null;
+        return findChildByType(KtTokens.VAR_KEYWORD) != null || getParentNode().findChildByType(KtTokens.VAR_KEYWORD) != null;
     }
 
     @Nullable
     @Override
-    public KtExpression getInitializer() {
-        return null;
+    public KtNameReferenceExpression getInitializer() {
+        return PsiTreeUtil.getNextSiblingOfType(getEqualsToken(), KtNameReferenceExpression.class);
+    }
+
+    /**
+     * Returns the equals sign before the initializer if it is present.
+     */
+    @Nullable
+    public PsiElement getEqualsToken() {
+        return findChildByType(EQ);
     }
 
     @Override
     public boolean hasInitializer() {
-        return false;
+        return getInitializer() != null;
     }
 
     @NotNull
@@ -133,9 +127,19 @@ public class KtDestructuringDeclarationEntry extends KtNamedDeclarationNotStubbe
 
     @Override
     public PsiElement getValOrVarKeyword() {
-        ASTNode node = getParentNode().findChildByType(VAL_VAR_KEYWORDS);
+        ASTNode node = getParentNode().findChildByType(KtTokens.VAL_VAR);
         if (node == null) return null;
         return node.getPsi();
+    }
+
+    /**
+     * @return the PSI element for the val or var keyword of the entry itself or null.
+     *
+     * Only entries of full form destructuring declarations have their own val or var keyword.
+     */
+    @Nullable
+    public PsiElement getOwnValOrVarKeyword() {
+        return findChildByType(KtTokens.VAL_VAR);
     }
 
     @Nullable

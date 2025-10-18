@@ -2,6 +2,8 @@ plugins {
     kotlin("jvm")
     id("jps-compatible")
     id("org.jetbrains.kotlinx.binary-compatibility-validator")
+    id("java-test-fixtures")
+    id("project-tests-convention")
 }
 
 dependencies {
@@ -14,16 +16,20 @@ dependencies {
     compileOnly(libs.guava)
     compileOnly(libs.intellij.fastutil)
 
-    testApi(platform(libs.junit.bom))
-    testImplementation(libs.junit.jupiter.api)
+    testFixturesApi(platform(libs.junit.bom))
+    testFixturesImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
 
-    testImplementation(projectTests(":compiler"))
+    testFixturesImplementation(testFixtures(project(":compiler:tests-common")))
+    testImplementation(testFixtures(project(":compiler:tests-common")))
+    testFixturesCompileOnly(intellijCore())
+    testCompileOnly(intellijCore())
 }
 
 sourceSets {
     "main" { projectDefault() }
     "test" { projectDefault() }
+    "testFixtures" { projectDefault() }
 }
 
 apiValidation {
@@ -34,7 +40,8 @@ apiValidation {
 
 testsJar()
 
-projectTest(jUnitMode = JUnitMode.JUnit5) {
-    workingDir = rootDir
-    useJUnitPlatform()
+projectTests {
+    testTask(jUnitMode = JUnitMode.JUnit5) {
+        workingDir = rootDir
+    }
 }

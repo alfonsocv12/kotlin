@@ -1,4 +1,4 @@
-PsiJetFileStubImpl[package=]
+FILE[kind=File[packageFqName=<root>]]
   PACKAGE_DIRECTIVE
   IMPORT_LIST
     IMPORT_DIRECTIVE[importedFqName=kotlin.reflect.KProperty, isAllUnder=false, isValid=true]
@@ -7,7 +7,7 @@ PsiJetFileStubImpl[package=]
           REFERENCE_EXPRESSION[referencedName=kotlin]
           REFERENCE_EXPRESSION[referencedName=reflect]
         REFERENCE_EXPRESSION[referencedName=KProperty]
-  CLASS[classId=/Foo, fqName=Foo, isClsStubCompiledToJvmDefaultImplementation=false, isEnumEntry=false, isInterface=false, isLocal=false, isTopLevel=true, name=Foo, superNames=[]]
+  CLASS[classId=/Foo, fqName=Foo, isClsStubCompiledToJvmDefaultImplementation=false, isInterface=false, isLocal=false, isTopLevel=true, name=Foo, superNames=[]]
     MODIFIER_LIST[abstract]
     PRIMARY_CONSTRUCTOR[fqName=null, hasBody=false, hasNoExpressionBody=true, isDelegatedCallToThis=false, isExplicitDelegationCall=false, isExtension=false, isTopLevel=false, mayHaveContract=false, name=Foo]
       VALUE_PARAMETER_LIST
@@ -84,7 +84,7 @@ PsiJetFileStubImpl[package=]
       FUN[fqName=Foo.getValue, hasBody=true, hasNoExpressionBody=true, hasTypeParameterListBeforeFunctionName=true, isExtension=true, isTopLevel=false, mayHaveContract=false, name=getValue]
         MODIFIER_LIST[operator]
         TYPE_PARAMETER_LIST
-          TYPE_PARAMETER[fqName=null, isInVariance=false, isOutVariance=false, name=T]
+          TYPE_PARAMETER[fqName=null, name=T]
         TYPE_REFERENCE
           USER_TYPE
             REFERENCE_EXPRESSION[referencedName=T]
@@ -103,5 +103,5 @@ PsiJetFileStubImpl[package=]
         TYPE_REFERENCE
           USER_TYPE
             REFERENCE_EXPRESSION[referencedName=String]
-      CLASS[classId=/Foo.Anno, fqName=Foo.Anno, isClsStubCompiledToJvmDefaultImplementation=false, isEnumEntry=false, isInterface=false, isLocal=false, isTopLevel=false, name=Anno, superNames=[]]
+      CLASS[classId=/Foo.Anno, fqName=Foo.Anno, isClsStubCompiledToJvmDefaultImplementation=false, isInterface=false, isLocal=false, isTopLevel=false, name=Anno, superNames=[]]
         MODIFIER_LIST[annotation]
