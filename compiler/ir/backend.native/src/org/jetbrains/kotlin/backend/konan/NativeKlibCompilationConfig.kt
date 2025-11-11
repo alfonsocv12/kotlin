@@ -14,6 +14,7 @@ import org.jetbrains.kotlin.konan.target.CompilerOutputKind
 import org.jetbrains.kotlin.konan.target.KonanTarget
 import org.jetbrains.kotlin.konan.util.visibleName
 import org.jetbrains.kotlin.library.metadata.resolver.KotlinLibraryResolveResult
+import org.jetbrains.kotlin.platform.TargetPlatform
 import org.jetbrains.kotlin.util.removeSuffixIfPresent
 
 /**
@@ -26,6 +27,8 @@ interface NativeKlibCompilationConfig {
     val configuration: CompilerConfiguration
 
     val target: KonanTarget
+
+    val targetPlatform: TargetPlatform
 
     val resolvedLibraries: KotlinLibraryResolveResult
 

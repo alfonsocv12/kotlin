@@ -31,6 +31,8 @@ import org.jetbrains.kotlin.konan.properties.loadProperties
 import org.jetbrains.kotlin.konan.target.*
 import org.jetbrains.kotlin.konan.util.visibleName
 import org.jetbrains.kotlin.library.metadata.resolver.TopologicalLibraryOrder
+import org.jetbrains.kotlin.platform.konan.NativePlatformWithTarget
+import org.jetbrains.kotlin.platform.toTargetPlatform
 import org.jetbrains.kotlin.util.removeSuffixIfPresent
 import org.jetbrains.kotlin.utils.KotlinNativePaths
 import java.nio.file.Files
@@ -91,6 +93,7 @@ class KonanConfig(
     private val platformManager = PlatformManager(distribution)
     internal val targetManager = platformManager.targetManager(configuration.get(KonanConfigKeys.TARGET))
     override val target = targetManager.target
+    override val targetPlatform = NativePlatformWithTarget(target).toTargetPlatform()
     internal val phaseConfig = configuration.phaseConfig!!
 
     // See https://youtrack.jetbrains.com/issue/KT-67692.

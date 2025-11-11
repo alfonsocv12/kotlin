@@ -10,6 +10,8 @@ import org.jetbrains.kotlin.descriptors.ModuleCapability
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.descriptors.impl.ModuleDescriptorImpl
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.platform.TargetPlatform
+import org.jetbrains.kotlin.platform.konan.NativePlatforms
 import org.jetbrains.kotlin.storage.StorageManager
 
 interface KlibModuleDescriptorFactory {
@@ -22,7 +24,8 @@ interface KlibModuleDescriptorFactory {
         storageManager: StorageManager,
         builtIns: KotlinBuiltIns,
         origin: KlibModuleOrigin,
-        customCapabilities: Map<ModuleCapability<*>, Any?> = emptyMap()
+        customCapabilities: Map<ModuleCapability<*>, Any?> = emptyMap(),
+        targetPlatform: TargetPlatform = NativePlatforms.unspecifiedNativePlatform
     ): ModuleDescriptorImpl
 
     /**
@@ -33,6 +36,7 @@ interface KlibModuleDescriptorFactory {
         name: Name,
         storageManager: StorageManager,
         origin: KlibModuleOrigin,
-        customCapabilities: Map<ModuleCapability<*>, Any?> = emptyMap()
+        customCapabilities: Map<ModuleCapability<*>, Any?> = emptyMap(),
+        targetPlatform: TargetPlatform = NativePlatforms.unspecifiedNativePlatform
     ): ModuleDescriptorImpl
 }

@@ -37,7 +37,7 @@ internal object TopDownAnalyzerFacadeForKonan {
         val projectContext = ProjectContext(config.project, "TopDownAnalyzer for Konan")
 
         val module = nativeFactories.DefaultDescriptorFactory.createDescriptorAndNewBuiltIns(
-                moduleName, projectContext.storageManager, origin = CurrentKlibModuleOrigin)
+                moduleName, projectContext.storageManager, origin = CurrentKlibModuleOrigin, targetPlatform = config.targetPlatform)
         val moduleContext = MutableModuleContextImpl(module, projectContext)
 
         val resolvedModuleDescriptors = nativeFactories.DefaultResolvedDescriptorsFactory.createResolved(

@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.library.metadata.KlibModuleDescriptorFactory
 import org.jetbrains.kotlin.library.metadata.KlibModuleOrigin
 import org.jetbrains.kotlin.library.metadata.isCInteropLibrary
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.platform.TargetPlatform
 import org.jetbrains.kotlin.platform.konan.NativePlatforms
 import org.jetbrains.kotlin.resolve.ImplicitIntegerCoercion
 import org.jetbrains.kotlin.storage.StorageManager
@@ -23,7 +24,8 @@ internal class KlibModuleDescriptorFactoryImpl(val createBuiltIns: (StorageManag
         storageManager: StorageManager,
         builtIns: KotlinBuiltIns,
         origin: KlibModuleOrigin,
-        customCapabilities: Map<ModuleCapability<*>, Any?>
+        customCapabilities: Map<ModuleCapability<*>, Any?>,
+        targetPlatform: TargetPlatform
     ) = ModuleDescriptorImpl(
         name,
         storageManager,
@@ -32,20 +34,20 @@ internal class KlibModuleDescriptorFactoryImpl(val createBuiltIns: (StorageManag
             KlibModuleOrigin.CAPABILITY to origin,
             ImplicitIntegerCoercion.MODULE_CAPABILITY to origin.isCInteropLibrary()
         ),
-        // TODO: don't use hardcoded platform; it should be supplied as a parameter
-        platform = NativePlatforms.unspecifiedNativePlatform
+        platform = targetPlatform
     )
 
     override fun createDescriptorAndNewBuiltIns(
         name: Name,
         storageManager: StorageManager,
         origin: KlibModuleOrigin,
-        customCapabilities: Map<ModuleCapability<*>, Any?>
+        customCapabilities: Map<ModuleCapability<*>, Any?>,
+        targetPlatform: TargetPlatform
     ): ModuleDescriptorImpl {
 
         val builtIns = createBuiltIns(storageManager)
 
-        val moduleDescriptor = createDescriptor(name, storageManager, builtIns, origin, customCapabilities)
+        val moduleDescriptor = createDescriptor(name, storageManager, builtIns, origin, customCapabilities, targetPlatform)
         builtIns.builtInsModule = moduleDescriptor
 
         return moduleDescriptor
