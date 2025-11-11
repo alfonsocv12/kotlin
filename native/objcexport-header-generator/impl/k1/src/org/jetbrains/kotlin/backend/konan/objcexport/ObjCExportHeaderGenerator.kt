@@ -14,6 +14,9 @@ import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.descriptors.SourceFile
 import org.jetbrains.kotlin.resolve.scopes.MemberScope
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.Collections.synchronizedList
 
 abstract class ObjCExportHeaderGenerator @InternalKotlinNativeApi constructor(
     val moduleDescriptors: List<ModuleDescriptor>,
@@ -22,6 +25,7 @@ abstract class ObjCExportHeaderGenerator @InternalKotlinNativeApi constructor(
     val objcGenerics: Boolean,
     val objcExportBlockExplicitParameterNames: Boolean,
     problemCollector: ObjCExportProblemCollector,
+    val threadsCount: Int = Runtime.getRuntime().availableProcessors()
 ) {
     private val stubs = mutableListOf<ObjCExportStub>()
 
@@ -117,32 +121,90 @@ abstract class ObjCExportHeaderGenerator @InternalKotlinNativeApi constructor(
             .flatMap { it.getPackageFragments() }
             .makePackagesOrderStable()
 
-        packageFragments.forEach { packageFragment ->
-            packageFragment.getMemberScope().getContributedDescriptors()
-                .asSequence()
-                .filterIsInstance<CallableMemberDescriptor>()
-                .filter { mapper.shouldBeExposed(it) }
-                .forEach {
-                    val classDescriptor = getClassIfCategory(it)
-                    if (classDescriptor == null) {
-                        topLevel.getOrPut(it.findSourceFile(), { mutableListOf() }) += it
-                    } else {
-                        // If a class is hidden from Objective-C API then it is meaningless
-                        // to export its extensions.
-                        if (!classDescriptor.isHiddenFromObjC()) {
-                            extensions.getOrPut(classDescriptor, { mutableListOf() }) += it
+        val executor = if (threadsCount > 1) {
+            Executors.newFixedThreadPool(threadsCount)
+        } else {
+            null
+        }
+
+        val clangLock = Any()
+
+        val tasks = packageFragments.map { packageFragment ->
+            java.util.concurrent.Callable {
+                val localTopLevel = mutableListOf<CallableMemberDescriptor>()
+                val localExtensions = mutableListOf<Pair<ClassDescriptor, CallableMemberDescriptor>>()
+                val localClasses = mutableListOf<ClassDescriptor>()
+
+                val memberScope = packageFragment.getMemberScope()
+
+                memberScope.getContributedDescriptors()
+                    .asSequence()
+                    .filterIsInstance<CallableMemberDescriptor>()
+                    .forEach { descriptor ->
+                        val shouldBeExposed = synchronized(clangLock) {
+                            mapper.shouldBeExposed(descriptor)
+                        }
+
+                        if (shouldBeExposed) {
+                            val classDescriptor = synchronized(clangLock) {
+                                getClassIfCategory(descriptor)
+                            }
+
+                            if (classDescriptor == null) {
+                                localTopLevel.add(descriptor)
+                            } else {
+                                val isHidden = synchronized(clangLock) {
+                                    classDescriptor.isHiddenFromObjC()
+                                }
+                                if (!isHidden) {
+                                    localExtensions.add(classDescriptor to descriptor)
+                                }
+                            }
                         }
                     }
+
+                memberScope.collectClasses(localClasses)
+                Triple(localTopLevel, localExtensions, localClasses)
+            }
+        }
+
+        val results = if (executor != null) {
+            executor.invokeAll(tasks).map { it.get() }
+        } else {
+            tasks.map { it.call() }
+        }
+
+        executor?.shutdown()
+        executor?.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS)
+
+        results.forEach { (localTopLevel, localExtensions, localClasses) ->
+            synchronized(topLevel) {
+                localTopLevel.forEach {
+                    topLevel.getOrPut(it.findSourceFile()) { mutableListOf() } += it
                 }
+            }
+            synchronized(extensions) {
+                localExtensions.forEach { (classDescriptor, descriptor) ->
+                    extensions.getOrPut(classDescriptor) { mutableListOf() } += descriptor
+                }
+            }
+            // classesToTranslate was originally synchronizedList, but now we can just add them sequentially
+            // However, the original code added them to a shared list during iteration.
+            // We need to make sure we process them.
+            // The original code: classesToTranslate.makeClassesOrderStable().forEach { translateClass(it) }
+            // We can just collect them all and then process.
         }
-
-        val classesToTranslate = mutableListOf<ClassDescriptor>()
-
-        packageFragments.forEach { packageFragment ->
-            packageFragment.getMemberScope().collectClasses(classesToTranslate)
-        }
-
-        classesToTranslate.makeClassesOrderStable().forEach { translateClass(it) }
+        
+        // We need to handle classesToTranslate. 
+        // In the original code, `classesToTranslate` was populated during `collectClasses`.
+        // Now we have `localClasses` from each task.
+        val allCollectedClasses = results.flatMap { it.third }
+        
+        // We need to ensure stability of classes processing as well.
+        // The original code used `classesToTranslate.makeClassesOrderStable()` which sorts them.
+        // So we can just add all of them to a list and sort/process.
+        
+        allCollectedClasses.makeClassesOrderStable().forEach { translateClass(it) }
 
         extensions.makeCategoriesOrderStable().forEach { (classDescriptor, declarations) ->
             generateExtensions(classDescriptor, declarations)
@@ -247,6 +309,7 @@ abstract class ObjCExportHeaderGenerator @InternalKotlinNativeApi constructor(
             objcExportBlockExplicitParameterNames: Boolean,
             shouldExportKDoc: Boolean,
             additionalImports: List<String>,
+            threadsCount: Int = Runtime.getRuntime().availableProcessors()
         ): ObjCExportHeaderGenerator = ObjCExportHeaderGeneratorImpl(
             moduleDescriptors,
             mapper,
@@ -255,7 +318,8 @@ abstract class ObjCExportHeaderGenerator @InternalKotlinNativeApi constructor(
             objcGenerics,
             objcExportBlockExplicitParameterNames,
             shouldExportKDoc,
-            additionalImports
+            additionalImports,
+            threadsCount
         )
     }
 }
