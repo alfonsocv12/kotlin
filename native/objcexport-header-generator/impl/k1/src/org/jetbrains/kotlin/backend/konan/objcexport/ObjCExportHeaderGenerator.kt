@@ -14,6 +14,8 @@ import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.descriptors.SourceFile
 import org.jetbrains.kotlin.resolve.scopes.MemberScope
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 abstract class ObjCExportHeaderGenerator @InternalKotlinNativeApi constructor(
     val moduleDescriptors: List<ModuleDescriptor>,
@@ -23,6 +25,8 @@ abstract class ObjCExportHeaderGenerator @InternalKotlinNativeApi constructor(
     val objcExportBlockExplicitParameterNames: Boolean,
     problemCollector: ObjCExportProblemCollector,
 ) {
+    // TODO pipe context
+    private val nThreads = Runtime.getRuntime().availableProcessors()
     private val stubs = mutableListOf<ObjCExportStub>()
 
     private val classForwardDeclarations = linkedSetOf<ObjCClassForwardDeclaration>()
@@ -117,30 +121,47 @@ abstract class ObjCExportHeaderGenerator @InternalKotlinNativeApi constructor(
             .flatMap { it.getPackageFragments() }
             .makePackagesOrderStable()
 
+        val classesToTranslate = java.util.Collections.synchronizedList(mutableListOf<ClassDescriptor>())
+
+        val executor = if (packageFragments.size > 16 && nThreads > 1) {
+            Executors.newFixedThreadPool(nThreads)
+        } else {
+            null
+        }
+
         packageFragments.forEach { packageFragment ->
-            packageFragment.getMemberScope().getContributedDescriptors()
-                .asSequence()
-                .filterIsInstance<CallableMemberDescriptor>()
-                .filter { mapper.shouldBeExposed(it) }
-                .forEach {
-                    val classDescriptor = getClassIfCategory(it)
-                    if (classDescriptor == null) {
-                        topLevel.getOrPut(it.findSourceFile(), { mutableListOf() }) += it
-                    } else {
-                        // If a class is hidden from Objective-C API then it is meaningless
-                        // to export its extensions.
-                        if (!classDescriptor.isHiddenFromObjC()) {
-                            extensions.getOrPut(classDescriptor, { mutableListOf() }) += it
+            val memberScope = packageFragment.getMemberScope()
+
+            val task = {
+                memberScope.getContributedDescriptors()
+                    .asSequence()
+                    .filterIsInstance<CallableMemberDescriptor>()
+                    .filter { mapper.shouldBeExposed(it) }
+                    .forEach {
+                        val classDescriptor = getClassIfCategory(it)
+                        if (classDescriptor == null) {
+                            synchronized(topLevel) {
+                                topLevel.getOrPut(it.findSourceFile(), { mutableListOf() }) += it
+                            }
+                        } else {
+                            // If a class is hidden from Objective-C API then it is meaningless
+                            // to export its extensions.
+                            if (!classDescriptor.isHiddenFromObjC()) {
+                                synchronized(extensions) {
+                                    extensions.getOrPut(classDescriptor, { mutableListOf() }) += it
+                                }
+                            }
                         }
                     }
-                }
+            }
+
+            executor?.submit(task) ?: task()
+
+            memberScope.collectClasses(classesToTranslate)
         }
 
-        val classesToTranslate = mutableListOf<ClassDescriptor>()
-
-        packageFragments.forEach { packageFragment ->
-            packageFragment.getMemberScope().collectClasses(classesToTranslate)
-        }
+        executor?.shutdown()
+        executor?.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS)
 
         classesToTranslate.makeClassesOrderStable().forEach { translateClass(it) }
 
