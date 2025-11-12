@@ -8,6 +8,7 @@ package org.jetbrains.kotlin.tools
 import org.gradle.api.DefaultTask
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.file.FileCollection
 import org.gradle.api.plugins.BasePlugin
 import org.gradle.api.tasks.*
 import org.gradle.kotlin.dsl.*
@@ -17,6 +18,7 @@ import org.jetbrains.kotlin.dependencies.NativeDependenciesExtension
 import org.jetbrains.kotlin.dependencies.NativeDependenciesPlugin
 import org.jetbrains.kotlin.konan.target.HostManager.Companion.hostIsMac
 import org.jetbrains.kotlin.konan.target.HostManager.Companion.hostIsMingw
+import org.jetbrains.kotlin.utils.reproduciblySortedFilePaths
 import java.io.File
 import javax.inject.Inject
 import kotlin.collections.List
@@ -194,6 +196,46 @@ open class NativeToolsExtension(val project: Project) {
     val llvmDir by nativeDependenciesExtension::llvmPath
     val hostPlatform by nativeDependenciesExtension::hostPlatform
 
+    // This is copied from `ClangArgs`
+    private val jdkDir: File
+        get() = File(System.getProperty("java.home")).canonicalFile.let { home ->
+            if (home.resolve("include").exists()) {
+                home
+            } else {
+                home.parentFile.also {
+                    check(it.resolve("include").exists())
+                }
+            }
+        }
+
+    private val reproducibilityRootsMap: Map<File, String>
+        get() = mapOf(
+                // This applies for both sources of the current project, and dependencies on other
+                // projects inside the repo.
+                project.isolated.rootProject.let {
+                    it.projectDirectory.asFile to it.name
+                },
+                // This is the common root for native dependencies: sysroots, llvm, ...
+                nativeDependenciesExtension.nativeDependenciesRoot to "NATIVE_DEPS",
+                // Not every user of `NativePlugin` uses JNI, but there's no harm to keep it for all.
+                jdkDir to "JDK",
+        )
+
+    /**
+     * Use these flags for `clang` invocations, so that the generated binaries do not contain
+     * absolute paths.
+     */
+    val reproducibilityCompilerFlags: Array<String>
+        get() = reproducibilityRootsMap.map {
+            "-ffile-prefix-map=${it.key}=${it.value}"
+        }.toTypedArray()
+
+    /**
+     * Whenever a `FileCollection` is passed as arguments, it's order must be stable sorted for reproducibility.
+     */
+    fun reproduciblySortedFilePaths(fileCollection: FileCollection): List<File> =
+            fileCollection.reproduciblySortedFilePaths(reproducibilityRootsMap)
+
     val sourceSets = SourceSets(project, this, mutableMapOf<String, SourceSet>())
     val toolPatterns = ToolConfigurationPatterns(this, mutableMapOf<Pair<String, String>, ToolPatternConfiguration>())
     val cleanupFiles = mutableListOf<String>()
@@ -217,7 +259,7 @@ open class NativeToolsExtension(val project: Project) {
             objSet.forEach {
                 dependsOn(it.implicitTasks())
             }
-            val deps = objSet.flatMap { it.collection.files }.map { it.path }
+            val deps = objSet.flatMap { reproduciblySortedFilePaths(it.collection) }.map { it.path }
             val toolConfiguration = ToolPatternImpl(sourceSets.extension, "${project.layout.buildDirectory.get().asFile.path}/$name", *deps.toTypedArray())
             toolConfiguration.configuration()
             toolConfiguration.configure(this, false )

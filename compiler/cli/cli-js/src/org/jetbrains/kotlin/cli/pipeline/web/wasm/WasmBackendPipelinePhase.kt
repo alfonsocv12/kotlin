@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.cli.pipeline.web.wasm
 
+import org.jetbrains.kotlin.backend.common.serialization.kotlinLibrary
 import org.jetbrains.kotlin.backend.wasm.*
 import org.jetbrains.kotlin.backend.wasm.dce.eliminateDeadDeclarations
 import org.jetbrains.kotlin.backend.wasm.ic.IrFactoryImplForWasmIC
@@ -24,6 +25,7 @@ import org.jetbrains.kotlin.ir.backend.js.ModulesStructure
 import org.jetbrains.kotlin.ir.backend.js.WholeWorldStageController
 import org.jetbrains.kotlin.ir.backend.js.dce.DceDumpNameCache
 import org.jetbrains.kotlin.ir.backend.js.dce.dumpDeclarationIrSizesIfNeed
+import org.jetbrains.kotlin.ir.backend.js.jsOutputName
 import org.jetbrains.kotlin.ir.backend.js.loadIr
 import org.jetbrains.kotlin.ir.backend.js.loadIrForSingleModule
 import org.jetbrains.kotlin.ir.declarations.IdSignatureRetriever
@@ -57,10 +59,10 @@ fun getAllReferencedDeclarations(
 }
 
 private val IrModuleFragment.outputFileName
-    get() = name.asString()
+    get() = kotlinLibrary?.jsOutputName ?: (name.asString()
         .replace("<", "_")
         .replace(">", "_")
-        .let { URLEncoder.encode(it, "UTF-8") }
+        .let { URLEncoder.encode(it, "UTF-8").replace("%", "%25") })
 
 object WasmBackendPipelinePhase : WebBackendPipelinePhase<WasmBackendPipelineArtifact>("WasmBackendPipelinePhase") {
     override val configFiles: EnvironmentConfigFiles
@@ -260,12 +262,27 @@ object WasmBackendPipelinePhase : WebBackendPipelinePhase<WasmBackendPipelineArt
         }
     }
 
+    private fun parseDependencyResolutionMap(configuration: CompilerConfiguration)
+            : Map<String, String> {
+
+        val rawResolutionMap = configuration[WasmConfigurationKeys.WASM_DEPENDENCY_RESOLUTION_MAP] ?: return emptyMap()
+
+        val parsedResolutionMap = rawResolutionMap.split(",")
+            .map { it.split(":") }
+            .associate { it[0] to it[1] }
+
+        return parsedResolutionMap
+    }
+
     private fun compileSingleModule(
         configuration: CompilerConfiguration,
         module: ModulesStructure,
         outputDir: File,
         wasmDebug: Boolean,
     ): WasmCompilerResult {
+
+        val dependencyResolutionMap = parseDependencyResolutionMap(configuration)
+
         val performanceManager = configuration.perfManager
 
         val irFactory = IrFactoryImplForWasmIC(WholeWorldStageController())
@@ -296,6 +313,7 @@ object WasmBackendPipelinePhase : WebBackendPipelinePhase<WasmBackendPipelineArt
                 stdlibIsMainModule = module.klibs.included?.isWasmStdlib == true,
                 generateWat = configuration.get(WasmConfigurationKeys.WASM_GENERATE_WAT, false),
                 wasmDebug = wasmDebug,
+                dependencyResolutionMap = dependencyResolutionMap,
             )
 
             writeCompilationResult(
@@ -318,7 +336,7 @@ fun compileWasmLoweredFragmentsForSingleModule(
     generateWat: Boolean,
     wasmDebug: Boolean,
     outputFileNameBase: String? = null,
-    singleModulePreloadJs: String? = null,
+    dependencyResolutionMap: Map<String, String>,
 ): WasmCompilerResult {
     val mainModuleFragment = backendContext.irModuleFragment
     val moduleName = mainModuleFragment.name.asString()
@@ -330,7 +348,6 @@ fun compileWasmLoweredFragmentsForSingleModule(
         signatureRetriever,
         allowIncompleteImplementations = false,
         skipCommentInstructions = !generateWat,
-        inlineUnitGetter = stdlibIsMainModule,
     )
 
     val wasmCompiledFileFragments = mutableListOf<WasmCompiledFileFragment>()
@@ -352,10 +369,25 @@ fun compileWasmLoweredFragmentsForSingleModule(
     val dependencyModules = loweredIrFragments.filterNot { it == mainModuleFragment }
     dependencyModules.mapTo(wasmCompiledFileFragments) {
         val dependencyName = it.name.asString()
-        dependencyImports.add(WasmModuleDependencyImport(dependencyName, it.outputFileName))
+        val initialOutputFileName = it.outputFileName
+
+        dependencyImports.add(
+            WasmModuleDependencyImport(
+                dependencyName,
+                dependencyResolutionMap[dependencyName]
+                    ?: initialOutputFileName
+            )
+        )
         codeGenerator.generateModuleAsSingleFileFragmentWithModuleImport(it, dependencyName, importedDeclarations)
     }
     wasmCompiledFileFragments.add(mainModuleFileFragment)
+
+    val stdlibModuleNameForImport =
+        loweredIrFragments.first().name.asString().takeIf { !stdlibIsMainModule }
+
+    val useDebuggerCustomFormatters =
+        configuration.getBoolean(JSConfigurationKeys.USE_DEBUGGER_CUSTOM_FORMATTERS) &&
+                stdlibModuleNameForImport == null
 
     return compileWasm(
         wasmCompiledFileFragments = wasmCompiledFileFragments,
@@ -367,10 +399,9 @@ fun compileWasmLoweredFragmentsForSingleModule(
         generateWat = generateWat,
         generateSourceMaps = false,
         generateDwarf = false,
-        useDebuggerCustomFormatters = false,
-        stdlibModuleNameForImport = loweredIrFragments.first().name.asString().takeIf { !stdlibIsMainModule },
+        useDebuggerCustomFormatters = useDebuggerCustomFormatters,
+        stdlibModuleNameForImport = stdlibModuleNameForImport,
         dependencyModules = dependencyImports,
         initializeUnit = stdlibIsMainModule,
-        singleModulePreloadJs = singleModulePreloadJs,
     )
 }

@@ -38,7 +38,7 @@ object FirFakeOverrideGenerator {
     fun createSubstitutionOverrideFunction(
         session: FirSession,
         symbolForSubstitutionOverride: FirNamedFunctionSymbol,
-        baseFunction: FirSimpleFunction,
+        baseFunction: FirNamedFunction,
         derivedClassLookupTag: ConeClassLikeLookupTag?,
         newDispatchReceiverType: ConeSimpleKotlinType?,
         origin: FirDeclarationOrigin.SubstitutionOverride,
@@ -70,7 +70,7 @@ object FirFakeOverrideGenerator {
     private fun createSubstitutionOverrideFunction(
         fakeOverrideSymbol: FirNamedFunctionSymbol,
         session: FirSession,
-        baseFunction: FirSimpleFunction,
+        baseFunction: FirNamedFunction,
         derivedClassLookupTag: ConeClassLikeLookupTag?,
         newDispatchReceiverType: ConeSimpleKotlinType?,
         newReceiverType: ConeKotlinType?,
@@ -81,7 +81,7 @@ object FirFakeOverrideGenerator {
         isExpect: Boolean = baseFunction.isExpect,
         callableCopySubstitutionForTypeUpdater: DeferredCallableCopyReturnType?,
         origin: FirDeclarationOrigin.SubstitutionOverride,
-    ): FirSimpleFunction {
+    ): FirNamedFunction {
         // TODO: consider using here some light-weight functions instead of pseudo-real FirMemberFunctionImpl
         // As second alternative, we can invent some light-weight kind of FirRegularClass
         return createCopyForFirFunction(
@@ -106,7 +106,7 @@ object FirFakeOverrideGenerator {
 
     fun createCopyForFirFunction(
         newSymbol: FirNamedFunctionSymbol,
-        baseFunction: FirSimpleFunction,
+        baseFunction: FirNamedFunction,
         derivedClassLookupTag: ConeClassLikeLookupTag?,
         session: FirSession,
         origin: FirDeclarationOrigin,
@@ -122,7 +122,7 @@ object FirFakeOverrideGenerator {
         deferredReturnTypeCalculation: DeferredCallableCopyReturnType? = null,
         newSource: KtSourceElement? = derivedClassLookupTag?.toSymbol(session)?.source ?: baseFunction.source,
         markAsOverride: Boolean,
-    ): FirSimpleFunction = buildSimpleFunction {
+    ): FirNamedFunction = buildNamedFunction {
         source = newSource
         moduleData = session.nullableModuleData ?: baseFunction.moduleData
         this.origin = origin
@@ -133,6 +133,7 @@ object FirFakeOverrideGenerator {
             isExpect = isExpect,
             isOverride = if (markAsOverride) true else baseFunction.status.isOverride
         )
+        isLocal = baseFunction.isLocal
         symbol = newSymbol
         resolvePhase = origin.resolvePhaseForCopy
 
@@ -177,6 +178,7 @@ object FirFakeOverrideGenerator {
         }
 
         status = baseConstructor.status.copy(isExpect = isExpect)
+        isLocal = baseConstructor.isLocal
         symbol = fakeOverrideSymbol
 
         typeParameters += configureAnnotationsTypeParametersAndSignature(
@@ -306,7 +308,7 @@ object FirFakeOverrideGenerator {
             returnTypeRef = baseFunction.returnTypeRef.withReplacedReturnType(newReturnType)
         }
 
-        if (this is FirSimpleFunctionBuilder) {
+        if (this is FirNamedFunctionBuilder) {
             receiverParameter = baseFunction.receiverParameter?.let { receiverParameter ->
                 buildReceiverParameterCopy(receiverParameter) {
                     typeRef = receiverParameter.typeRef.withReplacedConeType(newReceiverType)
@@ -419,6 +421,7 @@ object FirFakeOverrideGenerator {
         isVar = baseProperty.isVar
         this.symbol = newSymbol
         status = baseProperty.status.copy(newVisibility, newModality, isExpect = isExpect, isOverride = true)
+        isLocal = baseProperty.isLocal
 
         resolvePhase = origin.resolvePhaseForCopy
         dispatchReceiverType = newDispatchReceiverType
@@ -584,6 +587,7 @@ object FirFakeOverrideGenerator {
         isVar = baseField.isVar
         this.symbol = newSymbol
         status = baseField.status.copy(newVisibility, newModality, isExpect = isExpect)
+        isLocal = baseField.isLocal
 
         resolvePhase = origin.resolvePhaseForCopy
         dispatchReceiverType = newDispatchReceiverType
@@ -732,6 +736,7 @@ object FirFakeOverrideGenerator {
         name = baseField.name
         isVar = baseField.isVar
         status = baseField.status
+        isLocal = baseField.isLocal
         resolvePhase = origin.resolvePhaseForCopy
         annotations += baseField.annotations
         attributes = baseField.attributes.copy()

@@ -312,10 +312,6 @@ open class PsiRawFirBuilder(
                 this@toFirOrErrorType?.extractAnnotationsTo(this)
             }
 
-        // Here we accept lambda as a receiver to prevent expression calculation in stub mode
-        private fun (() -> KtExpression?).toFirExpression(errorReason: String, sourceWhenInvalidExpression: KtElement): FirExpression =
-            this().toFirExpression(errorReason, sourceWhenInvalidExpression = sourceWhenInvalidExpression)
-
         private fun KtElement?.toFirExpression(
             errorReason: String,
             sourceWhenInvalidExpression: KtElement,
@@ -473,7 +469,7 @@ open class PsiRawFirBuilder(
             // No block body -> expression body and no contract
             !hasBlockBody() -> {
                 val block = buildOrLazyBlock {
-                    val result = { bodyExpression }.toFirExpression("Function has no body (but should)", this)
+                    val result = bodyExpression.toFirExpression("Function has no body (but should)", this)
                     FirSingleExpressionBlock(result.toReturn(baseSource = result.source))
                 }
 
@@ -521,7 +517,7 @@ open class PsiRawFirBuilder(
                 }
 
                 else -> {
-                    { expression }.toFirExpression("Argument is absent", sourceWhenInvalidExpression = this.asElement())
+                    expression.toFirExpression("Argument is absent", sourceWhenInvalidExpression = this.asElement())
                 }
             }
 
@@ -756,7 +752,7 @@ open class PsiRawFirBuilder(
                         }
                     } else {
                         buildOrLazyExpression(null) {
-                            { this@toFirValueParameter.defaultValue }.toFirExpression(
+                            this@toFirValueParameter.defaultValue.toFirExpression(
                                 "Should have default value",
                                 sourceWhenInvalidExpression = this@toFirValueParameter
                             )
@@ -840,6 +836,7 @@ open class PsiRawFirBuilder(
                     )
 
                     this.status = status
+                    isLocal = this@PsiRawFirBuilder.context.inLocalContext
                     getter = FirDefaultPropertyGetter(
                         source = defaultAccessorSource,
                         moduleData = baseModuleData,
@@ -1040,13 +1037,13 @@ open class PsiRawFirBuilder(
                 returnTypeRef = type
                 withContainerSymbol(symbol) {
                     initializer = buildOrLazyExpression(delegateSource) {
-                        { entry.delegateExpression }
-                            .toFirExpression("Should have delegate", sourceWhenInvalidExpression = entry)
+                        entry.delegateExpression.toFirExpression("Should have delegate", sourceWhenInvalidExpression = entry)
                     }
                 }
 
                 isVar = false
                 status = FirDeclarationStatusImpl(Visibilities.Private, Modality.FINAL)
+                isLocal = context.inLocalContext
                 dispatchReceiverType = currentDispatchReceiverType()
             }
         }
@@ -1248,6 +1245,7 @@ open class PsiRawFirBuilder(
                     origin = FirDeclarationOrigin.Source
                     returnTypeRef = delegatedSelfTypeRef
                     this.status = status
+                    isLocal = context.inLocalContext
                     dispatchReceiverType = owner.obtainDispatchReceiverForConstructor()
                     symbol = constructorSymbol
                     delegatedConstructor = firDelegatedCall
@@ -1613,6 +1611,7 @@ open class PsiRawFirBuilder(
                         isExpect = containingClassIsExpectClass
                     }
                     symbol = enumSymbol
+                    isLocal = this@PsiRawFirBuilder.context.inLocalContext
                     if (ownerClassHasDefaultConstructor && ktEnumEntry.initializerList == null &&
                         ktEnumEntry.annotationEntries.isEmpty() && ktEnumEntry.body == null
                     ) {
@@ -1764,12 +1763,7 @@ open class PsiRawFirBuilder(
                     val firTypeParameters = classOrObject.convertTypeParameters(classSymbol)
 
                     withCapturedTypeParameters(
-                        // Transferring phantom type parameters to objects is cursed as they are
-                        // accessible by qualifier `MyObject`, which is an expression and must have
-                        // some single type.
-                        // Letting their types contain no type arguments while the class itself
-                        // expects some sounds fragile.
-                        status = status.isInner || isLocal && !classKind.isObject,
+                        status = status.isInner || isLocal,
                         declarationSource = sourceElement,
                         currentFirTypeParameters = firTypeParameters,
                     ) {
@@ -2032,12 +2026,13 @@ open class PsiRawFirBuilder(
                         }
                     }
                 } else {
-                    FirSimpleFunctionBuilder().apply {
+                    FirNamedFunctionBuilder().apply {
                         receiverParameter = receiverTypeCalculator?.let { createReceiverParameter(it, baseModuleData, functionSymbol) }
                         name = function.nameAsSafeName
                         labelName = context.getLastLabel(function)?.name ?: runIf(!name.isSpecial) { name.identifier }
                         symbol = functionSymbol as FirNamedFunctionSymbol
                         dispatchReceiverType = runIf(!isLocalFunction) { currentDispatchReceiverType() }
+                        isLocal = context.inLocalContext
                         status = FirDeclarationStatusImpl(
                             if (isLocalFunction) Visibilities.Local else function.getVisibility(),
                             function.modality,
@@ -2084,7 +2079,7 @@ open class PsiRawFirBuilder(
                         this.body = body
                         val contractDescription = outerContractDescription ?: innerContractDescription
                         contractDescription?.let {
-                            if (this is FirSimpleFunctionBuilder) {
+                            if (this is FirNamedFunctionBuilder) {
                                 this.contractDescription = it
                             } else if (this is FirAnonymousFunctionBuilder) {
                                 this.contractDescription = it
@@ -2249,6 +2244,7 @@ open class PsiRawFirBuilder(
                         isFromSealedClass = owner.hasModifier(SEALED_KEYWORD) && explicitVisibility !== Visibilities.Private
                         isFromEnumClass = owner.hasModifier(ENUM_KEYWORD)
                     }
+                    isLocal = this@PsiRawFirBuilder.context.inLocalContext
                     dispatchReceiverType = owner.obtainDispatchReceiverForConstructor()
                     contextParameters.addContextParameters(owner.contextReceiverLists, symbol)
                     contextParameters.addContextParameters(this@toFirConstructor.modifierList?.contextReceiverLists.orEmpty(), symbol)
@@ -2360,6 +2356,7 @@ open class PsiRawFirBuilder(
                     }
 
                     initializer = propertyInitializer
+                    isLocal = context.inLocalContext
 
                     val propertyAnnotations = mutableListOf<FirAnnotationCall>()
                     for (annotationEntry in annotationEntries) {
@@ -2486,7 +2483,7 @@ open class PsiRawFirBuilder(
                         }
                     }
                     annotations += when {
-                        isLocal -> propertyAnnotations
+                        this@toFirProperty.isLocal -> propertyAnnotations
                         else -> propertyAnnotations.filterStandalonePropertyRelevantAnnotations(isVar)
                     }
 
@@ -2843,6 +2840,7 @@ open class PsiRawFirBuilder(
                             }
                             isVar = false
                             status = FirResolvedDeclarationStatusImpl(Visibilities.Local, Modality.FINAL, EffectiveVisibility.Local)
+                            isLocal = true
                             this.name = name
                             symbol = FirLocalPropertySymbol()
                             for (annotationEntry in ktParameter.annotationEntries) {
@@ -2907,6 +2905,7 @@ open class PsiRawFirBuilder(
                         isVar = false
                         symbol = FirLocalPropertySymbol()
                         status = FirDeclarationStatusImpl(Visibilities.Local, Modality.FINAL)
+                        isLocal = true
                         receiverParameter = ktSubjectExpression.receiverTypeReference?.let {
                             createReceiverParameter({ it.toFirType() }, moduleData, symbol)
                         }
@@ -2930,6 +2929,7 @@ open class PsiRawFirBuilder(
                     isVar = false
                     symbol = FirLocalPropertySymbol()
                     status = FirDeclarationStatusImpl(Visibilities.Local, Modality.FINAL)
+                    isLocal = true
                 }
             }
 
@@ -3682,8 +3682,8 @@ private val snippetDeclarationVisitor: FirVisitorVoid = object : FirVisitorVoid(
         }
     }
 
-    override fun visitSimpleFunction(simpleFunction: FirSimpleFunction) {
-        simpleFunction.isReplSnippetDeclaration = true
+    override fun visitNamedFunction(namedFunction: FirNamedFunction) {
+        namedFunction.isReplSnippetDeclaration = true
     }
 
     override fun visitPropertyAccessor(propertyAccessor: FirPropertyAccessor) {

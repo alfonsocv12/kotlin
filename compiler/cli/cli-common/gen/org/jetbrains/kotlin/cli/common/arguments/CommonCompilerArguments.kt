@@ -341,6 +341,16 @@ For WASM and JS, the performance report includes execution time and lines per se
         }
 
     @Argument(
+        value = "-Xdont-sort-source-files",
+        description = "Disable automatic sorting of source files.",
+    )
+    var dontSortSourceFiles: Boolean = false
+        set(value) {
+            checkFrozen()
+            field = value
+        }
+
+    @Argument(
         value = "-Xdont-warn-on-error-suppression",
         description = "Don't report warnings when errors are suppressed. This only affects K2.",
     )
@@ -491,6 +501,21 @@ The argument should be used only if the new compilation scheme is enabled with -
         }
 
     @Argument(
+        value = "-Xheader-mode",
+        description = """Enable header compilation mode.
+In this mode, the compiler produces class files that only contain the 'skeleton' of the classes to be
+compiled but the method bodies of all the implementations are empty.  This is used to speed up parallel compilation
+build systems where header libraries can be used to replace downstream dependencies for which we only need to
+see the type names and method signatures required to compile a given translation unit. Inline functions are still kept
+with bodies.""",
+    )
+    var headerMode: Boolean = false
+        set(value) {
+            checkFrozen()
+            field = value
+        }
+
+    @Argument(
         value = "-Xignore-const-optimization-errors",
         description = "Ignore all compilation exceptions while optimizing some constant expressions.",
     )
@@ -527,6 +552,17 @@ The argument should be used only if the new compilation scheme is enabled with -
         description = "List backend phases.",
     )
     var listPhases: Boolean = false
+        set(value) {
+            checkFrozen()
+            field = value
+        }
+
+    @Argument(
+        value = "-Xlocal-type-aliases",
+        description = "Enable experimental language support for local type aliases.",
+    )
+    @Enables(LanguageFeature.LocalTypeAliases)
+    var localTypeAliases: Boolean = false
         set(value) {
             checkFrozen()
             field = value
@@ -938,6 +974,16 @@ Warning: This feature is not yet production-ready.""",
         set(value) {
             checkFrozen()
             field = if (value.isNullOrEmpty()) null else value
+        }
+
+    @Argument(
+        value = "-Xverify-ir-nested-offsets",
+        description = "Check that offsets of nested IR elements conform to offsets of their containers. Only has effect if '-Xverify-ir' is not 'none'.",
+    )
+    var verifyIrNestedOffsets: Boolean = false
+        set(value) {
+            checkFrozen()
+            field = value
         }
 
     @Argument(

@@ -19,7 +19,7 @@ val cacheRedirectorEnabled = findProperty("cacheRedirectorEnabled")?.toString()?
 
 node {
     download.set(true)
-    version.set(nodejsVersion)
+    version.set(nodejsLtsVersion)
     nodeProjectDir.set(layout.buildDirectory.dir("node"))
     if (cacheRedirectorEnabled) {
         distBaseUrl.set("https://cache-redirector.jetbrains.com/nodejs.org/dist")
@@ -48,6 +48,7 @@ dependencies {
     testFixturesApi(testFixtures(project(":compiler:tests-compiler-utils")))
     testFixturesApi(testFixtures(project(":compiler:tests-common-new")))
     testFixturesApi(testFixtures(project(":compiler:fir:analysis-tests")))
+    testFixturesApi(testFixtures(project(":kotlin-util-klib")))
 
     testCompileOnly(project(":compiler:frontend"))
     testCompileOnly(project(":compiler:cli"))
@@ -56,6 +57,7 @@ dependencies {
     testCompileOnly(intellijCore())
     testFixturesApi(project(":compiler:backend.js"))
     testFixturesApi(project(":js:js.translator"))
+    testFixturesApi(project(":js:typescript-export-standalone"))
     testFixturesApi(project(":compiler:incremental-compilation-impl"))
     testImplementation(libs.junit4)
     testFixturesApi(testFixtures(project(":kotlin-build-common")))
@@ -93,6 +95,11 @@ dependencies {
     testRuntimeOnly(libs.ktor.client.cio)
     testRuntimeOnly(libs.ktor.client.core)
     testRuntimeOnly(libs.ktor.client.websockets)
+
+    implicitDependencies("org.nodejs:node:$nodejsLtsVersion:win-x64@zip")
+    implicitDependencies("org.nodejs:node:$nodejsLtsVersion:linux-x64@tar.gz")
+    implicitDependencies("org.nodejs:node:$nodejsLtsVersion:darwin-x64@tar.gz")
+    implicitDependencies("org.nodejs:node:$nodejsLtsVersion:darwin-arm64@tar.gz")
 }
 
 optInToExperimentalCompilerApi()
@@ -248,20 +255,12 @@ projectTests {
         configureTestDistribution()
     }
 
-    testTask("jsIrTest", jUnitMode = JUnitMode.JUnit5, skipInLocalBuild = true) {
-        setUpJsBoxTests("legacy-frontend & !es6")
+    testTask("jsTest", jUnitMode = JUnitMode.JUnit5, skipInLocalBuild = true) {
+        setUpJsBoxTests("!es6")
     }
 
-    testTask("jsIrES6Test", jUnitMode = JUnitMode.JUnit5, skipInLocalBuild = true) {
-        setUpJsBoxTests("legacy-frontend & es6")
-    }
-
-    testTask("jsFirTest", jUnitMode = JUnitMode.JUnit5, skipInLocalBuild = true) {
-        setUpJsBoxTests("!legacy-frontend & !es6")
-    }
-
-    testTask("jsFirES6Test", jUnitMode = JUnitMode.JUnit5, skipInLocalBuild = true) {
-        setUpJsBoxTests("!legacy-frontend & es6")
+    testTask("jsES6Test", jUnitMode = JUnitMode.JUnit5, skipInLocalBuild = true) {
+        setUpJsBoxTests("es6")
     }
 
     testTask("invalidationTest", jUnitMode = JUnitMode.JUnit5, skipInLocalBuild = true) {
@@ -303,3 +302,10 @@ val npmInstall by tasks.getting(NpmTask::class) {
     npmCommand.set(listOf("ci"))
 }
 
+tasks.processTestFixturesResources.configure {
+    from(project.layout.projectDirectory.dir("_additionalFilesForTests"))
+    from(project(":compiler").layout.projectDirectory.dir("testData/debug")) {
+        into("debugTestHelpers")
+        include("jsTestHelpers/")
+    }
+}

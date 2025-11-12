@@ -18,19 +18,13 @@ import org.jetbrains.kotlin.ir.declarations.IrExternalPackageFragment
 import org.jetbrains.kotlin.ir.declarations.IrFactory
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
-import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.IrPropertySymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.IrTypeSystemContextImpl
 import org.jetbrains.kotlin.ir.util.addFakeOverrides
 import org.jetbrains.kotlin.ir.util.createThisReceiverParameter
-import org.jetbrains.kotlin.ir.util.irError
-import org.jetbrains.kotlin.name.CallableId
-import org.jetbrains.kotlin.name.ClassId
-import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.name.StandardClassIds
+import org.jetbrains.kotlin.name.*
 
 /**
  * Symbols for builtins that are available without any context and are not specific to any backend
@@ -190,6 +184,9 @@ abstract class IrBuiltIns {
 
     abstract val linkageErrorSymbol: IrSimpleFunctionSymbol
 
+    abstract val deprecatedSymbol: IrClassSymbol
+    abstract val deprecationLevelSymbol: IrClassSymbol
+
     abstract fun functionN(arity: Int): IrClass
     abstract fun kFunctionN(arity: Int): IrClass
     abstract fun suspendFunctionN(arity: Int): IrClass
@@ -243,60 +240,7 @@ annotation class InternalSymbolFinderAPI
 
 @InternalSymbolFinderAPI
 abstract class SymbolFinder {
-    // TODO: drop variants from segments, add helper from whole fqn
     abstract fun findFunctions(callableId: CallableId): Iterable<IrSimpleFunctionSymbol>
     abstract fun findProperties(callableId: CallableId): Iterable<IrPropertySymbol>
     abstract fun findClass(classId: ClassId): IrClassSymbol?
-
-    fun findFunctions(name: Name, vararg packageNameSegments: String = arrayOf("kotlin")): Iterable<IrSimpleFunctionSymbol> {
-        return findFunctions(CallableId(FqName.fromSegments(listOf(*packageNameSegments)), name))
-    }
-
-    fun findFunctions(name: Name, packageFqName: FqName): Iterable<IrSimpleFunctionSymbol> {
-        return findFunctions(CallableId(packageFqName, name))
-    }
-
-    fun findProperties(name: Name, packageFqName: FqName): Iterable<IrPropertySymbol> {
-        return findProperties(CallableId(packageFqName, name))
-    }
-
-    fun findClass(name: Name, vararg packageNameSegments: String = arrayOf("kotlin")): IrClassSymbol? {
-        return findClass(ClassId(FqName.fromSegments(listOf(*packageNameSegments)), name))
-    }
-
-    fun findClass(name: Name, packageFqName: FqName): IrClassSymbol? {
-        return findClass(ClassId(packageFqName, name))
-    }
-
-    fun topLevelProperty(packageName: FqName, name: String): IrPropertySymbol {
-        val elements = findProperties(Name.identifier(name), packageName).toList()
-        require(elements.isNotEmpty()) { "No property ${packageName}.$name found" }
-        require(elements.size == 1) {
-            "Several properties ${packageName}.$name found:\n${elements.joinToString("\n")}"
-        }
-        return elements.single()
-    }
-
-    fun topLevelFunctions(packageName: FqName, name: String): Iterable<IrSimpleFunctionSymbol> =
-        findFunctions(Name.identifier(name), packageName)
-
-    inline fun topLevelFunction(
-        callableId: CallableId,
-        condition: (IrFunctionSymbol) -> Boolean = { true },
-    ): IrSimpleFunctionSymbol {
-        val elements = findFunctions(callableId).filter(condition)
-        require(elements.isNotEmpty()) { "No function ${callableId} found corresponding given condition" }
-        require(elements.size == 1) {
-            "Several functions ${callableId} found corresponding given condition:\n${elements.joinToString("\n")}"
-        }
-        return elements.single()
-    }
-
-    inline fun topLevelFunction(
-        packageName: FqName,
-        name: String,
-        condition: (IrFunctionSymbol) -> Boolean = { true },
-    ): IrSimpleFunctionSymbol {
-        return topLevelFunction(CallableId(packageName, Name.identifier(name)), condition)
-    }
 }

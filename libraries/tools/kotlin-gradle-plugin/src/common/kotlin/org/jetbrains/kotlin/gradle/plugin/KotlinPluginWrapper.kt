@@ -80,7 +80,8 @@ abstract class DefaultKotlinBasePlugin : KotlinBasePlugin {
         BuildSessionService.registerIfAbsent(project)
 
         val buildUidService = BuildUidService.registerIfAbsent(project.gradle)
-        BuildFusService.registerIfAbsent(project, pluginVersion, buildUidService)
+        val buildFinishBuildService = BuildFinishBuildService.registerIfAbsent(project, buildUidService, pluginVersion)
+        BuildFusService.registerIfAbsent(project, pluginVersion, buildUidService, buildFinishBuildService)
         PropertiesBuildService.registerIfAbsent(project)
 
         project.gradle.projectsEvaluated {
@@ -90,6 +91,7 @@ abstract class DefaultKotlinBasePlugin : KotlinBasePlugin {
         addKotlinCompilerConfiguration(project)
 
         project.configurations.maybeCreateResolvable(PLUGIN_CLASSPATH_CONFIGURATION_NAME).apply {
+            @Suppress("DEPRECATION")
             isVisible = false
             addGradlePluginMetadataAttributes(project)
         }
@@ -101,7 +103,7 @@ abstract class DefaultKotlinBasePlugin : KotlinBasePlugin {
 
         BuildMetricsService.registerIfAbsent(project)
         KotlinNativeBundleBuildService.registerIfAbsent(project)
-        BuildFinishBuildService.registerIfAbsent(project, buildUidService, pluginVersion)
+
     }
 
     private fun addKotlinCompilerConfiguration(project: Project) {
@@ -247,6 +249,7 @@ abstract class KotlinBasePluginWrapper : DefaultKotlinBasePlugin() {
         project.logger.info("Using Kotlin Gradle Plugin $pluginVariant variant")
 
         project.configurations.maybeCreateResolvable(NATIVE_COMPILER_PLUGIN_CLASSPATH_CONFIGURATION_NAME).apply {
+            @Suppress("DEPRECATION")
             isVisible = false
             isTransitive = false
             addGradlePluginMetadataAttributes(project)

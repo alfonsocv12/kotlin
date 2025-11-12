@@ -20,7 +20,7 @@ import org.jetbrains.kotlin.backend.wasm.utils.getWasmImportDescriptor
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.ir.backend.js.utils.getJsNameOrKotlinName
-import org.jetbrains.kotlin.ir.backend.js.utils.isJsExport
+import org.jetbrains.kotlin.ir.backend.js.utils.isExplicitlyExported
 import org.jetbrains.kotlin.ir.builders.*
 import org.jetbrains.kotlin.ir.builders.declarations.*
 import org.jetbrains.kotlin.ir.declarations.*
@@ -34,8 +34,8 @@ import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.util.OperatorNameConventions
 
-val JS_EXPORT_ADAPTER by IrDeclarationOriginImpl
-val KOTLIN_TO_JS_CLOSURE_ORIGIN by IrDeclarationOriginImpl
+val JS_EXPORT_ADAPTER by IrDeclarationOriginImpl.Regular
+val KOTLIN_TO_JS_CLOSURE_ORIGIN by IrDeclarationOriginImpl.Regular
 
 /**
  * Create wrappers for external and @JsExport functions when type adaptation is needed
@@ -55,7 +55,7 @@ class JsInteropFunctionsLowering(val context: WasmBackendContext) : DeclarationT
 
         if (declaration.isFakeOverride) return null
         if (declaration !is IrSimpleFunction) return null
-        val isExported = declaration.isJsExport()
+        val isExported = declaration.isExplicitlyExported()
         val isExternal = declaration.isExternal || declaration.getJsFunAnnotation() != null
         if (declaration.isPropertyAccessor) return null
         if (declaration.parent !is IrPackageFragment) return null
@@ -68,6 +68,13 @@ class JsInteropFunctionsLowering(val context: WasmBackendContext) : DeclarationT
         additionalDeclarations.clear()
         currentParent = declaration.parent
         currentFile = declaration.file
+
+        val declarationName = declaration.name
+        val jsInteropAdapters = jsRelatedSymbols.jsInteropAdapters
+
+        if (declarationName == jsInteropAdapters.getCachedJsObject.owner.name) {
+            return null
+        }
 
         val newDeclarations = context.irFactory.stageController.restrictTo(declaration) {
             if (isExternal)
@@ -120,7 +127,7 @@ class JsInteropFunctionsLowering(val context: WasmBackendContext) : DeclarationT
         val jsFunction = context.irFactory.buildFun {
             origin = JS_CALL_INTEROP_FUNCTION
             name = function.name
-            visibility = DescriptorVisibilities.PRIVATE
+            visibility = DescriptorVisibilities.PUBLIC
             returnType = resultAdapter?.fromType ?: function.returnType
             modality = Modality.FINAL
             isExternal = true
@@ -202,7 +209,9 @@ class JsInteropFunctionsLowering(val context: WasmBackendContext) : DeclarationT
         newFun.annotations += builder.irCallConstructor(jsRelatedSymbols.jsNameConstructor, typeArguments = emptyList()).also {
             it.arguments[0] = builder.irString(function.getJsNameOrKotlinName().identifier)
         }
-        function.annotations = function.annotations.filter { it.symbol != jsRelatedSymbols.jsExportConstructor }
+        function.annotations = function.annotations.filter {
+            it.symbol != jsRelatedSymbols.jsExportConstructor && it.symbol != jsRelatedSymbols.jsExportDefaultConstructor
+        }
 
         return listOf(function, newFun)
     }
@@ -228,14 +237,14 @@ class JsInteropFunctionsLowering(val context: WasmBackendContext) : DeclarationT
     val primitivesToExternRefAdapters: Map<IrType, InteropTypeAdapter> by lazy {
         mapOf(
             builtIns.byteType to adapters.kotlinByteToExternRefAdapter,
-            symbols.uByteType to adapters.kotlinUByteToJsNumber,
+            builtIns.ubyteType to adapters.kotlinUByteToJsNumber,
             builtIns.shortType to adapters.kotlinShortToExternRefAdapter,
-            symbols.uShortType to adapters.kotlinUShortToJsNumber,
+            builtIns.ushortType to adapters.kotlinUShortToJsNumber,
             builtIns.charType to adapters.kotlinCharToExternRefAdapter,
             builtIns.intType to adapters.kotlinIntToExternRefAdapter,
-            symbols.uIntType to adapters.kotlinUIntToJsNumber,
+            builtIns.uintType to adapters.kotlinUIntToJsNumber,
             builtIns.longType to adapters.kotlinLongToExternRefAdapter,
-            symbols.uLongType to adapters.kotlinULongToJsBigInt,
+            builtIns.ulongType to adapters.kotlinULongToJsBigInt,
             builtIns.floatType to adapters.kotlinFloatToExternRefAdapter,
             builtIns.doubleType to adapters.kotlinDoubleToExternRefAdapter,
         ).mapValues {
@@ -287,10 +296,10 @@ class JsInteropFunctionsLowering(val context: WasmBackendContext) : DeclarationT
             builtIns.anyType -> return FunctionBasedAdapter(adapters.kotlinToJsAnyAdapter.owner)
             builtIns.numberType -> return FunctionBasedAdapter(adapters.numberToDoubleAdapter.owner)
 
-            symbols.uByteType -> return FunctionBasedAdapter(adapters.kotlinUByteToJsNumber.owner)
-            symbols.uShortType -> return FunctionBasedAdapter(adapters.kotlinUShortToJsNumber.owner)
-            symbols.uIntType -> return FunctionBasedAdapter(adapters.kotlinUIntToJsNumber.owner)
-            symbols.uLongType -> return FunctionBasedAdapter(adapters.kotlinULongToJsBigInt.owner)
+            builtIns.ubyteType -> return FunctionBasedAdapter(adapters.kotlinUByteToJsNumber.owner)
+            builtIns.ushortType -> return FunctionBasedAdapter(adapters.kotlinUShortToJsNumber.owner)
+            builtIns.uintType -> return FunctionBasedAdapter(adapters.kotlinUIntToJsNumber.owner)
+            builtIns.ulongType -> return FunctionBasedAdapter(adapters.kotlinULongToJsBigInt.owner)
 
             builtIns.byteType,
             builtIns.shortType,
@@ -363,10 +372,10 @@ class JsInteropFunctionsLowering(val context: WasmBackendContext) : DeclarationT
                 builtIns.longType -> adapters.externRefToKotlinLongAdapter.owner
                 builtIns.booleanType -> adapters.externRefToKotlinBooleanAdapter.owner
 
-                symbols.uByteType -> adapters.externRefToKotlinUByteAdapter.owner
-                symbols.uShortType -> adapters.externRefToKotlinUShortAdapter.owner
-                symbols.uIntType -> adapters.externRefToKotlinUIntAdapter.owner
-                symbols.uLongType -> adapters.externRefToKotlinULongAdapter.owner
+                builtIns.ubyteType -> adapters.externRefToKotlinUByteAdapter.owner
+                builtIns.ushortType -> adapters.externRefToKotlinUShortAdapter.owner
+                builtIns.uintType -> adapters.externRefToKotlinUIntAdapter.owner
+                builtIns.ulongType -> adapters.externRefToKotlinULongAdapter.owner
 
                 else -> adapters.externRefToKotlinIntAdapter.owner
             }
@@ -433,10 +442,10 @@ class JsInteropFunctionsLowering(val context: WasmBackendContext) : DeclarationT
             builtIns.shortType -> return FunctionBasedAdapter(adapters.jsToKotlinShortAdapter.owner)
             builtIns.charType -> return FunctionBasedAdapter(adapters.jsToKotlinCharAdapter.owner)
 
-            symbols.uByteType,
-            symbols.uShortType,
-            symbols.uIntType,
-            symbols.uLongType,
+            builtIns.ubyteType,
+            builtIns.ushortType,
+            builtIns.uintType,
+            builtIns.ulongType,
             builtIns.booleanType,
             builtIns.intType,
             builtIns.longType,

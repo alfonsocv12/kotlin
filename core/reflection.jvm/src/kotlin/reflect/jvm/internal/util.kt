@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.descriptors.runtime.structure.ReflectJavaAnnotation
 import org.jetbrains.kotlin.descriptors.runtime.structure.ReflectJavaClass
 import org.jetbrains.kotlin.descriptors.runtime.structure.safeClassLoader
 import org.jetbrains.kotlin.load.java.JvmAbi
+import org.jetbrains.kotlin.load.java.JvmAnnotationNames
 import org.jetbrains.kotlin.load.kotlin.KotlinJvmBinarySourceElement
 import org.jetbrains.kotlin.metadata.ProtoBuf
 import org.jetbrains.kotlin.metadata.deserialization.BinaryVersion
@@ -46,6 +47,7 @@ import org.jetbrains.kotlin.resolve.descriptorUtil.annotationClass
 import org.jetbrains.kotlin.resolve.descriptorUtil.classId
 import org.jetbrains.kotlin.serialization.deserialization.DeserializationContext
 import org.jetbrains.kotlin.serialization.deserialization.MemberDeserializer
+import java.lang.annotation.Inherited
 import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.lang.reflect.Type
@@ -53,10 +55,11 @@ import kotlin.jvm.internal.CallableReference
 import kotlin.jvm.internal.FunctionReference
 import kotlin.jvm.internal.PropertyReference
 import kotlin.jvm.internal.RepeatableContainer
-import kotlin.reflect.KType
-import kotlin.reflect.KVisibility
+import kotlin.reflect.*
 import kotlin.reflect.full.IllegalCallableAccessException
 import kotlin.reflect.jvm.internal.calls.createAnnotationInstance
+import kotlin.reflect.jvm.internal.types.AbstractKType
+import kotlin.reflect.jvm.jvmName
 
 internal val JVM_STATIC = FqName("kotlin.jvm.JvmStatic")
 
@@ -148,17 +151,57 @@ internal fun Annotated.computeAnnotations(): List<Annotation> =
             is RuntimeSourceElementFactory.RuntimeSourceElement -> (source.javaElement as? ReflectJavaAnnotation)?.annotation
             else -> it.toAnnotationInstance()
         }
-    }.unwrapRepeatableAnnotations()
+    }.unwrapKotlinRepeatableAnnotations()
 
-fun List<Annotation>.unwrapRepeatableAnnotations(): List<Annotation> =
+internal fun Annotation.hasInherited(): Boolean = annotationClass.hasInherited()
+
+private fun KClass<out Annotation>.hasInherited(): Boolean =
+    java.getAnnotation(Inherited::class.java) != null
+
+@Suppress("UNCHECKED_CAST")
+private fun getRepeatableContainerComponentType(containerClass: KClass<out Annotation>) =
+    containerClass.java.getDeclaredMethod("value").returnType.componentType!!.kotlin as KClass<out Annotation>
+
+internal fun Annotation.isRepeatableContainerForNonInheritedAnnotation(): Boolean =
+    isJavaRepeatableContainer(annotationClass) && !getRepeatableContainerComponentType(annotationClass).hasInherited()
+
+internal val Annotation.unwrappedAnnotationClass: KClass<out Annotation>
+    get() {
+        val annotationOrContainerClass = annotationClass
+        if (isJavaRepeatableContainer(annotationOrContainerClass))
+            return getRepeatableContainerComponentType(annotationOrContainerClass)
+        else
+            return annotationOrContainerClass
+    }
+
+private fun isKotlinRepeatableContainer(klass: KClass<out Annotation>): Boolean {
+    val jClass = klass.java
+    return jClass.simpleName == JvmAbi.REPEATABLE_ANNOTATION_CONTAINER_NAME &&
+            jClass.getAnnotation(RepeatableContainer::class.java) != null
+}
+
+private fun isJavaRepeatableContainer(klass: KClass<out Annotation>): Boolean {
+    val jClass = klass.java
+    val valueMethod = jClass.getDeclaredMethodOrNull("value") ?: return false
+    val returnComponentType = valueMethod.returnType.componentType ?: return false
+    if (!returnComponentType.isAnnotation) return false
+
+    // we cannot directly use Java Repeatable class because it is missing on Android based on JDK 6
+    val javaRepeatable: Annotation =
+        returnComponentType.annotations.find { it.annotationClass.java.name == JvmAnnotationNames.REPEATABLE_ANNOTATION.asString() }
+            ?: return false
+    val repeatableContainerClass = javaRepeatable.annotationClass.java.getMethod("value").invoke(javaRepeatable) ?: return false
+
+    return jClass == repeatableContainerClass
+}
+
+fun List<Annotation>.unwrapKotlinRepeatableAnnotations(): List<Annotation> =
     if (any { it.annotationClass.java.simpleName == JvmAbi.REPEATABLE_ANNOTATION_CONTAINER_NAME })
         flatMap {
-            val klass = it.annotationClass.java
-            if (klass.simpleName == JvmAbi.REPEATABLE_ANNOTATION_CONTAINER_NAME &&
-                klass.getAnnotation(RepeatableContainer::class.java) != null
-            )
+            val klass = it.annotationClass
+            if (isKotlinRepeatableContainer(klass))
                 @Suppress("UNCHECKED_CAST")
-                (klass.getDeclaredMethod("value").invoke(it) as Array<out Annotation>).asList()
+                (klass.java.getDeclaredMethod("value").invoke(it) as Array<out Annotation>).asList()
             else
                 listOf(it)
         }
@@ -260,9 +303,11 @@ internal fun Any?.asReflectCallable(): ReflectKCallable<*>? = when (this) {
 }
 
 internal val CallableDescriptor.instanceReceiverParameter: ReceiverParameterDescriptor?
-    get() =
-        if (dispatchReceiverParameter != null) (containingDeclaration as ClassDescriptor).thisAsReceiverParameter
-        else null
+    get() = when {
+        this is ConstructorDescriptor -> dispatchReceiverParameter
+        dispatchReceiverParameter != null -> (containingDeclaration as ClassDescriptor).thisAsReceiverParameter
+        else -> null
+    }
 
 internal fun <M : MessageLite, D : CallableDescriptor> deserializeToDescriptor(
     moduleAnchor: Class<*>,
@@ -288,10 +333,7 @@ internal fun <M : MessageLite, D : CallableDescriptor> deserializeToDescriptor(
 }
 
 internal val KType.isInlineClassType: Boolean
-    get() = (classifier as? KClassImpl<*>)?.isInline == true
-
-internal val KType.needsMultiFieldValueClassFlattening: Boolean
-    get() = (classifier as? KClassImpl<*>)?.run { isValue && !isInline } == true
+    get() = (classifier as? KClassImpl<*>)?.isValue == true
 
 internal fun defaultPrimitiveValue(type: Type): Any? =
     if (type is Class<*> && type.isPrimitive) {
@@ -352,4 +394,85 @@ internal fun Class<*>.getDeclaredFieldOrNull(name: String): Field? =
         getDeclaredField(name)
     } catch (e: NoSuchFieldException) {
         null
+    }
+
+/**
+ * Returns `true` if this type allows `null` values. Based on `TypeUtils.isNullableType` (K1), `ConeKotlinType.canBeNull` (K2).
+ */
+internal fun KType.isNullableType(): Boolean {
+    if (isMarkedNullable) return true
+
+    val upperBound = (this as AbstractKType).upperBoundIfFlexible()
+    if (upperBound != null && upperBound.isNullableType()) return true
+
+    if (isDefinitelyNotNullType) return false
+
+    val classifier = classifier
+    return classifier is KTypeParameter && classifier.upperBounds.any { it.isNullableType() }
+}
+
+internal class FunctionJvmDescriptor(val parameters: List<String>, val returnType: String)
+
+internal fun parseJvmDescriptor(desc: String): FunctionJvmDescriptor {
+    val parameterTypes = arrayListOf<String>()
+
+    var begin = 1
+    while (desc[begin] != ')') {
+        var end = begin
+        while (desc[end] == '[') end++
+        @Suppress("SpellCheckingInspection")
+        when (desc[end]) {
+            in "VZCBSIFJD" -> end++
+            'L' -> end = desc.indexOf(';', begin) + 1
+            else -> throw KotlinReflectionInternalError("Unknown type prefix in the method signature: $desc")
+        }
+
+        parameterTypes.add(desc.substring(begin, end))
+        begin = end
+    }
+
+    val returnType = desc.substring(begin + 1)
+
+    return FunctionJvmDescriptor(parameterTypes, returnType)
+}
+
+/**
+ * Returns JVM descriptor, assuming that given KClass is not primitive or array
+ */
+internal fun KClass<*>.toJvmDescriptor(): String = "L${jvmName.replace('.', '/')};"
+
+internal val KParameter.isAlwaysBoxedByCompiler: Boolean
+    get() {
+        return this is ReflectKParameter && declaresDefaultValue && type.isInlineClassType &&
+                generateSequence(type) { it.unsubstitutedUnderlyingType() }.drop(1).any { it.isNullableType() }
+    }
+
+internal fun KType.unsubstitutedUnderlyingType(): KType? =
+    (classifier as? KClassImpl<*>)?.inlineClassUnderlyingType
+
+internal class FunctionJvmDescriptorLoaded(val parameters: List<Class<*>>, val returnType: Class<*>?)
+
+internal fun ClassLoader.parseAndLoadDescriptor(desc: String, loadReturnType: Boolean): FunctionJvmDescriptorLoaded {
+    val descriptor = parseJvmDescriptor(desc)
+
+    return FunctionJvmDescriptorLoaded(
+        descriptor.parameters.map { parseAndLoadType(it) },
+        if (loadReturnType) parseAndLoadType(descriptor.returnType) else null
+    )
+}
+
+private fun ClassLoader.parseAndLoadType(desc: String, begin: Int = 0, end: Int = desc.length): Class<*> =
+    when (desc[begin]) {
+        'L' -> loadClass(desc.substring(begin + 1, end - 1).replace('/', '.'))
+        '[' -> parseAndLoadType(desc, begin + 1, end).createArrayType()
+        'V' -> Void.TYPE
+        'Z' -> Boolean::class.java
+        'C' -> Char::class.java
+        'B' -> Byte::class.java
+        'S' -> Short::class.java
+        'I' -> Int::class.java
+        'F' -> Float::class.java
+        'J' -> Long::class.java
+        'D' -> Double::class.java
+        else -> throw KotlinReflectionInternalError("Unknown type prefix in the method signature: $desc")
     }

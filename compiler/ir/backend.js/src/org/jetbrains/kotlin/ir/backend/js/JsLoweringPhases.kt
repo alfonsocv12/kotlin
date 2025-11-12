@@ -16,19 +16,16 @@ import org.jetbrains.kotlin.backend.common.phaser.*
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersionSettings
-import org.jetbrains.kotlin.config.languageVersionSettings
 import org.jetbrains.kotlin.config.phaser.NamedCompilerPhase
-import org.jetbrains.kotlin.diagnostics.impl.deduplicating
-import org.jetbrains.kotlin.ir.KtDiagnosticReporterWithImplicitIrBasedContext
 import org.jetbrains.kotlin.ir.backend.js.checkers.JsKlibErrors
 import org.jetbrains.kotlin.ir.backend.js.lower.*
 import org.jetbrains.kotlin.ir.backend.js.lower.calls.CallsLowering
 import org.jetbrains.kotlin.ir.backend.js.lower.cleanup.CleanupLowering
 import org.jetbrains.kotlin.ir.backend.js.lower.coroutines.*
 import org.jetbrains.kotlin.ir.backend.js.lower.inline.CopyInlineFunctionBodyLowering
-import org.jetbrains.kotlin.ir.backend.js.lower.inline.JsInlineFunctionResolver
+import org.jetbrains.kotlin.ir.backend.js.lower.inline.JsAllFunctionInlining
+import org.jetbrains.kotlin.ir.backend.js.lower.inline.JsPrivateFunctionInlining
 import org.jetbrains.kotlin.ir.backend.js.lower.inline.RemoveInlineDeclarationsWithReifiedTypeParametersLowering
-import org.jetbrains.kotlin.ir.backend.js.lower.serialization.ir.JsManglerIr
 import org.jetbrains.kotlin.ir.backend.js.utils.compileSuspendAsJsGenerator
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
 import org.jetbrains.kotlin.ir.inline.*
@@ -151,13 +148,8 @@ private val jsCodeOutliningPhaseOnSecondStage = makeIrModulePhase(
 
 private val jsCodeOutliningPhaseOnFirstStage = makeIrModulePhase(
     { context: JsPreSerializationLoweringContext ->
-        val irDiagnosticReporter = KtDiagnosticReporterWithImplicitIrBasedContext(
-            context.diagnosticReporter.deduplicating(),
-            context.configuration.languageVersionSettings
-        )
-
         JsCodeOutliningLowering(context) { jsCall, valueDeclaration, container ->
-            irDiagnosticReporter.at(jsCall, container)
+            context.diagnosticReporter.at(jsCall, container)
                 .report(JsKlibErrors.JS_CODE_CAPTURES_INLINABLE_FUNCTION, valueDeclaration)
         }
     },
@@ -189,12 +181,7 @@ private val replaceSuspendIntrinsicLowering = makeIrModulePhase(
  * The first phase of inlining (inline only private functions).
  */
 private val inlineOnlyPrivateFunctionsPhase = makeIrModulePhase(
-    { context: JsIrBackendContext ->
-        FunctionInlining(
-            context,
-            JsInlineFunctionResolver(context, inlineMode = InlineMode.PRIVATE_INLINE_FUNCTIONS),
-        )
-    },
+    ::JsPrivateFunctionInlining,
     name = "InlineOnlyPrivateFunctions",
     prerequisite = setOf(arrayConstructorPhase)
 )
@@ -215,12 +202,7 @@ private val syntheticAccessorGenerationPhase = makeIrModulePhase(
  * The second phase of inlining (inline all functions).
  */
 private val inlineAllFunctionsPhase = makeIrModulePhase(
-    { context: JsIrBackendContext ->
-        FunctionInlining(
-            context,
-            JsInlineFunctionResolver(context, inlineMode = InlineMode.ALL_INLINE_FUNCTIONS),
-        )
-    },
+    ::JsAllFunctionInlining,
     name = "InlineAllFunctions",
     prerequisite = setOf(outerThisSpecialAccessorInInlineFunctionsPhase)
 )
@@ -612,12 +594,12 @@ private val constLoweringPhase = makeIrModulePhase(
     name = "ConstLowering",
 )
 private val inlineClassDeclarationLoweringPhase = makeIrModulePhase<JsIrBackendContext>(
-    { InlineClassLowering(it).inlineClassDeclarationLowering },
+    { JsInlineClassLowering(it).inlineClassDeclarationLowering },
     name = "InlineClassDeclarationLowering",
 )
 
 private val inlineClassUsageLoweringPhase = makeIrModulePhase(
-    { InlineClassLowering(it).inlineClassUsageLowering },
+    { JsInlineClassLowering(it).inlineClassUsageLowering },
     name = "InlineClassUsageLowering",
     prerequisite = setOf(
         // Const lowering generates inline class constructors for unsigned integers
@@ -750,7 +732,7 @@ fun jsLoweringsOfTheFirstPhase(
     if (languageVersionSettings.supportsFeature(LanguageFeature.IrIntraModuleInlinerBeforeKlibSerialization)) {
         this += jsCodeOutliningPhaseOnFirstStage
     }
-    this += loweringsOfTheFirstPhase(JsManglerIr, languageVersionSettings)
+    this += loweringsOfTheFirstPhase(languageVersionSettings)
 }
 
 fun getJsLowerings(

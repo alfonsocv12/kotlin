@@ -41,7 +41,7 @@ KaNamedFunctionSymbol:
                     typeArguments: []
                     type: kotlin/Unit
                 ]
-                type: kotlin/Function0<kotlin/Unit>
+                type: () -> kotlin/Unit
               visibility: PUBLIC
               getContainingFileSymbol: KaFileSymbol(callsInPlaceAtMostOnceContract.kt)
               getContainingJvmClassName: CallsInPlaceAtMostOnceContractKt
@@ -103,7 +103,7 @@ KaNamedFunctionSymbol:
             typeArguments: []
             type: kotlin/Unit
         ]
-        type: kotlin/Function0<kotlin/Unit>
+        type: () -> kotlin/Unit
       visibility: PUBLIC
       getContainingFileSymbol: KaFileSymbol(callsInPlaceAtMostOnceContract.kt)
       getContainingJvmClassName: CallsInPlaceAtMostOnceContractKt
@@ -117,4 +117,5 @@ KaNamedFunctionSymbol:
   canBeOperator: false
   getContainingModule: KaSourceModule "Sources of main"
   deprecationStatus: null
+  returnValueStatus: Unspecified
   importableFqName: atMostOnceContract

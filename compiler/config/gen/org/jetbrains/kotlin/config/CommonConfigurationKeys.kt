@@ -22,6 +22,7 @@ import org.jetbrains.kotlin.incremental.components.ImportTracker
 import org.jetbrains.kotlin.incremental.components.InlineConstTracker
 import org.jetbrains.kotlin.incremental.components.LookupTracker
 import org.jetbrains.kotlin.metadata.deserialization.BinaryVersion
+import org.jetbrains.kotlin.platform.TargetPlatform
 import org.jetbrains.kotlin.util.PerformanceManager
 
 object CommonConfigurationKeys {
@@ -110,13 +111,15 @@ object CommonConfigurationKeys {
     val ENABLE_IR_VARARG_TYPES_CHECKS = CompilerConfigurationKey.create<Boolean>("Check IR for vararg types mismatches")
 
     @JvmField
+    val ENABLE_IR_NESTED_OFFSETS_CHECKS = CompilerConfigurationKey.create<Boolean>("Check that offsets of nested IR elements conform to offsets of their containers")
+
+    @JvmField
     val PHASE_CONFIG = CompilerConfigurationKey.create<PhaseConfig>("phase configuration")
 
     // Should be used only in tests, impossible to set via compiler arguments
     @JvmField
     val DONT_CREATE_SEPARATE_SESSION_FOR_SCRIPTS = CompilerConfigurationKey.create<Boolean>("don't create separate session for scripts")
 
-    // Should be used only in tests, impossible to set via compiler arguments
     @JvmField
     val DONT_SORT_SOURCE_FILES = CompilerConfigurationKey.create<Boolean>("don't sort source files in FS order")
 
@@ -131,6 +134,9 @@ object CommonConfigurationKeys {
     // See the description of `-Xdetailed-perf` for more details
     @JvmField
     val DETAILED_PERF = CompilerConfigurationKey.create<Boolean>("Enables detailed performance stats that might slow down the general compiler performance")
+
+    @JvmField
+    val TARGET_PLATFORM = CompilerConfigurationKey.create<TargetPlatform>("target platform")
 
 }
 
@@ -246,6 +252,10 @@ var CompilerConfiguration.enableIrVarargTypesChecks: Boolean
     get() = getBoolean(CommonConfigurationKeys.ENABLE_IR_VARARG_TYPES_CHECKS)
     set(value) { put(CommonConfigurationKeys.ENABLE_IR_VARARG_TYPES_CHECKS, value) }
 
+var CompilerConfiguration.enableIrNestedOffsetsChecks: Boolean
+    get() = getBoolean(CommonConfigurationKeys.ENABLE_IR_NESTED_OFFSETS_CHECKS)
+    set(value) { put(CommonConfigurationKeys.ENABLE_IR_NESTED_OFFSETS_CHECKS, value) }
+
 var CompilerConfiguration.phaseConfig: PhaseConfig?
     get() = get(CommonConfigurationKeys.PHASE_CONFIG)
     set(value) { put(CommonConfigurationKeys.PHASE_CONFIG, requireNotNull(value) { "nullable values are not allowed" }) }
@@ -269,4 +279,8 @@ var CompilerConfiguration.perfManager: PerformanceManager?
 var CompilerConfiguration.detailedPerf: Boolean
     get() = getBoolean(CommonConfigurationKeys.DETAILED_PERF)
     set(value) { put(CommonConfigurationKeys.DETAILED_PERF, value) }
+
+var CompilerConfiguration.targetPlatform: TargetPlatform?
+    get() = get(CommonConfigurationKeys.TARGET_PLATFORM)
+    set(value) { put(CommonConfigurationKeys.TARGET_PLATFORM, requireNotNull(value) { "nullable values are not allowed" }) }
 

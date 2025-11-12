@@ -10,7 +10,7 @@ import org.jetbrains.kotlin.gradle.artifacts.*
 import org.jetbrains.kotlin.gradle.dsl.*
 import org.jetbrains.kotlin.gradle.internal.CustomizeKotlinDependenciesSetupAction
 import org.jetbrains.kotlin.gradle.plugin.PropertiesProvider.Companion.kotlinPropertiesProvider
-import org.jetbrains.kotlin.gradle.plugin.abi.AbiValidationSetupAction
+import org.jetbrains.kotlin.gradle.plugin.abi.internal.AbiValidationSetupAction
 import org.jetbrains.kotlin.gradle.plugin.diagnostics.KotlinGradleProjectChecker
 import org.jetbrains.kotlin.gradle.plugin.diagnostics.KotlinToolingDiagnosticsSetupAction
 import org.jetbrains.kotlin.gradle.plugin.diagnostics.checkers.*
@@ -117,6 +117,7 @@ internal fun Project.registerKotlinPluginExtensions() {
             register(project, NativeToolchainProjectSetupAction)
             register(project, UklibPublicationSetupAction)
             register(project, UklibConsumptionSetupAction)
+            register(project, KotlinMetadataCompilationTargetPlatformConfiguration)
         }
 
     }
@@ -191,9 +192,12 @@ internal fun Project.registerKotlinPluginExtensions() {
         register(project, KonanHomeConflictDeclarationChecker)
         register(project, KmpPartiallyResolvedDependenciesChecker)
         register(project, TestApiDependenciesChecker)
+        register(project, ConfigurationOnDemandSupportChecker)
 
         if (isMultiplatform) {
             register(project, NativeVersionChecker)
+            register(project, DisabledNativeCacheChecker)
+            register(project, SupportedNativeHostChecker)
             register(project, MultipleSourceSetRootsInCompilationChecker)
             register(project, SwiftExportModuleNameChecker)
             register(project, CinteropCrossCompilationChecker)

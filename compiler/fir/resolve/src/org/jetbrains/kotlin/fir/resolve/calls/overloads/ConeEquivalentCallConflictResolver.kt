@@ -10,7 +10,7 @@ import org.jetbrains.kotlin.fir.containingClassLookupTag
 import org.jetbrains.kotlin.fir.declarations.FirCallableDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirFunction
 import org.jetbrains.kotlin.fir.declarations.FirProperty
-import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
+import org.jetbrains.kotlin.fir.declarations.FirNamedFunction
 import org.jetbrains.kotlin.fir.declarations.FirVariable
 import org.jetbrains.kotlin.fir.declarations.utils.isExpect
 import org.jetbrains.kotlin.fir.resolve.calls.candidate.Candidate
@@ -80,7 +80,9 @@ class ConeEquivalentCallConflictResolver(private val session: FirSession) : Cone
     private val Candidate.mappedArgumentsOrderRepresentation: IntArray?
         get() {
             val function = symbol.fir as? FirFunction ?: return null
-            val parametersToIndices = function.valueParameters.mapIndexed { index, it -> it to index }.toMap()
+            val parametersToIndices = (function.valueParameters + function.contextParameters)
+                .mapIndexed { index, it -> it to index }
+                .toMap()
             if (!argumentMappingInitialized) return null
             val mapping = argumentMapping
             val result = IntArray(mapping.size + 1) { function.valueParameters.size }
@@ -132,7 +134,7 @@ class ConeEquivalentCallConflictResolver(private val session: FirSession) : Cone
                             overrideChecker.isOverriddenProperty(second, first, ignoreVisibility = true)
                 }
 
-                first is FirSimpleFunction && second is FirSimpleFunction -> {
+                first is FirNamedFunction && second is FirNamedFunction -> {
                     overrideChecker.isOverriddenFunction(first, second, ignoreVisibility = true) &&
                             overrideChecker.isOverriddenFunction(second, first, ignoreVisibility = true)
                 }

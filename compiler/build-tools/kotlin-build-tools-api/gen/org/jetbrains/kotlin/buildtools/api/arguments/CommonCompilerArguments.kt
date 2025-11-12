@@ -231,6 +231,16 @@ public interface CommonCompilerArguments : CommonToolArguments {
         CommonCompilerArgument("X_DISABLE_PHASES", KotlinReleaseVersion(1, 3, 20))
 
     /**
+     * Disable automatic sorting of source files.
+     *
+     * WARNING: this option is EXPERIMENTAL and it may be changed in the future without notice or may be removed entirely.
+     */
+    @JvmField
+    @ExperimentalCompilerArgument
+    public val X_DONT_SORT_SOURCE_FILES: CommonCompilerArgument<Boolean> =
+        CommonCompilerArgument("X_DONT_SORT_SOURCE_FILES", KotlinReleaseVersion(2, 3, 20))
+
+    /**
      * Don't report warnings when errors are suppressed. This only affects K2.
      *
      * WARNING: this option is EXPERIMENTAL and it may be changed in the future without notice or may be removed entirely.
@@ -318,6 +328,21 @@ public interface CommonCompilerArguments : CommonToolArguments {
         CommonCompilerArgument("X_FRAGMENT_FRIEND_DEPENDENCY", KotlinReleaseVersion(2, 3, 0))
 
     /**
+     * Enable header compilation mode.
+     * In this mode, the compiler produces class files that only contain the 'skeleton' of the classes to be
+     * compiled but the method bodies of all the implementations are empty.  This is used to speed up parallel compilation
+     * build systems where header libraries can be used to replace downstream dependencies for which we only need to
+     * see the type names and method signatures required to compile a given translation unit. Inline functions are still kept
+     * with bodies.
+     *
+     * WARNING: this option is EXPERIMENTAL and it may be changed in the future without notice or may be removed entirely.
+     */
+    @JvmField
+    @ExperimentalCompilerArgument
+    public val X_HEADER_MODE: CommonCompilerArgument<Boolean> =
+        CommonCompilerArgument("X_HEADER_MODE", KotlinReleaseVersion(2, 3, 20))
+
+    /**
      * Ignore all compilation exceptions while optimizing some constant expressions.
      *
      * WARNING: this option is EXPERIMENTAL and it may be changed in the future without notice or may be removed entirely.
@@ -346,6 +371,16 @@ public interface CommonCompilerArguments : CommonToolArguments {
     @ExperimentalCompilerArgument
     public val X_LIST_PHASES: CommonCompilerArgument<Boolean> =
         CommonCompilerArgument("X_LIST_PHASES", KotlinReleaseVersion(1, 3, 20))
+
+    /**
+     * Enable experimental language support for local type aliases.
+     *
+     * WARNING: this option is EXPERIMENTAL and it may be changed in the future without notice or may be removed entirely.
+     */
+    @JvmField
+    @ExperimentalCompilerArgument
+    public val X_LOCAL_TYPE_ALIASES: CommonCompilerArgument<Boolean> =
+        CommonCompilerArgument("X_LOCAL_TYPE_ALIASES", KotlinReleaseVersion(2, 3, 0))
 
     /**
      * Produce a klib that only contains the metadata of declarations.
@@ -665,6 +700,16 @@ public interface CommonCompilerArguments : CommonToolArguments {
     @ExperimentalCompilerArgument
     public val X_VERIFY_IR: CommonCompilerArgument<String?> =
         CommonCompilerArgument("X_VERIFY_IR", KotlinReleaseVersion(2, 0, 20))
+
+    /**
+     * Check that offsets of nested IR elements conform to offsets of their containers. Only has effect if '-Xverify-ir' is not 'none'.
+     *
+     * WARNING: this option is EXPERIMENTAL and it may be changed in the future without notice or may be removed entirely.
+     */
+    @JvmField
+    @ExperimentalCompilerArgument
+    public val X_VERIFY_IR_NESTED_OFFSETS: CommonCompilerArgument<Boolean> =
+        CommonCompilerArgument("X_VERIFY_IR_NESTED_OFFSETS", KotlinReleaseVersion(2, 3, 20))
 
     /**
      * Check for visibility violations in IR when validating it before running any lowerings. Only has effect if '-Xverify-ir' is not 'none'.

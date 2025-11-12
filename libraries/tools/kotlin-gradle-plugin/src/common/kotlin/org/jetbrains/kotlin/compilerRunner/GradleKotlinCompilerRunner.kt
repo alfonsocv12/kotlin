@@ -40,6 +40,7 @@ import org.jetbrains.kotlin.gradle.plugin.internal.BuildIdService
 import org.jetbrains.kotlin.gradle.plugin.internal.state.TaskLoggers
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinWithJavaTarget
 import org.jetbrains.kotlin.gradle.plugin.statistics.CompilerArgumentMetrics
+import org.jetbrains.kotlin.gradle.plugin.statistics.KotlinCompilerRefIndexMetrics
 import org.jetbrains.kotlin.gradle.tasks.*
 import org.jetbrains.kotlin.gradle.utils.*
 import org.jetbrains.kotlin.incremental.IncrementalModuleEntry
@@ -70,7 +71,7 @@ internal fun createGradleCompilerRunner(
     buildFinishedListenerService: Provider<BuildFinishedListenerService>,
     buildIdService: Provider<BuildIdService>,
     buildSessionService: Provider<BuildSessionService>,
-    fusMetricsConsumer: StatisticsValuesConsumer?,
+    fusMetricsConsumer: Provider<StatisticsValuesConsumer>,
     diagnosticsReporter: UsesKotlinToolingDiagnostics,
 ): GradleCompilerRunner {
     if (runViaBuildToolsApi) {
@@ -111,7 +112,7 @@ internal open class GradleCompilerRunner(
     protected val jdkToolsJar: File?,
     protected val compilerExecutionSettings: CompilerExecutionSettings,
     protected val buildMetrics: BuildMetricsReporter<BuildTimeMetric, BuildPerformanceMetric>,
-    protected val fusMetricsConsumer: StatisticsValuesConsumer?,
+    protected val fusMetricsConsumer: Provider<StatisticsValuesConsumer>,
 ) {
 
     internal val pathProvider = taskProvider.path.get()
@@ -176,7 +177,10 @@ internal open class GradleCompilerRunner(
         }
         val argsArray = ArgumentUtils.convertArgumentsToStringList(compilerArgs).toTypedArray()
 
-        fusMetricsConsumer?.let { metricsConsumer -> CompilerArgumentMetrics.collectMetrics(compilerArgs, argsArray, metricsConsumer) }
+        fusMetricsConsumer.orNull?.let { metricsConsumer ->
+            CompilerArgumentMetrics.collectMetrics(compilerArgs, argsArray, metricsConsumer)
+            KotlinCompilerRefIndexMetrics.collectMetrics(compilerExecutionSettings.generateCompilerRefIndex, metricsConsumer)
+        }
 
         val incrementalCompilationEnvironment = environment.incrementalCompilationEnvironment
         val modulesInfo = incrementalCompilationEnvironment?.let { incrementalModuleInfoProvider.orNull?.info }

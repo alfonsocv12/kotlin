@@ -74,7 +74,6 @@ import org.jetbrains.kotlin.fir.pipeline.*
 import org.jetbrains.kotlin.fir.references.FirReference
 import org.jetbrains.kotlin.fir.references.FirThisReference
 import org.jetbrains.kotlin.fir.references.toResolvedSymbol
-import org.jetbrains.kotlin.fir.resolve.referencedMemberSymbol
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhaseRecursively
@@ -1087,11 +1086,11 @@ internal class KaFirCompilerFacility(
     ): Fir2IrActualizedResult {
         val fir2IrConfiguration =
             Fir2IrConfiguration.forAnalysisApi(effectiveConfiguration, session.languageVersionSettings, diagnosticReporter)
-        val firResult = FirResult(listOf(ModuleCompilerAnalyzedOutput(session, session.getScopeSession(), firFiles)))
-        val singleOutput = firResult.outputs.size == 1
+        val frontendOutput = AllModulesFrontendOutput(listOf(SingleModuleFrontendOutput(session, session.getScopeSession(), firFiles)))
+        val singleOutput = frontendOutput.outputs.size == 1
         check(singleOutput) { "Single output invariant is used in the lambda below" }
 
-        return firResult.convertToIrAndActualize(
+        return frontendOutput.convertToIrAndActualize(
             fir2IrExtensions = fir2IrExtensions,
             fir2IrConfiguration = fir2IrConfiguration,
             irGeneratorExtensions = irGeneratorExtensions,
@@ -1291,14 +1290,7 @@ internal class KaFirCompilerFacility(
             val id = when (calleeReference) {
                 is FirThisReference -> when (val boundSymbol = calleeReference.boundSymbol) {
                     is FirClassSymbol -> CodeFragmentCapturedId(boundSymbol)
-                    is FirReceiverParameterSymbol, is FirValueParameterSymbol -> {
-                        when (val referencedSymbol = calleeReference.referencedMemberSymbol) {
-                            // Specific (deprecated) case for a class context receiver
-                            // TODO: remove with KT-72994
-                            is FirClassSymbol -> CodeFragmentCapturedId(referencedSymbol)
-                            else -> CodeFragmentCapturedId(boundSymbol)
-                        }
-                    }
+                    is FirReceiverParameterSymbol -> CodeFragmentCapturedId(boundSymbol)
                     is FirTypeParameterSymbol, is FirTypeAliasSymbol -> errorWithFirSpecificEntries(
                         message = "Unexpected FirThisOwnerSymbol ${calleeReference::class.simpleName}", fir = boundSymbol.fir
                     )

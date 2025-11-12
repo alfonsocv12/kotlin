@@ -2,6 +2,15 @@ public final class Foo /* Foo*/ {
   @org.jetbrains.annotations.NotNull()
   public static final Foo.Companion Companion;
 
+  @kotlin.jvm.JvmExposeBoxed(jvmName = "")
+  @kotlin.jvm.JvmStatic()
+  @org.jetbrains.annotations.NotNull()
+  public static final StringWrapper getBaz();//  getBaz()
+
+  @kotlin.jvm.JvmExposeBoxed(jvmName = "")
+  @kotlin.jvm.JvmStatic()
+  public static final void setBaz(@org.jetbrains.annotations.NotNull() StringWrapper);//  setBaz(StringWrapper)
+
   @org.jetbrains.annotations.NotNull()
   public static final java.lang.String getBaz-K4fyztM();//  getBaz-K4fyztM()
 
@@ -13,11 +22,13 @@ public final class Foo /* Foo*/ {
 }
 
 public static final class Companion /* Foo.Companion*/ {
-  @kotlin.jvm.JvmExposeBoxed()
+  @kotlin.jvm.JvmExposeBoxed(jvmName = "")
+  @kotlin.jvm.JvmStatic()
   @org.jetbrains.annotations.NotNull()
   public final StringWrapper getBaz();//  getBaz()
 
-  @kotlin.jvm.JvmExposeBoxed()
+  @kotlin.jvm.JvmExposeBoxed(jvmName = "")
+  @kotlin.jvm.JvmStatic()
   public final void setBaz(@org.jetbrains.annotations.NotNull() StringWrapper);//  setBaz(StringWrapper)
 
   @org.jetbrains.annotations.NotNull()

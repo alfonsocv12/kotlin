@@ -345,6 +345,12 @@ public class JsLightTreeBlackBoxCodegenWithSeparateKmpCompilationTestGenerated e
     public void testOptionalExpectation() {
       runTest("compiler/testData/codegen/box/multiplatform/k2/annotations/optionalExpectation.kt");
     }
+
+    @Test
+    @TestMetadata("optionalExpectationAnnotation.kt")
+    public void testOptionalExpectationAnnotation() {
+      runTest("compiler/testData/codegen/box/multiplatform/k2/annotations/optionalExpectationAnnotation.kt");
+    }
   }
 
   @Nested
@@ -684,6 +690,18 @@ public class JsLightTreeBlackBoxCodegenWithSeparateKmpCompilationTestGenerated e
     @TestMetadata("localSubstitutionOverrideInCommonModule.kt")
     public void testLocalSubstitutionOverrideInCommonModule() {
       runTest("compiler/testData/codegen/box/multiplatform/k2/basic/localSubstitutionOverrideInCommonModule.kt");
+    }
+
+    @Test
+    @TestMetadata("nameBasedDestructuringFullForm.kt")
+    public void testNameBasedDestructuringFullForm() {
+      runTest("compiler/testData/codegen/box/multiplatform/k2/basic/nameBasedDestructuringFullForm.kt");
+    }
+
+    @Test
+    @TestMetadata("nameBasedDestructuringShortForm.kt")
+    public void testNameBasedDestructuringShortForm() {
+      runTest("compiler/testData/codegen/box/multiplatform/k2/basic/nameBasedDestructuringShortForm.kt");
     }
 
     @Test

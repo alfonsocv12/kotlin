@@ -10,7 +10,7 @@ import org.jetbrains.kotlin.platform.SimplePlatform
 import org.jetbrains.kotlin.platform.TargetPlatform
 import org.jetbrains.kotlin.platform.toTargetPlatform
 
-sealed class NativePlatform : SimplePlatform("Native") {
+sealed class NativePlatform : org.jetbrains.kotlin.platform.NativePlatform("Native") {
     override val oldFashionedDescription: String
         get() = toString() + " "
 }
@@ -67,7 +67,7 @@ object NativePlatforms {
     }
 }
 
-fun TargetPlatform?.isNative(): Boolean = this?.isNotEmpty() == true && all { it is NativePlatform }
+fun TargetPlatform?.isNative(): Boolean = this != null && this.size > 0 && all { it is NativePlatform }
 
 private val legacyNativePlatformUnspecifiedTargetSerializedRepresentation = "${NativePlatformUnspecifiedTarget.platformName} []"
 fun NativePlatformUnspecifiedTarget.legacySerializeToString(): String = legacyNativePlatformUnspecifiedTargetSerializedRepresentation

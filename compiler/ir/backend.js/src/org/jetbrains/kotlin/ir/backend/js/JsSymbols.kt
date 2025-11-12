@@ -74,11 +74,6 @@ class JsSymbols(
     override val stringBuilder
         get() = TODO("not implemented")
 
-    override val arraysContentEquals: Map<IrType, IrSimpleFunctionSymbol> by CallableIds.contentEquals.functionSymbolAssociatedBy(
-        condition = { it.hasShape(extensionReceiver = true, regularParameters = 1) && it.parameters[0].type.isNullable() },
-        getKey = { it.parameters[0].type.makeNotNull() }
-    )
-
     override val getContinuation = CallableIds.getContinuation.functionSymbol()
 
     val coroutineEmptyContinuation: IrPropertySymbol = CallableIds.EmptyContinuation.propertySymbol()
@@ -312,6 +307,7 @@ class JsSymbols(
     // Coroutines
 
     val jsYieldFunctionSymbol = CallableIds.jsYield.functionSymbol()
+    val jsYieldStarFunctionSymbol = CallableIds.jsYieldStar.functionSymbol()
 
     val jsInvokeSuspendSuperType: IrSimpleFunctionSymbol = CallableIds.invokeSuspendSuperType.functionSymbol()
     val jsInvokeSuspendSuperTypeWithReceiver: IrSimpleFunctionSymbol = CallableIds.invokeSuspendSuperTypeWithReceiver.functionSymbol()
@@ -446,7 +442,6 @@ class JsSymbols(
     val jsNameAnnotationSymbol: IrClassSymbol = JsStandardClassIds.Annotations.JsName.classSymbol()
     val jsStaticAnnotationSymbol: IrClassSymbol = JsStandardClassIds.Annotations.JsStatic.classSymbol()
     val jsExportAnnotationSymbol: IrClassSymbol = JsStandardClassIds.Annotations.JsExport.classSymbol()
-    val jsGeneratorAnnotationSymbol: IrClassSymbol = JsStandardClassIds.Annotations.JsGenerator.classSymbol()
 
     val jsExportIgnoreAnnotationSymbol = JsStandardClassIds.Annotations.JsExportIgnore.classSymbol()
 
@@ -635,6 +630,7 @@ private object CallableIds {
     val booleanInExternalException = "booleanInExternalException".jsCallableId
     val jsNewAnonymousClass = "jsNewAnonymousClass".jsCallableId
     val jsYield = "jsYield".jsCallableId
+    val jsYieldStar = "jsYieldStar".jsCallableId
     val numberRangeToNumber = "numberRangeToNumber".jsCallableId
     val numberRangeToLong = "numberRangeToLong".jsCallableId
     val longRangeToNumber = "longRangeToNumber".jsCallableId
@@ -723,7 +719,6 @@ private object CallableIds {
 
     // Collections functions
     private val String.collectionsCallableId get() = CallableId(StandardNames.COLLECTIONS_PACKAGE_FQ_NAME, Name.identifier(this))
-    val contentEquals = "contentEquals".collectionsCallableId
     val createListFrom = "createListFrom".collectionsCallableId
     val createMutableListFrom = "createMutableListFrom".collectionsCallableId
     val createSetFrom = "createSetFrom".collectionsCallableId

@@ -19,6 +19,7 @@ import org.jetbrains.kotlin.fir.expressions.FirThisReceiverExpression
 import org.jetbrains.kotlin.fir.expressions.builder.buildPropertyAccessExpressionCopy
 import org.jetbrains.kotlin.fir.expressions.builder.buildThisReceiverExpressionCopy
 import org.jetbrains.kotlin.fir.expressions.impl.FirExpressionStub
+import org.jetbrains.kotlin.fir.expressions.unwrapArgument
 import org.jetbrains.kotlin.fir.resolve.FirSamResolver
 import org.jetbrains.kotlin.fir.resolve.calls.*
 import org.jetbrains.kotlin.fir.resolve.calls.stages.TypeArgumentMapping
@@ -43,9 +44,7 @@ class Candidate(
     // - in some cases with static entities, no matter is a use-site receiver explicit or not
     // OR we may have here a kind of ImplicitReceiverValue (non-statics only)
     override var dispatchReceiver: ConeResolutionAtom?,
-    // In most cases, it contains zero or single element
-    // More than one, only in case of context receiver group
-    val givenExtensionReceiverOptions: List<ConeResolutionAtom>,
+    val givenExtensionReceiver: ConeResolutionAtom?,
     override val explicitReceiverKind: ExplicitReceiverKind,
     private val constraintSystemFactory: InferenceComponents.ConstraintSystemFactory,
     private val baseSystem: ConstraintStorage,
@@ -293,7 +292,7 @@ class Candidate(
 
     // ---------------------------------------- Receivers ----------------------------------------
 
-    override var chosenExtensionReceiver: ConeResolutionAtom? = givenExtensionReceiverOptions.singleOrNull()
+    override var chosenExtensionReceiver: ConeResolutionAtom? = givenExtensionReceiver
 
     override var contextArguments: List<ConeResolutionAtom>? = null
 
@@ -314,7 +313,7 @@ class Candidate(
     }
 
     fun contextArguments(): List<FirExpression> {
-        return contextArguments?.map { it.expression } ?: emptyList()
+        return contextArguments?.map { it.expression.unwrapArgument() } ?: emptyList()
     }
 
     private var sourcesWereUpdated = false

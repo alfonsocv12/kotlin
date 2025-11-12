@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.ir.types.impl.IrSimpleTypeImpl
 import org.jetbrains.kotlin.ir.util.defaultType
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.ClassIdBasedLocality
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.StandardClassIds
@@ -99,17 +100,17 @@ class Fir2IrBuiltinSymbolsContainer(
     val longClass: IrClassSymbol by lazy { loadClass(StandardClassIds.Long) }
     val longType: IrType get() = longClass.defaultTypeWithoutArguments
 
-    val ubyteClass: IrClassSymbol by lazy { loadClass(StandardClassIds.UByte) }
-    val ubyteType: IrType get() = ubyteClass.defaultTypeWithoutArguments
+    val ubyteClass: IrClassSymbol? by lazy { loadClassSafe(StandardClassIds.UByte) }
+    val ubyteType: IrType by lazy { ubyteClass!!.defaultTypeWithoutArguments }
 
-    val ushortClass: IrClassSymbol by lazy { loadClass(StandardClassIds.UShort) }
-    val ushortType: IrType get() = ushortClass.defaultTypeWithoutArguments
+    val ushortClass: IrClassSymbol? by lazy { loadClassSafe(StandardClassIds.UShort) }
+    val ushortType: IrType by lazy { ushortClass!!.defaultTypeWithoutArguments }
 
-    val uintClass: IrClassSymbol by lazy { loadClass(StandardClassIds.UInt) }
-    val uintType: IrType get() = uintClass.defaultTypeWithoutArguments
+    val uintClass: IrClassSymbol? by lazy { loadClassSafe(StandardClassIds.UInt) }
+    val uintType: IrType by lazy { uintClass!!.defaultTypeWithoutArguments }
 
-    val ulongClass: IrClassSymbol by lazy { loadClass(StandardClassIds.ULong) }
-    val ulongType: IrType get() = ulongClass.defaultTypeWithoutArguments
+    val ulongClass: IrClassSymbol? by lazy { loadClassSafe(StandardClassIds.ULong) }
+    val ulongType: IrType by lazy { ulongClass!!.defaultTypeWithoutArguments }
 
     val floatClass: IrClassSymbol by lazy { loadClass(StandardClassIds.Float) }
     val floatType: IrType get() = floatClass.defaultTypeWithoutArguments
@@ -310,6 +311,7 @@ class Fir2IrBuiltinSymbolsContainer(
 
     @Fir2IrBuiltInsInternals
     internal fun findFunctions(callableId: CallableId): List<IrSimpleFunctionSymbol> {
+        @OptIn(ClassIdBasedLocality::class)
         require(!callableId.isLocal)
         val classId = callableId.classId
         return if (classId == null) {
@@ -321,6 +323,7 @@ class Fir2IrBuiltinSymbolsContainer(
 
     @Fir2IrBuiltInsInternals
     internal fun findProperties(callableId: CallableId): List<IrPropertySymbol> {
+        @OptIn(ClassIdBasedLocality::class)
         require(!callableId.isLocal)
         val classId = callableId.classId
         return if (classId == null) {

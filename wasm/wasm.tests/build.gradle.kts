@@ -1,8 +1,15 @@
-import org.gradle.internal.os.OperatingSystem
-import java.net.URI
 import com.github.gradle.node.npm.task.NpmTask
+import org.gradle.internal.os.OperatingSystem
+import org.tukaani.xz.XZInputStream
+import java.net.URI
 import java.nio.file.Files
 import java.util.*
+
+buildscript {
+    dependencies {
+        classpath("org.tukaani:xz:1.10") // to extract `tar.xz`
+    }
+}
 
 plugins {
     kotlin("jvm")
@@ -13,6 +20,7 @@ plugins {
     id("nodejs-configuration")
     id("java-test-fixtures")
     id("project-tests-convention")
+    id("test-inputs-check")
 }
 
 node {
@@ -45,6 +53,14 @@ repositories {
         }
         metadataSources { artifact() }
         content { includeModule("org.jsc", "jsc") }
+    }
+    ivy {
+        url = URI("https://github.com/bytecodealliance/wasmtime/releases/download/")
+        patternLayout {
+            artifact("v[revision]/wasmtime-v[revision]-[classifier].[ext]")
+        }
+        metadataSources { artifact() }
+        content { includeModule("dev.wasmtime", "wasmtime") }
     }
 }
 
@@ -186,14 +202,41 @@ val jsc by configurations.creating {
     isCanBeConsumed = false
 }
 
+val wasmtimeVersion = libs.versions.wasmtime
+val wasmtimePlatformSuffix = when (currentOsType) {
+    OsType(OsName.LINUX, OsArch.X86_64) -> "x86_64-linux"
+    OsType(OsName.MAC, OsArch.X86_64) -> "x86_64-macos"
+    OsType(OsName.MAC, OsArch.ARM64) -> "aarch64-macos"
+    OsType(OsName.WINDOWS, OsArch.X86_32),
+    OsType(OsName.WINDOWS, OsArch.X86_64) -> "x86_64-windows"
+    else -> error("unsupported os type $currentOsType")
+}
+val wasmtimeSuffix = wasmtimePlatformSuffix + "@" + when (currentOsType.name) {
+    OsName.LINUX -> "tar.xz"
+    OsName.MAC -> "tar.xz"
+    OsName.WINDOWS -> "zip"
+    else -> error("unsupported os type $currentOsType")
+}
+
+val wasmtime by configurations.creating {
+    isCanBeResolved = true
+    isCanBeConsumed = false
+}
+
 dependencies {
     testFixturesApi(testFixtures(project(":compiler:tests-common")))
     testFixturesApi(testFixtures(project(":compiler:tests-common-new")))
     testFixturesApi(testFixtures(project(":js:js.tests")))
-    testFixturesApi(intellijCore())
+    testFixturesImplementation(testFixtures(project(":compiler:fir:analysis-tests")))
+    testFixturesImplementation(intellijCore())
     testFixturesApi(platform(libs.junit.bom))
     testFixturesApi(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
+
+    implicitDependencies("org.nodejs:node:$nodejsVersion:win-x64@zip")
+    implicitDependencies("org.nodejs:node:$nodejsVersion:linux-x64@tar.gz")
+    implicitDependencies("org.nodejs:node:$nodejsVersion:darwin-x64@tar.gz")
+    implicitDependencies("org.nodejs:node:$nodejsVersion:darwin-arm64@tar.gz")
 
     jsShell("org.mozilla:jsshell:${jsShellVersion.get()}:$jsShellSuffix@zip")
 
@@ -212,6 +255,12 @@ dependencies {
     implicitDependencies("org.jsc:jsc:${libs.versions.jscSequoia.get()}:sequoia")
     implicitDependencies("org.jsc:jsc:${libs.versions.jscLinux.get()}:linux64")
     implicitDependencies("org.jsc:jsc:${libs.versions.jscWindows.get()}:win64")
+
+    wasmtime("dev.wasmtime:wasmtime:${wasmtimeVersion.get()}:$wasmtimeSuffix")
+
+    implicitDependencies("dev.wasmtime:wasmtime:${wasmtimeVersion.get()}:x86_64-windows@zip")
+    implicitDependencies("dev.wasmtime:wasmtime:${wasmtimeVersion.get()}:x86_64-linux@tar.xz")
+    implicitDependencies("dev.wasmtime:wasmtime:${wasmtimeVersion.get()}:aarch64-macos@tar.xz")
 }
 
 optInToExperimentalCompilerApi()
@@ -224,16 +273,6 @@ sourceSets {
     }
     "testFixtures" { projectDefault() }
 }
-
-fun Test.setupWasmStdlib(target: String) {
-    @Suppress("LocalVariableName")
-    val Target = target.capitalize()
-    dependsOn(":kotlin-stdlib:compileKotlinWasm$Target")
-    systemProperty("kotlin.wasm-$target.stdlib.path", "libraries/stdlib/build/classes/kotlin/wasm$Target/main")
-    dependsOn(":kotlin-test:compileKotlinWasm$Target")
-    systemProperty("kotlin.wasm-$target.kotlin.test.path", "libraries/kotlin.test/build/classes/kotlin/wasm$Target/main")
-}
-
 fun Test.setupGradlePropertiesForwarding() {
     val rootLocalProperties = Properties().apply {
         rootProject.file("local.properties").takeIf { it.isFile }?.inputStream()?.use {
@@ -299,74 +338,28 @@ val unzipJsShell by task<Copy> {
     into(jsShellUnpackedDirectory)
 }
 
-val wasmEdgeDirectory = toolsDirectory.map { it.dir("WasmEdge").asFile }
-val wasmEdgeDirectoryName = wasmEdgeVersion.map { version -> "WasmEdge-$version-$wasmEdgeInnerSuffix" }
-val wasmEdgeUnpackedDirectory = wasmEdgeDirectory.map { it.resolve(wasmEdgeDirectoryName.get()) }
-val unzipWasmEdge by task<Copy> {
-    dependsOn(wasmEdge)
+val unzipWasmEdge by task<UnzipWasmEdge> {
+    from.setFrom(wasmEdge)
 
-    val wasmEdgeDirectory = wasmEdgeDirectory
     val currentOsTypeForConfigurationCache = currentOsType.name
-    val wasmEdgeUnpackedDirectory = wasmEdgeUnpackedDirectory
 
-    from {
-        if (wasmEdge.singleFile.extension == "zip") {
-            zipTree(wasmEdge.singleFile)
-        } else {
-            tarTree(wasmEdge.singleFile)
-        }
-    }
-    into(wasmEdgeDirectory)
-    inputs.property("currentOsTypeForConfigurationCache", currentOsTypeForConfigurationCache)
+    into.fileProvider(toolsDirectory.map { it.dir("WasmEdge").asFile })
 
-    doLast {
-        if (currentOsTypeForConfigurationCache !in setOf(OsName.MAC, OsName.LINUX)) return@doLast
+    directoryName.set(wasmEdgeVersion.map { version -> "WasmEdge-$version-$wasmEdgeInnerSuffix" })
 
-        val unpackedWasmEdgeDirectory = wasmEdgeUnpackedDirectory.get().toPath()
-
-        val libDirectory = unpackedWasmEdgeDirectory
-            .resolve(if (currentOsTypeForConfigurationCache == OsName.MAC) "lib" else "lib64")
-
-        val targets = if (currentOsTypeForConfigurationCache == OsName.MAC)
-            listOf("libwasmedge.0.1.0.dylib", "libwasmedge.0.1.0.tbd")
-        else listOf("libwasmedge.so.0.1.0")
-
-        targets.forEach {
-            val target = libDirectory.resolve(it)
-            val firstLink = libDirectory.resolve(it.replace("0.1.0", "0")).also(Files::deleteIfExists)
-            val secondLink = libDirectory.resolve(it.replace(".0.1.0", "")).also(Files::deleteIfExists)
-
-            Files.createSymbolicLink(firstLink, target)
-            Files.createSymbolicLink(secondLink, target)
-        }
-    }
+    getIsWindows.set(currentOsTypeForConfigurationCache !in setOf(OsName.MAC, OsName.LINUX))
+    getIsMac.set(currentOsTypeForConfigurationCache == OsName.MAC)
 }
 
 
 val jscDirectory = toolsDirectory.map { it.dir("JavaScriptCore").asFile }
-val jscUnpackedDirectory = jscDirectory.map { it.resolve("jsc-$jscOsDependentClassifier-$jscOsDependentRevision") }
-val unzipJsc by task<Copy> {
-    dependsOn(jsc)
-    from { zipTree(jsc.singleFile) }
+val unzipJsc by task<UnzipJsc> {
+    from.setFrom(jsc)
 
-    val jscUnpackedDirectory = jscUnpackedDirectory
-    into(jscUnpackedDirectory)
+    into.fileProvider(jscDirectory.map { it.resolve("jsc-$jscOsDependentClassifier-$jscOsDependentRevision") })
 
     val isLinux = currentOsType.name == OsName.LINUX
-    inputs.property("isLinux", isLinux)
-
-    doLast {
-        if (isLinux) {
-            val libDirectory = File(jscUnpackedDirectory.get(), "lib")
-            for (file in libDirectory.listFiles()) {
-                if (file.isFile && file.length() < 100) { // seems unpacked file link
-                    val linkTo = file.readText()
-                    file.delete()
-                    Files.createSymbolicLink(file.toPath(), File(linkTo).toPath())
-                }
-            }
-        }
-    }
+    getIsLinux.set(isLinux)
 }
 
 val createJscRunner by task<CreateJscRunner> {
@@ -376,13 +369,54 @@ val createJscRunner by task<CreateJscRunner> {
     val runnerFilePath = jscDirectory.map { it.resolve(runnerFileName) }
     outputFile.fileProvider(runnerFilePath)
 
-    inputDirectory.fileProvider(unzipJsc.map { it.outputs.files.singleFile })
+    inputDirectory.set(unzipJsc.flatMap { it.into })
+}
+
+// Repack .tar.xz archives into .tar due to an issue in the Gradle
+// https://github.com/gradle/gradle/issues/31858
+val wasmtimeArchive by task<Task> {
+    inputs.files(wasmtime)
+
+    val archive = wasmtime.singleFile
+
+    if (archive.extension == "xz") {
+        val tarFile = temporaryDir.resolve("${archive.name}.tar")
+        XZInputStream(archive.inputStream().buffered()).use { xzIn ->
+            tarFile.outputStream().buffered().use { tarOut ->
+                xzIn.copyTo(tarOut)
+            }
+        }
+
+        outputs.file(tarFile)
+    } else {
+        outputs.file(archive)
+    }
+}
+
+val unzipWasmtime by task<Copy> {
+    val wasmtime = wasmtimeArchive.map { it.outputs.files }
+    dependsOn(wasmtime)
+
+    from({
+             val wasmtimeFile = wasmtime.get().files.single()
+             if (wasmtimeFile.extension == "zip") {
+                 zipTree(wasmtimeFile)
+             } else {
+                 tarTree(wasmtimeFile)
+             }
+         })
+
+    val wasmtimeDirectory = toolsDirectory.map { it.dir("Wasmtime").asFile }
+    val wasmtimeDirectoryName = wasmtimeVersion.map { version -> "wasmtime-$version-$wasmtimePlatformSuffix" }
+    val wasmtimeUnpackedDirectory = wasmtimeDirectory.map { it.resolve(wasmtimeDirectoryName.get()) }
+
+    into(wasmtimeUnpackedDirectory)
 }
 
 fun Test.setupSpiderMonkey() {
     val jsShellExecutablePath = unzipJsShell
-        .map { it.outputs.files.singleFile }
-        .map { it.resolve("js").absolutePath }
+        .map { it.destinationDir }
+        .map { it.resolve("js") }
 
     jvmArgumentProviders += objects.newInstance<SystemPropertyClasspathProvider>().apply {
         classpath.from(jsShellExecutablePath)
@@ -392,9 +426,12 @@ fun Test.setupSpiderMonkey() {
 
 fun Test.setupWasmEdge() {
     val wasmEdgeExecutablePath = unzipWasmEdge
-        .map { it.outputs.files.singleFile }
-        .map { it.resolve(wasmEdgeDirectoryName.get()) }
-        .map { it.resolve("bin/wasmedge").absolutePath }
+        .flatMap { task ->
+            task.into.zip(task.directoryName) { into, dirName ->
+                into.dir(dirName)
+            }
+        }
+        .map { it.file("bin/wasmedge") }
 
     jvmArgumentProviders += objects.newInstance<SystemPropertyClasspathProvider>().apply {
         classpath.from(wasmEdgeExecutablePath)
@@ -404,8 +441,7 @@ fun Test.setupWasmEdge() {
 
 fun Test.setupJsc() {
     val jscRunnerExecutablePath = createJscRunner
-        .map { it.outputFile.asFile.get() }
-        .map { it.absolutePath }
+        .flatMap { it.outputFile }
 
     jvmArgumentProviders += objects.newInstance<SystemPropertyClasspathProvider>().apply {
         classpath.from(jscRunnerExecutablePath)
@@ -413,18 +449,19 @@ fun Test.setupJsc() {
     }
 }
 
+fun Test.setupWasmtime() {
+    dependsOn(unzipWasmtime)
+    val wasmtimeDirectory = unzipWasmtime.map { it.destinationDir.resolve("wasmtime-v${wasmtimeVersion.get()}-$wasmtimePlatformSuffix") }
+
+    jvmArgumentProviders += objects.newInstance<SystemPropertyClasspathProvider>().apply {
+        classpath.from(wasmtimeDirectory.map { it.resolve("wasmtime") })
+        property.set("wasm.engine.path.Wasmtime")
+    }
+}
+
 testsJar {}
 
 projectTests {
-    testData(project(":compiler").isolated, "testData/debug")
-    testData(project(":compiler").isolated, "testData/diagnostics")
-    testData(project(":compiler").isolated, "testData/codegen")
-    testData(project(":compiler").isolated, "testData/ir")
-    testData(project(":compiler").isolated, "testData/klib")
-    testData(project(":js:js.translator").isolated, "testData/box")
-    testData(project(":js:js.translator").isolated, "testData/incremental")
-    testData(project(":js:js.translator").isolated, "testData/typescript-export")
-
     testGenerator("org.jetbrains.kotlin.generators.tests.GenerateWasmTestsKt")
 
     fun wasmProjectTest(taskName: String, skipInLocalBuild: Boolean = false, body: Test.() -> Unit = {}) {
@@ -432,12 +469,12 @@ projectTests {
             taskName = taskName,
             jUnitMode = JUnitMode.JUnit5,
             skipInLocalBuild = skipInLocalBuild,
+            maxHeapSizeMb = 6144
         ) {
-            workingDir = rootDir
             with(d8KotlinBuild) {
                 setupV8()
             }
-            with(nodeJsKotlinBuild) {
+            with(wasmNodeJsKotlinBuild) {
                 setupNodeJs(nodejsVersion)
             }
             with(binaryenKotlinBuild) {
@@ -446,14 +483,12 @@ projectTests {
             setupSpiderMonkey()
             setupWasmEdge()
             setupJsc()
+            setupWasmtime()
             useJUnitPlatform()
-            setupWasmStdlib("js")
-            setupWasmStdlib("wasi")
             setupGradlePropertiesForwarding()
-            val buildDirectory = layout.buildDirectory.map { "${it.asFile}/" }
-            jvmArgumentProviders += objects.newInstance<SystemPropertyClasspathProvider>().apply {
-                classpath.from(buildDirectory)
+            jvmArgumentProviders += objects.newInstance<AbsolutePathArgumentProvider>().apply {
                 property.set("kotlin.wasm.test.root.out.dir")
+                buildDirectory.set(layout.buildDirectory)
             }
             body()
         }
@@ -467,5 +502,29 @@ projectTests {
 
     wasmProjectTest("diagnosticTest", skipInLocalBuild = true) {
         include("**/Diagnostics*.class")
+    }
+
+    testData(project(":compiler").isolated, "testData/diagnostics")
+    testData(project(":compiler").isolated, "testData/codegen")
+    testData(project(":compiler").isolated, "testData/debug/stepping")
+    testData(project(":compiler").isolated, "testData/ir")
+    testData(project(":compiler").isolated, "testData/loadJava")
+    testData(project(":compiler").isolated, "testData/klib/partial-linkage")
+    testData(project(":compiler").isolated, "testData/klib/resolve")
+    testData(project(":compiler").isolated, "testData/klib/syntheticAccessors")
+    testData(project(":compiler").isolated, "testData/klib/__utils__")
+
+    testData(project(":js:js.translator").isolated, "testData/incremental")
+    testData(project(":js:js.translator").isolated, "testData/box")
+    testData(project(":js:js.translator").isolated, "testData/typescript-export/wasm/")
+
+    withWasmRuntime()
+}
+
+tasks.processTestFixturesResources.configure {
+    from(project.layout.projectDirectory.dir("_additionalFilesForTests"))
+    from(project(":compiler").layout.projectDirectory.dir("testData/debug")) {
+        into("debugTestHelpers")
+        include("wasmTestHelpers/")
     }
 }

@@ -1254,6 +1254,12 @@ public class FirWasmJsCodegenBoxInlineTestGenerated extends AbstractFirWasmJsCod
       }
 
       @Test
+      @TestMetadata("genericVararg.kt")
+      public void testGenericVararg() {
+        runTest("compiler/testData/codegen/boxInline/callableReference/adaptedReferences/genericVararg.kt");
+      }
+
+      @Test
       @TestMetadata("inlineBound.kt")
       public void testInlineBound() {
         runTest("compiler/testData/codegen/boxInline/callableReference/adaptedReferences/inlineBound.kt");
@@ -1263,6 +1269,12 @@ public class FirWasmJsCodegenBoxInlineTestGenerated extends AbstractFirWasmJsCod
       @TestMetadata("inlineDefault.kt")
       public void testInlineDefault() {
         runTest("compiler/testData/codegen/boxInline/callableReference/adaptedReferences/inlineDefault.kt");
+      }
+
+      @Test
+      @TestMetadata("inlineFuctionWithGenericVarargAndCallableRefAsDefaultValue.kt")
+      public void testInlineFuctionWithGenericVarargAndCallableRefAsDefaultValue() {
+        runTest("compiler/testData/codegen/boxInline/callableReference/adaptedReferences/inlineFuctionWithGenericVarargAndCallableRefAsDefaultValue.kt");
       }
 
       @Test
@@ -3282,6 +3294,12 @@ public class FirWasmJsCodegenBoxInlineTestGenerated extends AbstractFirWasmJsCod
     @Test
     public void testAllFilesPresentInMultiModule() {
       KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/codegen/boxInline/multiModule"), Pattern.compile("^(.+)\\.kt$"), null, true);
+    }
+
+    @Test
+    @TestMetadata("notInlinedFunFromKlib.kt")
+    public void testNotInlinedFunFromKlib() {
+      runTest("compiler/testData/codegen/boxInline/multiModule/notInlinedFunFromKlib.kt");
     }
 
     @Test

@@ -372,6 +372,12 @@
             "major": 2,
             "minor": 3,
             "patch": 0
+        },
+        {
+            "name": "2.3.20",
+            "major": 2,
+            "minor": 3,
+            "patch": 20
         }
     ],
     "types": {
@@ -1869,6 +1875,37 @@
                         }
                     },
                     {
+                        "name": "Xdont-sort-source-files",
+                        "shortName": null,
+                        "deprecatedName": null,
+                        "description": {
+                            "current": "Disable automatic sorting of source files.",
+                            "valueInVersions": []
+                        },
+                        "delimiter": null,
+                        "valueType": {
+                            "type": "org.jetbrains.kotlin.arguments.dsl.types.BooleanType",
+                            "isNullable": {
+                                "current": false,
+                                "valueInVersions": []
+                            },
+                            "defaultValue": {
+                                "current": false,
+                                "valueInVersions": []
+                            }
+                        },
+                        "valueDescription": {
+                            "current": null,
+                            "valueInVersions": []
+                        },
+                        "releaseVersionsMetadata": {
+                            "introducedVersion": "2.3.20",
+                            "stabilizedVersion": null,
+                            "deprecatedVersion": null,
+                            "removedVersion": null
+                        }
+                    },
+                    {
                         "name": "Xdont-warn-on-error-suppression",
                         "shortName": null,
                         "deprecatedName": null,
@@ -2272,6 +2309,37 @@
                         }
                     },
                     {
+                        "name": "Xheader-mode",
+                        "shortName": null,
+                        "deprecatedName": null,
+                        "description": {
+                            "current": "Enable header compilation mode.\nIn this mode, the compiler produces class files that only contain the 'skeleton' of the classes to be\ncompiled but the method bodies of all the implementations are empty.  This is used to speed up parallel compilation\nbuild systems where header libraries can be used to replace downstream dependencies for which we only need to\nsee the type names and method signatures required to compile a given translation unit. Inline functions are still kept\nwith bodies.",
+                            "valueInVersions": []
+                        },
+                        "delimiter": null,
+                        "valueType": {
+                            "type": "org.jetbrains.kotlin.arguments.dsl.types.BooleanType",
+                            "isNullable": {
+                                "current": false,
+                                "valueInVersions": []
+                            },
+                            "defaultValue": {
+                                "current": false,
+                                "valueInVersions": []
+                            }
+                        },
+                        "valueDescription": {
+                            "current": null,
+                            "valueInVersions": []
+                        },
+                        "releaseVersionsMetadata": {
+                            "introducedVersion": "2.3.20",
+                            "stabilizedVersion": null,
+                            "deprecatedVersion": null,
+                            "removedVersion": null
+                        }
+                    },
+                    {
                         "name": "Xignore-const-optimization-errors",
                         "shortName": null,
                         "deprecatedName": null,
@@ -2390,6 +2458,37 @@
                         },
                         "releaseVersionsMetadata": {
                             "introducedVersion": "1.3.20",
+                            "stabilizedVersion": null,
+                            "deprecatedVersion": null,
+                            "removedVersion": null
+                        }
+                    },
+                    {
+                        "name": "Xlocal-type-aliases",
+                        "shortName": null,
+                        "deprecatedName": null,
+                        "description": {
+                            "current": "Enable experimental language support for local type aliases.",
+                            "valueInVersions": []
+                        },
+                        "delimiter": null,
+                        "valueType": {
+                            "type": "org.jetbrains.kotlin.arguments.dsl.types.BooleanType",
+                            "isNullable": {
+                                "current": false,
+                                "valueInVersions": []
+                            },
+                            "defaultValue": {
+                                "current": false,
+                                "valueInVersions": []
+                            }
+                        },
+                        "valueDescription": {
+                            "current": null,
+                            "valueInVersions": []
+                        },
+                        "releaseVersionsMetadata": {
+                            "introducedVersion": "2.3.0",
                             "stabilizedVersion": null,
                             "deprecatedVersion": null,
                             "removedVersion": null
@@ -3568,6 +3667,37 @@
                         },
                         "releaseVersionsMetadata": {
                             "introducedVersion": "2.0.20",
+                            "stabilizedVersion": null,
+                            "deprecatedVersion": null,
+                            "removedVersion": null
+                        }
+                    },
+                    {
+                        "name": "Xverify-ir-nested-offsets",
+                        "shortName": null,
+                        "deprecatedName": null,
+                        "description": {
+                            "current": "Check that offsets of nested IR elements conform to offsets of their containers. Only has effect if '-Xverify-ir' is not 'none'.",
+                            "valueInVersions": []
+                        },
+                        "delimiter": null,
+                        "valueType": {
+                            "type": "org.jetbrains.kotlin.arguments.dsl.types.BooleanType",
+                            "isNullable": {
+                                "current": false,
+                                "valueInVersions": []
+                            },
+                            "defaultValue": {
+                                "current": false,
+                                "valueInVersions": []
+                            }
+                        },
+                        "valueDescription": {
+                            "current": null,
+                            "valueInVersions": []
+                        },
+                        "releaseVersionsMetadata": {
+                            "introducedVersion": "2.3.20",
                             "stabilizedVersion": null,
                             "deprecatedVersion": null,
                             "removedVersion": null
@@ -11354,6 +11484,37 @@
                                 },
                                 "releaseVersionsMetadata": {
                                     "introducedVersion": "1.4.0",
+                                    "stabilizedVersion": null,
+                                    "deprecatedVersion": null,
+                                    "removedVersion": null
+                                }
+                            },
+                            {
+                                "name": "Xtarget-platform",
+                                "shortName": null,
+                                "deprecatedName": null,
+                                "description": {
+                                    "current": "Target platform for metadata generation. Possible values: JVM, JS, WasmJs, WasmWasi, Native",
+                                    "valueInVersions": []
+                                },
+                                "delimiter": null,
+                                "valueType": {
+                                    "type": "org.jetbrains.kotlin.arguments.dsl.types.StringArrayType",
+                                    "defaultValue": {
+                                        "current": null,
+                                        "valueInVersions": []
+                                    },
+                                    "isNullable": {
+                                        "current": true,
+                                        "valueInVersions": []
+                                    }
+                                },
+                                "valueDescription": {
+                                    "current": null,
+                                    "valueInVersions": []
+                                },
+                                "releaseVersionsMetadata": {
+                                    "introducedVersion": "2.3.20",
                                     "stabilizedVersion": null,
                                     "deprecatedVersion": null,
                                     "removedVersion": null

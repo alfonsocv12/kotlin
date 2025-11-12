@@ -836,12 +836,8 @@ tasks {
         )
     }
 
-    register("jsFirCompilerTest") {
-        dependsOn(":js:js.tests:jsFirTest")
-    }
-
-    register("jsIrCompilerTest") {
-        dependsOn(":js:js.tests:jsIrTest")
+    register("jsCompilerTest") {
+        dependsOn(":js:js.tests:jsTest")
     }
 
     register("wasmCompilerTest") {
@@ -964,8 +960,8 @@ tasks {
         dependsOn("compilerPluginTest")
         dependsOn(":kotlin-daemon-tests:test")
         dependsOn(":compiler:arguments:test")
-        dependsOn(":compiler:fir:modularized-tests:modelDumpTest")
         dependsOn(":compiler:multiplatform-parsing:jvmTest")
+        dependsOn(":compiler:fir:modularized-tests:test")
     }
 
     register("miscTest") {
@@ -979,6 +975,7 @@ tasks {
         dependsOn(":kotlin-util-klib:test")
         dependsOn(":kotlin-util-klib-abi:test")
         dependsOn(":kotlinx-metadata-klib:test")
+        dependsOn(":compiler:ir.validation:test")
         dependsOn(":generators:test")
         dependsOn(":kotlin-gradle-plugin-dsl-codegen:test")
     }
@@ -1015,6 +1012,8 @@ tasks {
         dependsOn(":compiler:build-tools:kotlin-build-tools-api-tests:check")
         dependsOn(":tools:ide-plugin-dependencies-validator:test")
         dependsOn(":tools:stats-analyser:test")
+        dependsOn(":libraries:tools:abi-validation:abi-tools:check")
+        dependsOn(":libraries:tools:abi-validation:abi-tools-api:check")
     }
 
     register("examplesTest") {

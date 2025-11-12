@@ -321,7 +321,7 @@ class FirCallCompletionResultsWriterTransformer(
 
         return findSingleSubstitutedSymbolWithOriginal(original.symbol) { processor ->
             when (original) {
-                is FirSimpleFunction -> scope.processFunctionsByName(original.name, processor)
+                is FirNamedFunction -> scope.processFunctionsByName(original.name, processor)
                 is FirProperty -> scope.processPropertiesByName(original.name, processor)
                 is FirConstructor -> scope.processDeclaredConstructors(processor)
                 else -> error("Unexpected declaration kind ${original.render()}")
@@ -440,6 +440,7 @@ class FirCallCompletionResultsWriterTransformer(
         val expectedArgumentsTypeMapping = subCandidate.createArgumentsMapping(forErrorReference = calleeReference.isError)
 
         result.transformArgumentList(expectedArgumentsTypeMapping)
+        result.transformContextArguments(this, expectedArgumentsTypeMapping)
 
         result.replaceConeTypeOrNull(resultType)
         session.lookupTracker?.recordTypeResolveAsLookup(resultType, functionCall.source, context.file.source)
@@ -551,11 +552,17 @@ class FirCallCompletionResultsWriterTransformer(
                     // Finally, the result can be wrapped in a SAM conversion if necessary.
                     val key = (element as? FirAnonymousFunctionExpression)?.anonymousFunction ?: element
                     expectedArgumentsTypeMapping?.samConversions?.get(key)?.let { samInfo ->
-                        @Suppress("UNCHECKED_CAST")
-                        return transformed.wrapInSamExpression(
+                        val samConversionExpression = transformed.wrapInSamExpression(
                             expectedArgumentType = samInfo.samType,
                             usesFunctionKindConversion = key in expectedArgumentsTypeMapping.argumentsWithFunctionKindConversion
-                        ) as E
+                        )
+
+                        if (this@transformArgumentList is FirContextArgumentListOwner && transformed in contextArguments) {
+                            replaceContextArguments(contextArguments.map { if (it == transformed) samConversionExpression else it })
+                        }
+
+                        @Suppress("UNCHECKED_CAST")
+                        return samConversionExpression as E
                     }
                 }
 
@@ -588,7 +595,7 @@ class FirCallCompletionResultsWriterTransformer(
     private fun FirExpression.wrapInSamExpression(
         expectedArgumentType: ConeKotlinType,
         usesFunctionKindConversion: Boolean,
-    ): FirExpression {
+    ): FirSamConversionExpression {
         return buildSamConversionExpression {
             expression = this@wrapInSamExpression
             coneTypeOrNull = expectedArgumentType.withNullabilityOf(resolvedType, session.typeContext)
@@ -1157,7 +1164,7 @@ class FirCallCompletionResultsWriterTransformer(
 
     private fun ConeKotlinType.functionTypeKindForDeserializedConeType(): FunctionTypeKind? {
         val coneClassLikeType = this.lowerBoundIfFlexible() as? ConeClassLikeType ?: return null
-        val classId = coneClassLikeType.classId ?: return null
+        val classId = coneClassLikeType.classId
         return session.functionTypeService.extractSingleExtensionKindForDeserializedConeType(classId, coneClassLikeType.customAnnotations)
     }
 
@@ -1288,7 +1295,7 @@ class FirCallCompletionResultsWriterTransformer(
         data: ExpectedArgumentType?,
     ): D where D : FirResolvable, D : FirExpression {
         val calleeReference = syntheticCall.calleeReference as? FirNamedReferenceWithCandidate
-        val declaration = calleeReference?.candidate?.symbol?.fir as? FirSimpleFunction
+        val declaration = calleeReference?.candidate?.symbol?.fir as? FirNamedFunction
 
         if (calleeReference == null || declaration == null) {
             transformSyntheticCallChildren(syntheticCall, data)

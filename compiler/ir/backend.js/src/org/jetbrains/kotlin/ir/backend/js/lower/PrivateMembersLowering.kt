@@ -24,7 +24,7 @@ import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.utils.addToStdlib.assignFrom
 
-private val STATIC_THIS_PARAMETER by IrDeclarationOriginImpl
+private val STATIC_THIS_PARAMETER by IrDeclarationOriginImpl.Regular
 
 private var IrFunction.correspondingStatic: IrSimpleFunction? by irAttribute(copyByDefault = false)
 
@@ -63,6 +63,7 @@ class PrivateMembersLowering(val context: JsIrBackendContext) : DeclarationTrans
         }.also {
             it.parent = function.parent
             it.annotations = function.annotations
+            it.copyAttributes(function)
         }
 
         function.correspondingStatic = staticFunction

@@ -14,6 +14,7 @@ import org.jetbrains.kotlin.config.phaser.PhaseConfig
 import org.jetbrains.kotlin.constant.EvaluatedConstTracker
 import org.jetbrains.kotlin.incremental.components.*
 import org.jetbrains.kotlin.metadata.deserialization.BinaryVersion
+import org.jetbrains.kotlin.platform.TargetPlatform
 import org.jetbrains.kotlin.util.PerformanceManager
 
 @Suppress("unused")
@@ -57,6 +58,8 @@ object CommonConfigurationKeysContainer : KeysContainer("org.jetbrains.kotlin.co
     val VERIFY_IR by key<IrVerificationMode>("IR verification mode")
     val ENABLE_IR_VISIBILITY_CHECKS by key<Boolean>("Check pre-lowering IR for visibility violations")
     val ENABLE_IR_VARARG_TYPES_CHECKS by key<Boolean>("Check IR for vararg types mismatches")
+    val ENABLE_IR_NESTED_OFFSETS_CHECKS by key<Boolean>("Check that offsets of nested IR elements conform to offsets of their containers")
+
     val PHASE_CONFIG by key<PhaseConfig>("phase configuration")
 
     val DONT_CREATE_SEPARATE_SESSION_FOR_SCRIPTS by key<Boolean>(
@@ -66,7 +69,6 @@ object CommonConfigurationKeysContainer : KeysContainer("org.jetbrains.kotlin.co
 
     val DONT_SORT_SOURCE_FILES by key<Boolean>(
         description = "don't sort source files in FS order",
-        comment = "Should be used only in tests, impossible to set via compiler arguments",
     )
 
     val SCRIPTING_HOST_CONFIGURATION by key<Any>(
@@ -83,4 +85,6 @@ object CommonConfigurationKeysContainer : KeysContainer("org.jetbrains.kotlin.co
         description = "Enables detailed performance stats that might slow down the general compiler performance",
         comment = "See the description of `-Xdetailed-perf` for more details"
     )
+
+    val TARGET_PLATFORM by key<TargetPlatform>("target platform")
 }

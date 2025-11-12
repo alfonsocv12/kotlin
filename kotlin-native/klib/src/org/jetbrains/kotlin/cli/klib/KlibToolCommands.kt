@@ -17,12 +17,14 @@ import org.jetbrains.kotlin.ir.declarations.impl.IrFactoryImpl
 import org.jetbrains.kotlin.ir.declarations.impl.IrFileImpl
 import org.jetbrains.kotlin.ir.symbols.impl.IrFileSymbolImpl
 import org.jetbrains.kotlin.ir.util.*
-import org.jetbrains.kotlin.konan.library.BitcodeLibrary
-import org.jetbrains.kotlin.konan.library.impl.createKonanLibrary
+import org.jetbrains.kotlin.konan.library.components.bitcode
 import org.jetbrains.kotlin.konan.target.KonanTarget
 import org.jetbrains.kotlin.library.KotlinIrSignatureVersion
 import org.jetbrains.kotlin.library.KotlinLibrary
 import org.jetbrains.kotlin.library.abi.*
+import org.jetbrains.kotlin.library.components.inlinableFunctionsIr
+import org.jetbrains.kotlin.library.components.ir
+import org.jetbrains.kotlin.library.components.metadata
 import org.jetbrains.kotlin.library.hasAbi
 import org.jetbrains.kotlin.library.metadata.kotlinLibrary
 import org.jetbrains.kotlin.library.metadata.parseModuleHeader
@@ -44,11 +46,10 @@ internal sealed class KlibToolCommand(
     abstract fun execute()
 
     protected fun checkLibraryHasIr(library: KotlinLibrary): Boolean {
-        if (!library.hasMainIr) {
+        return if (library.ir == null) {
             output.logError("Library ${library.libraryFile} is an IR-less library")
-            return false
-        }
-        return true
+            false
+        } else true
     }
 
     protected fun KotlinIrSignatureVersion?.checkSupportedInLibrary(library: KotlinLibrary): Boolean {
@@ -85,7 +86,9 @@ internal sealed class KlibToolCommand(
 internal class Info(output: KlibToolOutput, args: KlibToolArguments) : KlibToolCommand(output, args) {
     override fun execute() {
         val library = resolveKlib(args.libraryPath)
-        val metadataHeader = parseModuleHeader(library.moduleHeaderData)
+        val metadata = library.metadata
+
+        val metadataHeader = parseModuleHeader(metadata.moduleHeaderData)
 
         val nonEmptyPackageFQNs = buildSet {
             addAll(metadataHeader.packageFragmentNameList)
@@ -93,8 +96,8 @@ internal class Info(output: KlibToolOutput, args: KlibToolArguments) : KlibToolC
 
             // Sometimes `emptyPackageList` is empty, so it's necessary to explicitly filter out empty packages:
             val stillRemainingEmptyPackageFQNs = filterTo(hashSetOf()) { packageName ->
-                library.packageMetadataParts(packageName).all { partName ->
-                    parsePackageFragment(library.packageMetadata(packageName, partName)).isEmpty()
+                metadata.getPackageFragmentNames(packageName).all { partName ->
+                    parsePackageFragment(metadata.getPackageFragment(packageName, partName)).isEmpty()
                 }
             }
 
@@ -110,7 +113,7 @@ internal class Info(output: KlibToolOutput, args: KlibToolArguments) : KlibToolC
         nonEmptyPackageFQNs.forEach { packageFQN ->
             output.appendLine("  $packageFQN")
         }
-        output.appendLine("Has IR: ${library.hasMainIr}")
+        output.appendLine("Has IR: ${library.ir != null}")
         val irInfo = KlibIrInfoLoader(library).loadIrInfo()
         irInfo?.preparedInlineFunctionCopyNumber?.let { output.appendLine("  Inlinable function copies: $it") }
         output.appendLine("Has LLVM bitcode: ${library.hasBitcode}")
@@ -130,23 +133,10 @@ internal class Info(output: KlibToolOutput, args: KlibToolArguments) : KlibToolC
         }
 
         private val KotlinLibrary.hasBitcode: Boolean
-            get() {
-                if (this is BitcodeLibrary) {
-                    val componentName = componentList.firstOrNull() ?: return false
-
-                    for (nativeTargetName in nativeTargets) {
-                        val nativeTarget = KonanTarget.predefinedTargets[nativeTargetName] ?: continue
-                        val targetedLibrary = createKonanLibrary(
-                            libraryFilePossiblyDenormalized = libraryFile,
-                            component = componentName,
-                            target = nativeTarget,
-                        )
-
-                        return targetedLibrary.bitcodePaths.isNotEmpty()
-                    }
-                }
-
-                return false
+            get() = nativeTargets.any { nativeTargetName ->
+                val nativeTarget = KonanTarget.predefinedTargets[nativeTargetName] ?: return@any false
+                val bitcode = bitcode(nativeTarget)
+                bitcode != null && bitcode.bitcodeFilePaths.isNotEmpty()
             }
 
         private fun KlibElementWithSize.renderTo(appendable: Appendable, indent: Int = 0) {
@@ -206,7 +196,8 @@ internal class DumpIrInlinableFunctions(output: KlibToolOutput, args: KlibToolAr
 
         if (!checkLibraryHasIr(library)) return
 
-        if (!library.hasInlinableFunsIr) {
+        val inlinableFunctionsIr = library.inlinableFunctionsIr
+        if (inlinableFunctionsIr == null) {
             output.appendLine("// No inlinable functions in ${library.libraryFile}")
             return
         }
@@ -224,7 +215,7 @@ internal class DumpIrInlinableFunctions(output: KlibToolOutput, args: KlibToolAr
         val irBuiltIns = IrBuiltInsOverDescriptors(module.builtIns, typeTranslator, symbolTable)
 
         val moduleDeserializer = NonLinkingIrInlineFunctionDeserializer.ModuleDeserializer(
-                library = library,
+                inlinableFunctionsIr = inlinableFunctionsIr,
                 detachedSymbolTable = symbolTable,
                 irInterner = IrInterningService(),
                 irBuiltIns = irBuiltIns,

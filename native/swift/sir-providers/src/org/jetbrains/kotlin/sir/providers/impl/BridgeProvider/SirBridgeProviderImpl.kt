@@ -8,7 +8,7 @@ package org.jetbrains.kotlin.sir.providers.impl.BridgeProvider
 import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.symbols.KaClassSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaNamedClassSymbol
-import org.jetbrains.kotlin.builtins.StandardNames.FqNames
+import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.sir.*
 import org.jetbrains.kotlin.sir.providers.*
 import org.jetbrains.kotlin.sir.providers.source.kaSymbolOrNull
@@ -28,14 +28,14 @@ private const val foundationHeader = "Foundation/Foundation.h"
 
 public class SirBridgeProviderImpl(private val session: SirSession, private val typeNamer: SirTypeNamer) : SirBridgeProvider {
     override fun generateTypeBridge(
-        kotlinFqName: List<String>,
+        kotlinFqName: FqName?,
         swiftFqName: String,
         swiftSymbolName: String,
     ): SirTypeBindingBridge? {
-        if (kotlinFqName in fqNamesExcludedFromTypeBinding) return null
+        if (kotlinFqName != null && session.isFqNameSupported(kotlinFqName)) return null
 
         val annotationName = "kotlin.native.internal.objc.BindClassToObjCName"
-        val kotlinFqName = kotlinFqName.joinToString(".")
+        val kotlinFqName = kotlinFqName?.asString() ?: ""
         return SirTypeBindingBridge(
             name = swiftFqName,
             kotlinFileAnnotation = "$annotationName($kotlinFqName::class, \"$swiftSymbolName\")"
@@ -46,7 +46,7 @@ public class SirBridgeProviderImpl(private val session: SirSession, private val 
         baseBridgeName: String,
         explicitParameters: List<SirParameter>,
         returnType: SirType,
-        kotlinFqName: List<String>,
+        kotlinFqName: FqName,
         selfParameter: SirParameter?,
         extensionReceiverParameter: SirParameter?,
         errorParameter: SirParameter?,
@@ -66,12 +66,12 @@ public class SirBridgeProviderImpl(private val session: SirSession, private val 
         BridgeFunctionDescriptor(
             baseBridgeName = baseBridgeName,
             parameters = explicitParameters.mapIndexed { index, value -> bridgeParameter(value, index) },
-            returnType = bridgeType(returnType),
+            returnType = bridgeReturnType(returnType),
             kotlinFqName = kotlinFqName,
             selfParameter = selfParameter?.let { bridgeParameter(it, 0) },
             extensionReceiverParameter = extensionReceiverParameter?.let { bridgeParameter(it, 0) },
             errorParameter = errorParameter?.let {
-                BridgeParameter(
+                BridgedParameter.InOut(
                     name = it.name!!.let(::createBridgeParameterName),
                     bridge = Bridge.AsOutError
                 )
@@ -101,7 +101,7 @@ internal fun isSupported(type: SirType): Boolean = when (type) {
 
 public interface BridgeFunctionBuilder {
     public val baseBridgeName: String
-    public val kotlinFqName: List<String>
+    public val kotlinFqName: FqName
     public val typeNamer: SirTypeNamer
 
     public val parameters: List<Any>
@@ -117,18 +117,18 @@ public interface BridgeFunctionBuilder {
 }
 
 public interface BridgeFunctionProxy {
-    public fun createSirBridge(kotlinCall: BridgeFunctionBuilder.() -> String): SirBridge
+    public fun createSirBridges(kotlinCall: BridgeFunctionBuilder.() -> String): List<SirBridge>
     public fun createSwiftInvocation(resultTransformer: ((String) -> String)?): List<String>
 }
 
 private class BridgeFunctionDescriptor(
     override val baseBridgeName: String,
-    override val parameters: List<BridgeParameter>,
-    override val returnType: Bridge,
-    override val kotlinFqName: List<String>,
-    override val selfParameter: BridgeParameter?,
-    override val extensionReceiverParameter: BridgeParameter?,
-    override val errorParameter: BridgeParameter?,
+    override val parameters: List<BridgedParameter>,
+    override val returnType: KotlinToSwiftBridge,
+    override val kotlinFqName: FqName,
+    override val selfParameter: BridgedParameter?,
+    override val extensionReceiverParameter: BridgedParameter?,
+    override val errorParameter: BridgedParameter.InOut?,
     override val isAsync: Boolean,
     override val typeNamer: SirTypeNamer,
 ) : BridgeFunctionBuilder, BridgeFunctionProxy {
@@ -138,12 +138,13 @@ private class BridgeFunctionDescriptor(
     val allParameters
         get() = listOfNotNull(selfParameter) + parameters + listOfNotNull(errorParameter) + listOfNotNull(asyncContinuationParameter)
 
-    val asyncContinuationParameter: BridgeParameter? = isAsync.ifTrue {
-        BridgeParameter(name = "continuation", bridge = Bridge.AsBlock(parameters = listOf(returnType), returnType = Bridge.AsVoid))
+    val asyncContinuationParameter: BridgedParameter? = isAsync.ifTrue {
+        require(returnType is Bridge)
+        BridgedParameter.In(name = "continuation", bridge = Bridge.AsBlock(parameters = listOf(returnType), returnType = Bridge.AsOutVoid))
     }
 
     override val name
-        get() = kotlinFqName.joinToString(separator = ".") { it.kotlinIdentifier }
+        get() = kotlinFqName.pathSegments().joinToString(separator = ".") { it.asString().kotlinIdentifier }
 
     override val argNames
         get() = buildList {
@@ -170,7 +171,7 @@ private class BridgeFunctionDescriptor(
                 "__${extensionReceiverParameter.name}.$safeImportName$args"
             }
         } else {
-            val memberName = kotlinFqName.last().kotlinIdentifier
+            val memberName = kotlinFqName.shortName().asString().kotlinIdentifier
             if (extensionReceiverParameter == null) {
                 "__${selfParameter.name}.$memberName$args"
             } else {
@@ -179,15 +180,20 @@ private class BridgeFunctionDescriptor(
         }
     }
 
-    override fun createSirBridge(kotlinCall: BridgeFunctionBuilder.() -> String) =
-        SirFunctionBridge(
-            name = baseBridgeName,
-            KotlinFunctionBridge(
-                createKotlinBridge(typeNamer, kotlinCall),
-                listOf(exportAnnotationFqName, cinterop, convertBlockPtrToKotlinFunction) + additionalImports()
-            ),
-            CFunctionBridge(listOf(cDeclaration()), listOf(foundationHeader, stdintHeader))
-        )
+    override fun createSirBridges(kotlinCall: BridgeFunctionBuilder.() -> String): List<SirBridge> {
+        return buildList {
+            add(
+                SirFunctionBridge(
+                    name = baseBridgeName,
+                    KotlinFunctionBridge(
+                        createKotlinBridge(typeNamer, kotlinCall),
+                        listOf(exportAnnotationFqName, cinterop, convertBlockPtrToKotlinFunction) + additionalImports()
+                    ),
+                    CFunctionBridge(listOf(cDeclaration()), listOf(foundationHeader, stdintHeader))
+                )
+            )
+        }
+    }
 
     override fun createSwiftInvocation(resultTransformer: ((String) -> String)?): List<String> = buildList {
         val descriptor = this@BridgeFunctionDescriptor
@@ -212,7 +218,7 @@ private class BridgeFunctionDescriptor(
 // problems with this approach are:
 // 1. there can be limit for declaration names in Clang compiler
 // 1. this name will be UGLY in the debug session
-private fun bridgeDeclarationName(bridgeName: String, parameterBridges: List<BridgeParameter>, typeNamer: SirTypeNamer): String {
+private fun bridgeDeclarationName(bridgeName: String, parameterBridges: List<BridgedParameter>, typeNamer: SirTypeNamer): String {
     val nameSuffixForOverloadSimulation = parameterBridges.joinToString(separator = "_") {
         typeNamer.swiftFqName(it.bridge.swiftType)
             .replace(".", "_")
@@ -318,7 +324,7 @@ private fun BridgeFunctionDescriptor.cDeclaration() = buildString {
 }
 
 private fun BridgeFunctionDescriptor.additionalImports(): List<String> = listOfNotNull(
-    (extensionReceiverParameter != null && selfParameter == null && kotlinFqName.size > 1).ifTrue {
+    (extensionReceiverParameter != null && selfParameter == null && !kotlinFqName.parent().isRoot).ifTrue {
         "$name as $safeImportName"
     },
     isAsync.ifTrue {
@@ -327,19 +333,4 @@ private fun BridgeFunctionDescriptor.additionalImports(): List<String> = listOfN
 )
 
 private val BridgeFunctionDescriptor.safeImportName: String
-    get() = kotlinFqName.run { if (size <= 1) single() else joinToString("_") { it.replace("_", "__") } }
-
-// These classes already have ObjC counterparts assigned statically in ObjC Export.
-private val fqNamesExcludedFromTypeBinding: List<List<String>> by lazy {
-    listOf(
-        FqNames.set,
-        FqNames.mutableSet,
-        FqNames.map,
-        FqNames.mutableList,
-        FqNames.list,
-        FqNames.mutableMap,
-        FqNames.string.toSafe()
-    ).map {
-        it.pathSegments().map { it.toString() }
-    }
-}
+    get() = kotlinFqName.pathSegments().joinToString(separator = "_") { it.asString().replace("_", "__") }

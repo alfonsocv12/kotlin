@@ -138,7 +138,7 @@ class FirElementSerializer private constructor(
             if (!declaration.isNotPrivateOrShouldBeSerialized(produceHeaderKlib)) return
             when (declaration) {
                 is FirProperty -> propertyProto(declaration)?.let { this.addProperty(it) }
-                is FirSimpleFunction -> functionProto(declaration)?.let { this.addFunction(it) }
+                is FirNamedFunction -> functionProto(declaration)?.let { this.addFunction(it) }
                 is FirTypeAlias -> typeAliasProto(declaration)?.let { this.addTypeAlias(it) }
                 else -> onUnsupportedDeclaration(declaration)
             }
@@ -265,7 +265,7 @@ class FirElementSerializer private constructor(
             }
             when (declaration) {
                 is FirProperty -> propertyProto(declaration)?.let { builder.addProperty(it) }
-                is FirSimpleFunction -> functionProto(declaration)?.let { builder.addFunction(it) }
+                is FirNamedFunction -> functionProto(declaration)?.let { builder.addFunction(it) }
                 is FirEnumEntry -> enumEntryProto(declaration).let { builder.addEnumEntry(it) }
                 else -> {}
             }
@@ -297,7 +297,8 @@ class FirElementSerializer private constructor(
                 builder.inlineClassUnderlyingPropertyName = getSimpleNameIndex(representation.underlyingPropertyName)
 
                 val property = callableMembers.single {
-                    it is FirProperty && it.receiverParameter == null && it.name == representation.underlyingPropertyName
+                    it is FirProperty && it.receiverParameter == null && it.contextParameters.isEmpty() &&
+                            it.name == representation.underlyingPropertyName
                 }
 
                 if (!property.visibility.isPublicAPI) {
@@ -403,7 +404,7 @@ class FirElementSerializer private constructor(
                         propertyProto(declaration)?.let { builder.addProperty(it) }
                     }
                 }
-                is FirSimpleFunction -> functionProto(declaration)?.let { builder.addFunction(it) }
+                is FirNamedFunction -> functionProto(declaration)?.let { builder.addFunction(it) }
                 else -> {}
             }
         }
@@ -466,7 +467,7 @@ class FirElementSerializer private constructor(
             val declaration = statement as? FirDeclaration ?: continue
             when (declaration) {
                 is FirProperty -> propertyProto(declaration)?.let { builder.addProperty(it) }
-                is FirSimpleFunction -> functionProto(declaration)?.let { builder.addFunction(it) }
+                is FirNamedFunction -> functionProto(declaration)?.let { builder.addFunction(it) }
                 is FirRegularClass -> builder.addNestedClassName(getSimpleNameIndex(declaration.name))
                 is FirTypeAlias -> typeAliasProto(declaration)?.let { builder.addTypeAlias(it) }
                 else -> {}
@@ -720,24 +721,24 @@ class FirElementSerializer private constructor(
 
     fun functionProto(function: FirFunction): ProtoBuf.Function.Builder? = whileAnalysing(session, function) {
         val builder = ProtoBuf.Function.newBuilder()
-        val simpleFunction = function as? FirSimpleFunction
+        val namedFunction = function as? FirNamedFunction
 
         val local = createChildSerializer(function)
 
         val flags = Flags.getFunctionFlags(
             function.nonSourceAnnotations(session).isNotEmpty() || extension.hasAdditionalAnnotations(function),
-            ProtoEnumFlags.visibility(simpleFunction?.let { normalizeVisibility(it) } ?: Visibilities.Local),
-            ProtoEnumFlags.modality(simpleFunction?.modality ?: Modality.FINAL),
+            ProtoEnumFlags.visibility(namedFunction?.let { normalizeVisibility(it) } ?: Visibilities.Local),
+            ProtoEnumFlags.modality(namedFunction?.modality ?: Modality.FINAL),
             function.memberKind(),
-            simpleFunction?.isOperator == true,
-            simpleFunction?.isInfix == true,
-            simpleFunction?.isInline == true,
-            simpleFunction?.isTailRec == true,
-            simpleFunction?.isExternal == true,
+            namedFunction?.isOperator == true,
+            namedFunction?.isInfix == true,
+            namedFunction?.isInline == true,
+            namedFunction?.isTailRec == true,
+            namedFunction?.isExternal == true,
             function.isSuspend,
-            simpleFunction?.isExpect == true,
+            namedFunction?.isExpect == true,
             shouldSetStableParameterNames(function),
-            ProtoEnumFlags.returnValueStatus(simpleFunction?.status?.returnValueStatus),
+            ProtoEnumFlags.returnValueStatus(namedFunction?.status?.returnValueStatus),
         )
 
         if (flags != builder.flags) {
@@ -745,7 +746,7 @@ class FirElementSerializer private constructor(
         }
 
         val name = when (function) {
-            is FirSimpleFunction -> {
+            is FirNamedFunction -> {
                 function.name
             }
             is FirAnonymousFunction -> {
@@ -874,6 +875,10 @@ class FirElementSerializer private constructor(
                 builder.addVersionRequirement(
                     writeLanguageVersionRequirement(LanguageFeature.DefinitelyNonNullableTypes, versionRequirementTable)
                 )
+            }
+
+            if (typeAlias.classId.isNestedClass) {
+                builder.addVersionRequirement(writeLanguageVersionRequirement(LanguageFeature.NestedTypeAliases, versionRequirementTable))
             }
         }
 
@@ -1334,7 +1339,7 @@ class FirElementSerializer private constructor(
     }
 
     private fun isDefaultAccessor(accessor: FirPropertyAccessor, property: FirProperty): Boolean {
-        if (property.isLocal) return true
+        if (property.symbol is FirLocalPropertySymbol) return true
 
         // [FirDefaultPropertyAccessor]---a property accessor without body---can still hold other information, such as annotations,
         // user-contributed visibility, and modifiers, such as `external` or `inline`.

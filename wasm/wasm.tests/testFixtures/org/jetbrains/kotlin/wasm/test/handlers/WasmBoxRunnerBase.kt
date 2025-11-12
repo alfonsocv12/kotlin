@@ -9,6 +9,7 @@ import org.jetbrains.kotlin.test.DebugMode
 import org.jetbrains.kotlin.test.InTextDirectivesUtils
 import org.jetbrains.kotlin.test.directives.WasmEnvironmentConfigurationDirectives.RUN_UNIT_TESTS
 import org.jetbrains.kotlin.test.directives.WasmEnvironmentConfigurationDirectives.USE_NEW_EXCEPTION_HANDLING_PROPOSAL
+import org.jetbrains.kotlin.test.directives.WasmEnvironmentConfigurationDirectives.WASM_NO_JS_TAG
 import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.test.services.moduleStructure
 import org.jetbrains.kotlin.wasm.test.tools.WasmVM
@@ -17,7 +18,6 @@ import java.io.File
 abstract class WasmBoxRunnerBase(
     testServices: TestServices
 ) : AbstractWasmArtifactsCollector(testServices) {
-    internal abstract val vmsToCheck: List<WasmVM>
 
     protected fun saveAdditionalFilesAndRun(
         outputDir: File,
@@ -33,7 +33,11 @@ abstract class WasmBoxRunnerBase(
 
         fun File.ignoreInSizeChecks() = also { filesToIgnoreInSizeChecks.add(it) }
 
+        val isNoJsTag = WASM_NO_JS_TAG in testServices.moduleStructure.allDirectives
+
         val testJs = """
+                    ${if (isNoJsTag) "import './tag.mjs'" else ""}
+                    import * as jsModule from './index.mjs'
                     if (globalThis.console == null) {
                         globalThis.console = {};
                     }
@@ -42,8 +46,6 @@ abstract class WasmBoxRunnerBase(
                     }
                     let actualResult;
                     try {
-                        // Use "dynamic import" to catch exception happened during JS & Wasm modules initialization
-                        let jsModule = await import('./index.mjs');
                         ${if (startUnitTests) "jsModule.startUnitTests();" else ""}
                         actualResult = jsModule.box();
                     } catch(e) {
@@ -65,6 +67,12 @@ abstract class WasmBoxRunnerBase(
 
                     ${if (debugMode >= DebugMode.DEBUG) "console.log('test passed');" else ""}                        
                 """.trimIndent()
+
+        if (isNoJsTag) {
+            File(outputDir, "tag.mjs")
+                .ignoreInSizeChecks()
+                .writeText("delete WebAssembly.JSTag;")
+        }
 
         File(outputDir, "test.mjs")
             .ignoreInSizeChecks()
@@ -119,7 +127,7 @@ abstract class WasmBoxRunnerBase(
 
         val useNewExceptionProposal = USE_NEW_EXCEPTION_HANDLING_PROPOSAL in testServices.moduleStructure.allDirectives
 
-        return vmsToCheck
+        return listOf(WasmVM.V8, WasmVM.SpiderMonkey, WasmVM.JavaScriptCore)
             .mapNotNull { vm ->
                 vm.runWithCaughtExceptions(
                     debugMode = debugMode,

@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.builtins.functions.FunctionTypeKind
 import org.jetbrains.kotlin.config.ApiVersion
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.config.LanguageVersionSettings
+import org.jetbrains.kotlin.config.MavenComparableVersion
 import org.jetbrains.kotlin.contracts.description.EventOccurrencesRange
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.EffectiveVisibility
@@ -202,6 +203,7 @@ object DIAGNOSTICS_LIST : DiagnosticList("FirErrors") {
         ) {
             parameter<ConeKotlinType>("type")
         }
+        val ROOT_IDE_PACKAGE_DEPRECATED by warning<PsiElement>(PositioningStrategy.DEFAULT)
     }
 
     val CALL_RESOLUTION by object : DiagnosticGroup("Call resolution") {
@@ -238,6 +240,12 @@ object DIAGNOSTICS_LIST : DiagnosticList("FirErrors") {
         }
         val SELF_CALL_IN_NESTED_OBJECT_CONSTRUCTOR_ERROR by error<PsiElement>()
         val UNSUPPORTED_COLLECTION_LITERAL_TYPE by error<PsiElement>()
+        val IMPLICIT_PROPERTY_TYPE_MAKES_BEHAVIOR_ORDER_DEPENDANT by warning<KtExpression>(PositioningStrategy.REFERENCED_NAME_BY_QUALIFIED) {
+            parameter<FirPropertySymbol>("property")
+        }
+        val IMPLICIT_PROPERTY_TYPE_MAKES_BEHAVIOR_ORDER_DEPENDANT_ERROR by error<KtExpression>(PositioningStrategy.REFERENCED_NAME_BY_QUALIFIED) {
+            parameter<FirPropertySymbol>("property")
+        }
     }
 
     val SUPER by object : DiagnosticGroup("Super") {
@@ -245,7 +253,7 @@ object DIAGNOSTICS_LIST : DiagnosticList("FirErrors") {
         val SUPER_NOT_AVAILABLE by error<PsiElement>(PositioningStrategy.REFERENCED_NAME_BY_QUALIFIED)
         val ABSTRACT_SUPER_CALL by error<PsiElement>(PositioningStrategy.REFERENCED_NAME_BY_QUALIFIED)
         val ABSTRACT_SUPER_CALL_WARNING by warning<PsiElement>(PositioningStrategy.REFERENCED_NAME_BY_QUALIFIED)
-        val INSTANCE_ACCESS_BEFORE_SUPER_CALL by error<PsiElement> {
+        val INSTANCE_ACCESS_BEFORE_SUPER_CALL by error<PsiElement>(PositioningStrategy.REFERENCED_NAME_BY_QUALIFIED) {
             parameter<String>("target")
         }
         val SUPER_CALL_WITH_DEFAULT_PARAMETERS by error<PsiElement> {
@@ -386,6 +394,13 @@ object DIAGNOSTICS_LIST : DiagnosticList("FirErrors") {
         val OVERRIDE_DEPRECATION by warning<KtNamedDeclaration>(PositioningStrategy.DECLARATION_NAME) {
             parameter<Symbol>("overridenSymbol")
             parameter<FirDeprecationInfo>("deprecationInfo")
+        }
+
+        val EXTENDING_AN_ANNOTATION_CLASS by deprecationError<PsiElement>(
+            LanguageFeature.ProhibitExtendingAnnotationClasses,
+            PositioningStrategy.DECLARATION_SIGNATURE_OR_DEFAULT,
+        ) {
+            parameter<FirRegularClassSymbol>("annotationSymbol")
         }
 
         val TYPEALIAS_EXPANSION_DEPRECATION_ERROR by error<PsiElement>(PositioningStrategy.DEPRECATION) {
@@ -876,10 +891,10 @@ object DIAGNOSTICS_LIST : DiagnosticList("FirErrors") {
         val UNSUPPORTED_CONTEXTUAL_DECLARATION_CALL by error<KtElement>(PositioningStrategy.NAME_IDENTIFIER)
         val AMBIGUOUS_CALL_WITH_IMPLICIT_CONTEXT_RECEIVER by error<KtElement>(PositioningStrategy.REFERENCE_BY_QUALIFIED)
         val SUBTYPING_BETWEEN_CONTEXT_RECEIVERS by error<KtElement>(PositioningStrategy.DEFAULT)
-        val CONTEXT_RECEIVERS_DEPRECATED by warning<KtElement>(PositioningStrategy.CONTEXT_KEYWORD) {
+        val CONTEXT_RECEIVERS_DEPRECATED by error<KtElement>(PositioningStrategy.CONTEXT_KEYWORD) {
             parameter<String>("message")
         }
-        val CONTEXT_CLASS_OR_CONSTRUCTOR by warning<KtElement>(PositioningStrategy.CONTEXT_KEYWORD)
+        val CONTEXT_CLASS_OR_CONSTRUCTOR by error<KtElement>(PositioningStrategy.CONTEXT_KEYWORD)
     }
 
     val TYPES_AND_TYPE_PARAMETERS by object : DiagnosticGroup("Types & type parameters") {
@@ -2044,6 +2059,7 @@ object DIAGNOSTICS_LIST : DiagnosticList("FirErrors") {
         val NOT_YET_SUPPORTED_IN_INLINE by error<KtDeclaration>(PositioningStrategy.NOT_SUPPORTED_IN_INLINE_MOST_RELEVANT) {
             parameter<String>("message")
         }
+        val NOT_YET_SUPPORTED_IN_INLINE_WARNING by warning<KtDeclaration>(PositioningStrategy.NOT_SUPPORTED_IN_INLINE_MOST_RELEVANT)
 
         val NOTHING_TO_INLINE by warning<KtDeclaration>(PositioningStrategy.NOT_SUPPORTED_IN_INLINE_MOST_RELEVANT)
 
@@ -2175,6 +2191,15 @@ object DIAGNOSTICS_LIST : DiagnosticList("FirErrors") {
             parameter<Name>("name")
         }
 
+        val FUNCTION_TYPE_OF_TOO_LARGE_ARITY by error<KtElement>(PositioningStrategy.IMPORT_LAST_NAME) {
+            parameter<ClassId>("classId")
+            parameter<Int>("maxArity")
+        }
+        val K_SUSPEND_FUNCTION_TYPE_OF_DANGEROUSLY_LARGE_ARITY by warning<KtElement>(PositioningStrategy.IMPORT_LAST_NAME) {
+            parameter<ClassId>("classId")
+            parameter<Int>("maxArity")
+        }
+
         val OPERATOR_RENAMED_ON_IMPORT by error<KtImportDirective>(PositioningStrategy.IMPORT_LAST_NAME)
 
         val TYPEALIAS_AS_CALLABLE_QUALIFIER_IN_IMPORT by deprecationError<KtImportDirective>(
@@ -2246,6 +2271,28 @@ object DIAGNOSTICS_LIST : DiagnosticList("FirErrors") {
             parameter<Name>("typeParameterName")
             parameter<Name>("containingDeclarationName")
         }
+    }
+
+    val VERSION_OVERLOADS by object : DiagnosticGroup("Version Overloads") {
+        val INVALID_VERSIONING_ON_NON_OPTIONAL by error<PsiElement>()
+        val INVALID_VERSIONING_ON_NONFINAL_FUNCTION by error<PsiElement>()
+        val INVALID_VERSIONING_ON_NONFINAL_CLASS by error<PsiElement>()
+        val INVALID_VERSIONING_ON_LOCAL_FUNCTION by error<PsiElement>()
+        val INVALID_VERSIONING_ON_ANNOTATION_CLASS by error<PsiElement>()
+        val INVALID_DEFAULT_VALUE_DEPENDENCY by error<PsiElement>() {
+            parameter<MavenComparableVersion?>("lowestVersion")
+            parameter<MavenComparableVersion?>("highestVersion")
+        }
+        val INVALID_NON_OPTIONAL_PARAMETER_POSITION by error<PsiElement>()
+        val INVALID_VERSIONING_ON_RECEIVER_OR_CONTEXT_PARAMETER_POSITION by error<PsiElement>()
+        val INVALID_VERSIONING_ON_VARARG by error<PsiElement>()
+        val INVALID_VERSIONING_ON_VALUE_CLASS_PARAMETER by error<PsiElement>()
+        val NON_ASCENDING_VERSION_ANNOTATION by error<PsiElement> {
+            parameter<MavenComparableVersion?>("lowestVersion")
+            parameter<MavenComparableVersion?>("highestVersion")
+            parameter<FirCallableSymbol<*>>("sourceOfHighestVersion")
+        }
+        val VERSION_OVERLOADS_TOO_COMPLEX_EXPRESSION by error<PsiElement>()
     }
 }
 

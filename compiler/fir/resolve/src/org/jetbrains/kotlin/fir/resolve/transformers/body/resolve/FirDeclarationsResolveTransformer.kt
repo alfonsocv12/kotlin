@@ -9,8 +9,10 @@ import org.jetbrains.kotlin.KtFakeSourceElementKind
 import org.jetbrains.kotlin.KtSourceElement
 import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.builtins.functions.FunctionTypeKind
+import org.jetbrains.kotlin.config.AnalysisFlags
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.descriptors.ClassKind
+import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.descriptors.Visibility
 import org.jetbrains.kotlin.fakeElement
 import org.jetbrains.kotlin.fir.*
@@ -22,7 +24,6 @@ import org.jetbrains.kotlin.fir.declarations.synthetic.FirSyntheticProperty
 import org.jetbrains.kotlin.fir.declarations.utils.hasExplicitBackingField
 import org.jetbrains.kotlin.fir.declarations.utils.isConst
 import org.jetbrains.kotlin.fir.declarations.utils.isInline
-import org.jetbrains.kotlin.fir.declarations.utils.isLocal
 import org.jetbrains.kotlin.fir.declarations.utils.isScriptTopLevelDeclaration
 import org.jetbrains.kotlin.fir.diagnostics.ConeSimpleDiagnostic
 import org.jetbrains.kotlin.fir.diagnostics.DiagnosticKind
@@ -48,7 +49,8 @@ import org.jetbrains.kotlin.fir.resolve.transformers.FirStatusResolver
 import org.jetbrains.kotlin.fir.resolve.transformers.contracts.runContractResolveForFunction
 import org.jetbrains.kotlin.fir.resolve.transformers.transformVarargTypeToArrayType
 import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirLocalPropertySymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirRegularPropertySymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirValueParameterSymbol
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.builder.buildErrorTypeRef
@@ -144,7 +146,7 @@ open class FirDeclarationsResolveTransformer(
 
         // script top level destructuring declaration container variables should be treated as properties here
         // to avoid CFG/DFA complications
-        if (property.isLocal && property.origin != FirDeclarationOrigin.Synthetic.ScriptTopLevelDestructuringDeclarationContainer) {
+        if (property.symbol is FirLocalPropertySymbol && property.origin != FirDeclarationOrigin.Synthetic.ScriptTopLevelDestructuringDeclarationContainer) {
             // approximation is required for properties in snippets because they may "leak" to the next snippet
             // it is also reflects the current script behavior (in contrast to a local context), i.e. the code
             // `val x = object { val v = 42 }; x.v`
@@ -377,7 +379,7 @@ open class FirDeclarationsResolveTransformer(
         // First, resolve delegate expression in dependent context withing existing (possibly Default) inference session
         val delegateExpression =
             // Resolve delegate expression; after that, delegate will contain either expr.provideDelegate or expr
-            if (property.isLocal) {
+            if (property.isLocalVariableOrParameter) {
                 transformDelegateExpression(delegateContainer)
             } else {
                 // TODO: the [skipCleanup] hack should be reverted on fixing KT-79107
@@ -497,7 +499,7 @@ open class FirDeclarationsResolveTransformer(
                     typeRef.approximateDeclarationType(
                         session,
                         property.visibilityForApproximation(),
-                        property.isLocal
+                        property.isLocalVariableOrParameter
                     )
                 )
 
@@ -641,7 +643,7 @@ open class FirDeclarationsResolveTransformer(
     }
 
     private fun transformLocalVariable(variable: FirProperty): FirProperty = whileAnalysing(session, variable) {
-        assert(variable.isLocal)
+        assert(variable.isLocalVariableOrParameter)
         val delegate = variable.delegate
 
         val hadExplicitType = variable.returnTypeRef !is FirImplicitTypeRef
@@ -703,6 +705,18 @@ open class FirDeclarationsResolveTransformer(
         }
 
         resolveSetter(mayResolveSetterBody, shouldResolveEverything)
+
+        /*
+         * We need the getter body in the `storeVariableReturnType`, so we remove bodies
+         * for accessors when they both are resolved
+         */
+        if (
+            session.languageVersionSettings.getFlag(AnalysisFlags.headerMode) &&
+            !this.isLocal && !this.isInline
+        ) {
+            getter?.replaceBody(newBody = null)
+            setter?.replaceBody(newBody = null)
+        }
     }
 
     private fun FirProperty.resolveGetter(shouldResolveEverything: Boolean) {
@@ -963,37 +977,37 @@ open class FirDeclarationsResolveTransformer(
         }
     }
 
-    override fun transformSimpleFunction(
-        simpleFunction: FirSimpleFunction,
+    override fun transformNamedFunction(
+        namedFunction: FirNamedFunction,
         data: ResolutionMode
-    ): FirSimpleFunction = whileAnalysing(session, simpleFunction) {
+    ): FirNamedFunction = whileAnalysing(session, namedFunction) {
         val shouldResolveEverything = !implicitTypeOnly
-        val returnTypeRef = simpleFunction.returnTypeRef
+        val returnTypeRef = namedFunction.returnTypeRef
         if ((returnTypeRef !is FirImplicitTypeRef) && implicitTypeOnly) {
-            return simpleFunction
+            return namedFunction
         }
 
         val containingDeclaration = context.containerIfAny
-        return context.withSimpleFunction(simpleFunction, session) {
+        return context.withNamedFunction(namedFunction, session) {
             // this is required to resolve annotations on functions of local classes
             if (shouldResolveEverything) {
-                simpleFunction.transformReceiverParameter(this, data)
-                doTransformTypeParameters(simpleFunction)
+                namedFunction.transformReceiverParameter(this, data)
+                doTransformTypeParameters(namedFunction)
             }
 
-            if (containingDeclaration != null && containingDeclaration !is FirClass && containingDeclaration !is FirFile && (containingDeclaration !is FirScript || simpleFunction.isLocal)) {
+            if (containingDeclaration != null && containingDeclaration !is FirClass && containingDeclaration !is FirFile && (containingDeclaration !is FirScript || namedFunction.status.visibility == Visibilities.Local)) {
                 // For class members everything should be already prepared
-                prepareSignatureForBodyResolve(simpleFunction)
-                simpleFunction.transformStatus(this, simpleFunction.resolveStatus().mode())
+                prepareSignatureForBodyResolve(namedFunction)
+                namedFunction.transformStatus(this, namedFunction.resolveStatus().mode())
 
-                if (simpleFunction.contractDescription != null) {
-                    simpleFunction.runContractResolveForFunction(session, scopeSession, context)
+                if (namedFunction.contractDescription != null) {
+                    namedFunction.runContractResolveForFunction(session, scopeSession, context)
                 }
             }
 
-            context.forFunctionBody(simpleFunction, components) {
+            context.forFunctionBody(namedFunction, components) {
                 withFullBodyResolve {
-                    transformFunctionWithGivenSignature(simpleFunction, shouldResolveEverything = shouldResolveEverything)
+                    transformFunctionWithGivenSignature(namedFunction, shouldResolveEverything = shouldResolveEverything)
                 }
             }
         }
@@ -1009,7 +1023,7 @@ open class FirDeclarationsResolveTransformer(
 
         val body = result.body
         if (result.returnTypeRef is FirImplicitTypeRef) {
-            val simpleFunction = function as? FirSimpleFunction
+            val namedFunction = function as? FirNamedFunction
             val returnExpression = (body?.statements?.singleOrNull() as? FirReturnExpression)?.result
             val expressionType = returnExpression?.resolvedType
             val newSource = result.returnTypeRef.source
@@ -1021,15 +1035,15 @@ open class FirDeclarationsResolveTransformer(
                     if (context.containers.getOrNull(context.containers.size - 2) is FirReplSnippet)
                         approximateDeclarationType(
                             session,
-                            simpleFunction?.visibilityForApproximation(),
-                            isLocal = false, isInlineFunction = simpleFunction?.isInline == true
+                            namedFunction?.visibilityForApproximation(),
+                            isLocal = false, isInlineFunction = namedFunction?.isInline == true
                         )
                     else
                         approximateDeclarationType(
                             session,
-                            simpleFunction?.visibilityForApproximation(),
-                            isLocal = simpleFunction?.isLocal == true,
-                            isInlineFunction = simpleFunction?.isInline == true
+                            namedFunction?.visibilityForApproximation(),
+                            isLocal = namedFunction?.let { it.status.visibility == Visibilities.Local } == true,
+                            isInlineFunction = namedFunction?.isInline == true
                         )
                 }
                 ?: buildErrorTypeRef {
@@ -1037,6 +1051,15 @@ open class FirDeclarationsResolveTransformer(
                     diagnostic = ConeSimpleDiagnostic("empty body", DiagnosticKind.Other)
                 }
             result.transformReturnTypeRef(transformer, ResolutionMode.UpdateImplicitTypeRef(returnTypeRef))
+        }
+        if (
+            session.languageVersionSettings.getFlag(AnalysisFlags.headerMode) &&
+            function !is FirPropertyAccessor && // property accessors are processed in `resolveAccessors`
+            !function.isInline &&
+            !function.isLocal
+        ) {
+            // Header mode: once the return type for non-inline function is known, the body can be removed.
+            result.replaceBody(null)
         }
 
         return result
@@ -1302,11 +1325,7 @@ open class FirDeclarationsResolveTransformer(
                         symbol = FirValueParameterSymbol()
                         returnTypeRef = receiverType
                             .toFirResolvedTypeRef(lambda.source?.fakeElement(KtFakeSourceElementKind.LambdaContextParameter))
-                        valueParameterKind = if (LanguageFeature.ContextParameters.isEnabled()) {
-                            FirValueParameterKind.ContextParameter
-                        } else {
-                            FirValueParameterKind.LegacyContextReceiver
-                        }
+                        valueParameterKind = FirValueParameterKind.ContextParameter
                     }
                 }.orEmpty()
         )
@@ -1579,7 +1598,7 @@ open class FirDeclarationsResolveTransformer(
 
             val newTypeRef: FirResolvedTypeRef = resultType?.let {
                 val expectedType = it.toExpectedTypeRef(fallbackSource = variable.source)
-                expectedType.approximateDeclarationType(session, variable.visibilityForApproximation(), variable.isLocal)
+                expectedType.approximateDeclarationType(session, variable.visibilityForApproximation(), variable.isLocalVariableOrParameter)
             } ?: buildErrorTypeRef {
                 diagnostic = ConeLocalVariableNoTypeOrInitializer(variable)
                 source = variable.source
@@ -1591,10 +1610,10 @@ open class FirDeclarationsResolveTransformer(
         }
     }
 
-    private val FirVariable.isLocal: Boolean
-        get() = when (val symbol = symbol) {
+    private val FirVariable.isLocalVariableOrParameter: Boolean
+        get() = when (symbol) {
             is FirValueParameterSymbol -> true
-            is FirPropertySymbol -> symbol.isLocal
+            is FirLocalPropertySymbol -> true
             else -> false
         }
 

@@ -512,6 +512,18 @@ val actualCommonCompilerArguments by compilerArgumentsLevel(CompilerArgumentsLev
 
 
     compilerArgument {
+        name = "Xverify-ir-nested-offsets"
+        description =
+            "Check that offsets of nested IR elements conform to offsets of their containers. Only has effect if '-Xverify-ir' is not 'none'.".asReleaseDependent()
+        valueType = BooleanType.defaultFalse
+
+        lifecycle(
+            introducedVersion = KotlinReleaseVersion.v2_3_20,
+        )
+    }
+
+
+    compilerArgument {
         name = "Xprofile-phases"
         description = "Profile backend phases.".asReleaseDependent()
         valueType = BooleanType.defaultFalse
@@ -989,6 +1001,19 @@ The argument should be used only if the new compilation scheme is enabled with -
         )
     }
 
+    compilerArgument {
+        name = "Xlocal-type-aliases"
+        description = "Enable experimental language support for local type aliases.".asReleaseDependent()
+        valueType = BooleanType.defaultFalse
+
+        additionalAnnotations(
+            Enables(LanguageFeature.LocalTypeAliases)
+        )
+
+        lifecycle(
+            introducedVersion = KotlinReleaseVersion.v2_3_0,
+        )
+    }
 
     compilerArgument {
         name = "Xsuppress-warning"
@@ -1165,6 +1190,35 @@ Warning: this flag is not intended for production use. If you want to configure 
         delimiter = KotlinCompilerArgument.Delimiter.None
         lifecycle(
             introducedVersion = KotlinReleaseVersion.v1_0_0
+        )
+    }
+
+    compilerArgument {
+        name = "Xheader-mode"
+        description = """
+                Enable header compilation mode.
+                In this mode, the compiler produces class files that only contain the 'skeleton' of the classes to be
+                compiled but the method bodies of all the implementations are empty.  This is used to speed up parallel compilation
+                build systems where header libraries can be used to replace downstream dependencies for which we only need to
+                see the type names and method signatures required to compile a given translation unit. Inline functions are still kept
+                with bodies.
+                """.trimIndent().asReleaseDependent()
+        valueType = BooleanType.defaultFalse
+
+        lifecycle(
+            introducedVersion = KotlinReleaseVersion.v2_3_20
+        )
+    }
+
+    compilerArgument {
+        name = "Xdont-sort-source-files"
+        description = """
+            Disable automatic sorting of source files.
+        """.trimIndent().asReleaseDependent()
+        valueType = BooleanType.defaultFalse
+
+        lifecycle(
+            introducedVersion = KotlinReleaseVersion.v2_3_20
         )
     }
 }

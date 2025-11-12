@@ -39,12 +39,11 @@ fun TestConfigurationBuilder.configureSteppingTests() {
     }
 }
 
-fun TestConfigurationBuilder.configureJsTypeScriptExportTest() {
+fun TestConfigurationBuilder.configureJsTypeScriptExportTest(expectedDtsSuffix: String? = null) {
     defaultDirectives {
         +JsEnvironmentConfigurationDirectives.GENERATE_DTS
-        if (getBoolean("kotlin.js.updateReferenceDtsFiles")) +JsEnvironmentConfigurationDirectives.UPDATE_REFERENCE_DTS_FILES
     }
     configureJsArtifactsHandlersStep {
-        useHandlers(::JsDtsHandler)
+        useHandlers(::JsDtsHandler.bind(expectedDtsSuffix))
     }
 }

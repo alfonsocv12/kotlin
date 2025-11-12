@@ -45,13 +45,7 @@ object CodegenTestDirectives : SimpleDirectivesContainer() {
 
     val IGNORE_HMPP by enumDirective<TargetBackend>("Ignore test in HMPP setup")
 
-    val USE_JAVAC_BASED_ON_JVM_TARGET by directive(
-        description = """
-            Determine version of javac for compilation of java files based
-              on JvmTarget of module. If not enabled then javac from
-              current runtime will be used
-        """.trimIndent()
-    )
+    val IGNORE_ANALYSIS_API_BASED_TYPESCRIPT_EXPORT by enumDirective<TargetBackend>("Ignore failures of the new AA-based TypeScript Export")
 
     val JAVAC_OPTIONS by stringDirective(
         description = "Specify javac options to compile java files"
@@ -235,14 +229,13 @@ object CodegenTestDirectives : SimpleDirectivesContainer() {
         """.trimIndent()
     )
 
-    val JVM_ABI_K1_K2_DIFF by stringDirective(
-        description = "Expect difference in JVM ABI between K1 and K2",
-        applicability = Global
+    // TODO: Drop this directive and make the offset validation enabled by default when KT-81475 is fixed.
+    val ENABLE_IR_NESTED_OFFSETS_CHECKS by stringDirective(
+        description = "Enables validation of the nested IR elements offsets"
     )
 
-    val IGNORE_JVM_ABI_K1_K2 by stringDirective(
-        description = "Ignore failures when running pipelines when computing difference in JVM ABI between K1 and K2",
-        applicability = Global
+    val DISABLE_IR_NESTED_OFFSETS_CHECKS by enumDirective<TargetBackend>(
+        description = "Disabled validation of the nested IR elements offsets on the target backend"
     )
 
     val DISABLE_IR_VISIBILITY_CHECKS by enumDirective<TargetBackend>(

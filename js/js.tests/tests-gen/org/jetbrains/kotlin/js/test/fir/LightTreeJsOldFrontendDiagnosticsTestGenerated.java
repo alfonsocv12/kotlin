@@ -213,6 +213,12 @@ public class LightTreeJsOldFrontendDiagnosticsTestGenerated extends AbstractLigh
     }
 
     @Test
+    @TestMetadata("inheritedDefaultValueLegacy.kt")
+    public void testInheritedDefaultValueLegacy() {
+      runTest("compiler/testData/diagnostics/testsWithJsStdLib/defaultArguments/inheritedDefaultValueLegacy.kt");
+    }
+
+    @Test
     @TestMetadata("inheritedDefaultValueWithIntersectionOverride.kt")
     public void testInheritedDefaultValueWithIntersectionOverride() {
       runTest("compiler/testData/diagnostics/testsWithJsStdLib/defaultArguments/inheritedDefaultValueWithIntersectionOverride.kt");
@@ -569,6 +575,18 @@ public class LightTreeJsOldFrontendDiagnosticsTestGenerated extends AbstractLigh
     }
 
     @Test
+    @TestMetadata("exportableSuspendFunctions.kt")
+    public void testExportableSuspendFunctions() {
+      runTest("compiler/testData/diagnostics/testsWithJsStdLib/export/exportableSuspendFunctions.kt");
+    }
+
+    @Test
+    @TestMetadata("exportedFileWithExportableSuspendFunctions.kt")
+    public void testExportedFileWithExportableSuspendFunctions() {
+      runTest("compiler/testData/diagnostics/testsWithJsStdLib/export/exportedFileWithExportableSuspendFunctions.kt");
+    }
+
+    @Test
     @TestMetadata("extendingNonExportedType.kt")
     public void testExtendingNonExportedType() {
       runTest("compiler/testData/diagnostics/testsWithJsStdLib/export/extendingNonExportedType.kt");
@@ -665,21 +683,15 @@ public class LightTreeJsOldFrontendDiagnosticsTestGenerated extends AbstractLigh
     }
 
     @Test
-    @TestMetadata("wrongExportedDeclarationInExportedFileWithExportableSuspendFunctions.kt")
-    public void testWrongExportedDeclarationInExportedFileWithExportableSuspendFunctions() {
-      runTest("compiler/testData/diagnostics/testsWithJsStdLib/export/wrongExportedDeclarationInExportedFileWithExportableSuspendFunctions.kt");
+    @TestMetadata("wrongExportedDeclarationInExportedFileWithNonExportableSuspendFunctions.kt")
+    public void testWrongExportedDeclarationInExportedFileWithNonExportableSuspendFunctions() {
+      runTest("compiler/testData/diagnostics/testsWithJsStdLib/export/wrongExportedDeclarationInExportedFileWithNonExportableSuspendFunctions.kt");
     }
 
     @Test
-    @TestMetadata("wrongExportedDeclarationWithExportableSuspendFunctions.kt")
-    public void testWrongExportedDeclarationWithExportableSuspendFunctions() {
-      runTest("compiler/testData/diagnostics/testsWithJsStdLib/export/wrongExportedDeclarationWithExportableSuspendFunctions.kt");
-    }
-
-    @Test
-    @TestMetadata("wrongExportedDeclarationWithoutExportableSuspendFunctions.kt")
-    public void testWrongExportedDeclarationWithoutExportableSuspendFunctions() {
-      runTest("compiler/testData/diagnostics/testsWithJsStdLib/export/wrongExportedDeclarationWithoutExportableSuspendFunctions.kt");
+    @TestMetadata("wrongExportedDeclarationWithNonExportableSuspendFunctions.kt")
+    public void testWrongExportedDeclarationWithNonExportableSuspendFunctions() {
+      runTest("compiler/testData/diagnostics/testsWithJsStdLib/export/wrongExportedDeclarationWithNonExportableSuspendFunctions.kt");
     }
   }
 
@@ -718,6 +730,22 @@ public class LightTreeJsOldFrontendDiagnosticsTestGenerated extends AbstractLigh
     @TestMetadata("nestedTypealias.kt")
     public void testNestedTypealias() {
       runTest("compiler/testData/diagnostics/testsWithJsStdLib/jsCode/nestedTypealias.kt");
+    }
+  }
+
+  @Nested
+  @TestMetadata("compiler/testData/diagnostics/testsWithJsStdLib/jsSymbol")
+  @TestDataPath("$PROJECT_ROOT")
+  public class JsSymbol {
+    @Test
+    public void testAllFilesPresentInJsSymbol() {
+      KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/diagnostics/testsWithJsStdLib/jsSymbol"), Pattern.compile("^([^_](.+))\\.kt$"), Pattern.compile("^(.+)\\.fir\\.kts?$"), true);
+    }
+
+    @Test
+    @TestMetadata("jsSymbolDiagnostics.kt")
+    public void testJsSymbolDiagnostics() {
+      runTest("compiler/testData/diagnostics/testsWithJsStdLib/jsSymbol/jsSymbolDiagnostics.kt");
     }
   }
 

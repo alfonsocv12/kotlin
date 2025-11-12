@@ -205,6 +205,34 @@ internal object KotlinToolingDiagnostics {
             get() = "Run the build with '--info' for more details."
     }
 
+    internal object NativeHostNotSupportedError : ToolingDiagnosticFactory(WARNING, DiagnosticGroup.Kgp.Misconfiguration) {
+        operator fun invoke(platform: String, supportedHosts: List<String>) =
+            build {
+                val supportedHostsList = supportedHosts
+                    .sorted()
+                    .joinToString(separator = "\n* ", prefix = "* ")
+
+                title("The host platform is not supported by Kotlin/Native")
+                    .description(
+                        """
+                        |The Kotlin/Native compiler does not support your current host platform: $platform.
+                        |
+                        |Compilation of Kotlin/Native targets is only possible on the following host platforms:
+                        |$supportedHostsList
+                        |
+                        |Your platform is not on this list, so the Kotlin/Native compiler cannot be executed.
+                        """.trimMargin()
+                    )
+                    .solutions {
+                        listOf(
+                            "Run your build on one of the supported host platforms (listed above).",
+                            "If using a CI/CD service, configure your build pipeline to use a supported runner (e.g., a Linux x86_64 agent)."
+                        )
+                    }
+                    .documentationLink(URI("https://kotlinlang.org/docs/native-target-support.html"))
+            }
+    }
+
     object CrossCompilationWithCinterops : ToolingDiagnosticFactory(WARNING, DiagnosticGroup.Kgp.Misconfiguration) {
         operator fun invoke(projectName: String, target: String, interops: List<String>, hostname: String) =
             build {
@@ -229,47 +257,83 @@ internal object KotlinToolingDiagnostics {
             }
     }
 
-    object IncompatibleBinaryConfiguration : ToolingDiagnosticFactory(WARNING, DiagnosticGroup.Kgp.Misconfiguration) {
-        operator fun invoke(binaryName: String, debuggable: Boolean, optimized: Boolean) =
-            build {
-                title("Incompatible Binary Configuration")
-                    .description {
-                        when {
-                            debuggable && optimized -> {
-                                """
-                            Binary '$binaryName' has incompatible configuration: debuggable=true and optimized=true.
-                            Debug binaries should not be optimized as this defeats the purpose of fast compilation and debugging.
-                            Optimization significantly increases compile time while making debugging more difficult.
-                            """.trimIndent()
-                            }
-                            else -> { // !debuggable && !optimized
-                                """
-                            Binary '$binaryName' has incompatible configuration: debuggable=false and optimized=false.
-                            Release binaries should be optimized to ensure good runtime performance.
-                            Without optimization, you get slow compilation (no debug build optimizations) and poor runtime performance.
-                            """.trimIndent()
-                            }
+    internal abstract class BaseIncompatibleBinaryConfiguration : ToolingDiagnosticFactory(WARNING, DiagnosticGroup.Kgp.Misconfiguration) {
+
+        /**
+         * Builds the common diagnostic message using context-specific phrases.
+         *
+         * @param binaryName The name of the binary.
+         * @param debuggable The 'debuggable' status.
+         * @param optimized The 'optimized' status.
+         * @param contextDescription A phrase describing the context (e.g., "in project '...'").
+         * @param contextSolution A phrase for the solution (e.g., "in project '...'" or "(... affecting task '...')").
+         */
+        protected fun buildDiagnostic(
+            binaryName: String,
+            debuggable: Boolean,
+            optimized: Boolean,
+            contextDescription: String,
+            contextSolution: String
+        ): ToolingDiagnostic = build {
+            title("Incompatible Binary Configuration")
+                .description {
+                    when {
+                        debuggable && optimized -> {
+                            """
+                        Binary '$binaryName' $contextDescription has incompatible configuration: debuggable=true and optimized=true.
+                        This configuration is not recommended. Optimization significantly increases compile time
+                        and makes debugging difficult, which defeats the purpose of a debuggable build.
+                        """.trimIndent()
+                        }
+                        else -> { // !debuggable && !optimized
+                            """
+                        Binary '$binaryName' $contextDescription has incompatible configuration: debuggable=false and optimized=false.
+                        This build is not optimized, which will result in poor runtime performance (like a debug build),
+                        but it also lacks debug symbols, making it unsuitable for debugging.
+                        This configuration is not recommended for either development or production use.
+                        """.trimIndent()
                         }
                     }
-                    .solutions {
-                        when {
-                            debuggable && optimized -> {
-                                listOf(
-                                    "Set 'optimized = false' for binary '$binaryName' to enable fast debug compilation",
-                                    "Use a release build type if you need optimization",
-                                    "Consider creating separate debug and release configurations"
-                                )
-                            }
-                            else -> { // !debuggable && !optimized
-                                listOf(
-                                    "Set 'optimized = true' for binary '$binaryName' to improve runtime performance",
-                                    "Use a debug build type if you need fast compilation and debugging capabilities",
-                                    "Verify that your build type configuration matches your intended use case"
-                                )
-                            }
+                }
+                .solutions {
+                    when {
+                        debuggable && optimized -> {
+                            listOf(
+                                "Set 'optimized = false' for binary '$binaryName' $contextSolution to create a standard debug build.",
+                                "If optimization is required, use a release build (debuggable=false, optimized=true)."
+                            )
+                        }
+                        else -> { // !debuggable && !optimized
+                            listOf(
+                                "Set 'optimized = true' for binary '$binaryName' $contextSolution to create a standard release build.",
+                                "Set 'debuggable = true' for binary '$binaryName' $contextSolution to create a standard debug build."
+                            )
                         }
                     }
-            }
+                }
+        }
+    }
+
+    internal object IncompatibleBinaryConfiguration : BaseIncompatibleBinaryConfiguration() {
+        operator fun invoke(projectPath: String, binaryName: String, debuggable: Boolean, optimized: Boolean) =
+            buildDiagnostic(
+                binaryName = binaryName,
+                debuggable = debuggable,
+                optimized = optimized,
+                contextDescription = "in project '$projectPath'",
+                contextSolution = "in project '$projectPath'"
+            )
+    }
+
+    internal object IncompatibleBinaryTaskConfiguration : BaseIncompatibleBinaryConfiguration() {
+        operator fun invoke(taskPath: String, binaryName: String, debuggable: Boolean, optimized: Boolean) =
+            buildDiagnostic(
+                binaryName = binaryName,
+                debuggable = debuggable,
+                optimized = optimized,
+                contextDescription = "built by task '$taskPath'",
+                contextSolution = "(in the build script affecting '$taskPath')"
+            )
     }
 
     object NoApplicationTargetFoundDiagnostic : ToolingDiagnosticFactory(WARNING, DiagnosticGroup.Kgp.Misconfiguration) {
@@ -348,6 +412,27 @@ internal object KotlinToolingDiagnostics {
                 .solution {
                     "Please adjust versions to avoid incompatibilities."
                 }
+        }
+    }
+
+    internal object NativeCacheDisabledDiagnostic : ToolingDiagnosticFactory(WARNING, DiagnosticGroup.Kgp.Misconfiguration) {
+        operator fun invoke(
+            kotlinVersion: KotlinToolingVersion,
+            target: KonanTarget,
+            reason: String,
+            issueUrl: URI?
+        ) = build {
+            title("Kotlin/Native cache is disabled for Kotlin $kotlinVersion")
+                .description {
+                    "The Kotlin/Native cache has been disabled for target '${target.visibleName}' " +
+                            "due to a configured workaround: $reason"
+                }
+                .solution {
+                    "Caching was disabled intentionally to prevent potential issues with this Kotlin version. " +
+                            "Build times for the '${target.visibleName}' target may be slower as a result. " +
+                            "To re-enable caching and improve performance, investigate whether this issue is resolved in newer versions of Kotlin or relevant third-party libraries."
+                }
+                .documentationLink(issueUrl ?: URI("https://kotl.in/disable-native-cache"))
         }
     }
 
@@ -655,18 +740,6 @@ internal object KotlinToolingDiagnostics {
         }
     }
 
-    object UnrecognizedKotlinNativeDistributionType : ToolingDiagnosticFactory(WARNING, DiagnosticGroup.Kgp.Misconfiguration) {
-        operator fun invoke(actualValue: String) = build {
-            title("Unrecognized Kotlin/Native Distribution Type")
-                .description {
-                    "Gradle Property `kotlin.native.distribution.type` sets unknown Kotlin/Native distribution type: $actualValue"
-                }
-                .solution {
-                    "Available values: `prebuilt`, `light`"
-                }
-        }
-    }
-
     object AndroidTargetIsMissing : ToolingDiagnosticFactory(WARNING, DiagnosticGroup.Kgp.Misconfiguration) {
         operator fun invoke(projectName: String, projectPath: String, androidPluginId: String) = build {
             title("Missing `androidTarget()` in Kotlin Multiplatform Project")
@@ -786,11 +859,19 @@ internal object KotlinToolingDiagnostics {
             jvmTarget: String,
             severity: ToolingDiagnostic.Severity,
         ) = build(severity = severity) {
+            val gradleErrorMessage = if (severity == WARNING &&
+                GradleVersion.current() < GradleVersion.version("8.0")
+            ) {
+                "This will become an error in Gradle 8.0."
+            } else {
+                ""
+            }
+
             title("Inconsistent JVM Target Compatibility Between Java and Kotlin Tasks")
                 .description {
                     """
                     Inconsistent JVM-target compatibility detected for tasks '$javaTaskName' ($targetCompatibility) and '$kotlinTaskName' ($jvmTarget).
-                    ${if (severity == WARNING) "This will become an error in Gradle 8.0." else ""}
+                    $gradleErrorMessage
                     """.trimIndent()
                 }
                 .solution {
@@ -831,6 +912,27 @@ internal object KotlinToolingDiagnostics {
     object WasmJsEnvironmentNotChosenExplicitly : JsLikeEnvironmentNotChosenExplicitly("WebAssembly-JavaScript", "wasmJs")
 
     object WasmWasiEnvironmentNotChosenExplicitly : JsLikeEnvironmentNotChosenExplicitly("WebAssembly WASI", "wasmWasi")
+
+    object ConfigurationOnDemandNotSupported : ToolingDiagnosticFactory(WARNING, DiagnosticGroup.Kgp.Misconfiguration) {
+        operator fun invoke(
+            projectDisplayName: String,
+            namesOfUnsupportedTargets: Set<String>,
+        ) = build {
+            title("Kotlin targets do not support Configuration on Demand")
+                .description {
+                    """
+                    |Gradle Configuration on Demand is enabled, but $projectDisplayName has Kotlin targets that do not support this feature.
+                    |This may lead to unpredictable and inconsistent behaviour during a Gradle build.
+                    |
+                    |Unsupported targets: $namesOfUnsupportedTargets
+                    |
+                    |See https://youtrack.jetbrains.com/issue/KT-52074 for the status of Configuration on Demand support.
+                    """.trimMargin()
+                }
+                .solution { "Do not enable Configuration on Demand" }
+                .documentationLink(URI("https://docs.gradle.org/current/userguide/configuration_on_demand.html"))
+        }
+    }
 
     object PreHmppDependenciesUsedInBuild : ToolingDiagnosticFactory(WARNING, DiagnosticGroup.Kgp.Deprecation) {
         operator fun invoke(dependencyName: String) = build {
@@ -1138,24 +1240,6 @@ internal object KotlinToolingDiagnostics {
     object KotlinTargetAlreadyDeclaredWarning : KotlinTargetAlreadyDeclared(WARNING)
     object KotlinTargetAlreadyDeclaredError : KotlinTargetAlreadyDeclared(ERROR)
 
-    object KotlinCompilationSourceDeprecation : ToolingDiagnosticFactory(ERROR, DiagnosticGroup.Kgp.Deprecation) {
-        operator fun invoke(trace: Throwable?) = build(throwable = trace) {
-            title("`KotlinCompilation.source(KotlinSourceSet)` Method Deprecated")
-                .description {
-                    """
-                    `KotlinCompilation.source(KotlinSourceSet)` method is deprecated
-                    and will be removed in Kotlin 2.3
-                    """.trimIndent()
-                }
-                .solution {
-                    "Please use `KotlinCompilation.defaultSourceSet` instead."
-                }
-                .documentationLink(URI("https://kotl.in/compilation-source-deprecation")) { url ->
-                    "See $url for details."
-                }
-        }
-    }
-
     object CircularDependsOnEdges : ToolingDiagnosticFactory(FATAL, DiagnosticGroup.Kgp.Misconfiguration) {
         operator fun invoke(sourceSetsOnCycle: Collection<String>) = build {
             title("Circular dependsOn Relationship Detected in Kotlin Source Sets")
@@ -1416,21 +1500,6 @@ internal object KotlinToolingDiagnostics {
         }
     }
 
-    object ResourceMayNotBeResolvedWithGradleVersion : ToolingDiagnosticFactory(ERROR, DiagnosticGroup.Kgp.Misconfiguration) {
-        operator fun invoke(
-            targetName: String, currentGradleVersion: String, minimumRequiredVersion: String,
-        ) = build {
-            title("Resource Resolution for Target '$targetName' Requires Gradle $minimumRequiredVersion")
-                .description {
-                    "Resources for target $targetName may not be resolved. Minimum required Gradle version is $minimumRequiredVersion but current is ${currentGradleVersion}."
-                }
-                .solution {
-                    "Please upgrade Gradle to $minimumRequiredVersion or higher."
-                }
-                .documentationLink(BUG_REPORT_URL, ::resourcesBugReportRequest)
-        }
-    }
-
     object MissingRuntimeDependencyConfigurationForWasmTarget : ToolingDiagnosticFactory(ERROR, DiagnosticGroup.Kgp.Misconfiguration) {
         operator fun invoke(targetName: String) = build {
             title("Missing Runtime Dependency Configuration for Wasm Target '$targetName'")
@@ -1439,19 +1508,6 @@ internal object KotlinToolingDiagnostics {
                 }
                 .solution {
                     "Please add runtimeDependencyConfiguration to the target."
-                }
-                .documentationLink(BUG_REPORT_URL, ::resourcesBugReportRequest)
-        }
-    }
-
-    object MissingResourcesConfigurationForTarget : ToolingDiagnosticFactory(ERROR, DiagnosticGroup.Kgp.Misconfiguration) {
-        operator fun invoke(targetName: String) = build {
-            title("Missing Resource Configuration for Target '$targetName'")
-                .description {
-                    "Resources will not be resolved for $targetName as it is missing resourcesConfiguration."
-                }
-                .solution {
-                    "Please add resourcesConfiguration to the target."
                 }
                 .documentationLink(BUG_REPORT_URL, ::resourcesBugReportRequest)
         }
@@ -1722,18 +1778,6 @@ internal object KotlinToolingDiagnostics {
         }
     }
 
-    object NotCompatibleWithGradle9 : ToolingDiagnosticFactory(FATAL, DiagnosticGroup.Kgp.Misconfiguration) {
-        operator fun invoke(fixAction: String) = build {
-            title("Kotlin Gradle Plugin Not Compatible with Gradle 9")
-                .description {
-                    "Current configuration of Kotlin Gradle Plugin is not compatible with Gradle 9."
-                }
-                .solution {
-                    "Please $fixAction to fix it."
-                }
-        }
-    }
-
     object KotlinTopLevelDependenciesUsedInIncompatibleGradleVersion :
         ToolingDiagnosticFactory(ERROR, DiagnosticGroup.Kgp.Misconfiguration) {
         operator fun invoke(
@@ -1806,22 +1850,6 @@ internal object KotlinToolingDiagnostics {
                 }
                 .solution {
                     "Please check the module name and ensure it is correct."
-                }
-        }
-    }
-
-    object SwiftExportArtifactResolution : ToolingDiagnosticFactory(WARNING, DiagnosticGroup.Kgp.Misconfiguration) {
-        operator fun invoke(component: String, artifacts: List<String>) = build(severity = if (artifacts.isEmpty()) WARNING else ERROR) {
-            title("Swift Export Artifact Resolution Error")
-                .description {
-                    if (artifacts.isEmpty()) {
-                        "Component $component doesn't have suitable artifacts"
-                    } else {
-                        "Component $component has too many artifacts: $artifacts"
-                    }
-                }
-                .solution {
-                    "Please check the component and ensure it has the correct artifacts."
                 }
         }
     }
@@ -1920,22 +1948,86 @@ internal object KotlinToolingDiagnostics {
             buildFile: File,
             trace: Throwable,
         ) = build(throwable = trace) {
-            title("Failed to apply plugin 'com.jetbrains.kotlin.android'")
+            title("Failed to apply plugin 'org.jetbrains.kotlin.android'")
                 .description("The 'org.jetbrains.kotlin.android' plugin is no longer required for Kotlin support since AGP 9.0.")
                 .solution("Remove the 'org.jetbrains.kotlin.android' plugin from this project's build file: ${buildFile}.")
                 .documentationLink(URI("https://kotl.in/gradle/agp-built-in-kotlin"))
         }
     }
 
-    internal object IncompatibleWithTheNewAgpDsl :
+    internal object KotlinAndroidIsIncompatibleWithTheNewAgpDsl :
         ToolingDiagnosticFactory(FATAL, DiagnosticGroup.Kgp.Misconfiguration) {
         operator fun invoke(
             trace: Throwable,
         ) = build(throwable = trace) {
-            title("Failed to apply plugin 'com.jetbrains.kotlin.android'")
-                .description("The 'org.jetbrains.kotlin.android' plugin is not compatible with AGP's new DSL (`android.newDsl=true`).")
+            title("Failed to apply plugin 'org.jetbrains.kotlin.android'")
+                .description("The 'org.jetbrains.kotlin.android' plugin is not compatible with AGP's 9.0 new DSL (`android.newDsl=true` is enabled by default).")
                 .solution("Set `android.builtInKotlin=true` in `gradle.properties` and migrate to built-in Kotlin (see https://kotl.in/gradle/agp-built-in-kotlin for guidance), or set `android.newDsl=false` in `gradle.properties` to temporarily bypass this issue.")
                 .documentationLink(URI("https://kotl.in/gradle/agp-new-dsl"))
+        }
+    }
+
+    internal object KMPIsIncompatibleWithTheNewAgpDsl :
+        ToolingDiagnosticFactory(FATAL, DiagnosticGroup.Kgp.Misconfiguration) {
+        operator fun invoke(
+            androidPluginId: String,
+            trace: Throwable,
+        ) = build(throwable = trace) {
+            title("Failed to apply plugin 'org.jetbrains.kotlin.multiplatform'")
+                .description("The 'org.jetbrains.kotlin.multiplatform' plugin with `androidTarget()` enabled is not compatible with AGP's 9.0 new DSL (`android.newDsl=true` is enabled by default).")
+                .solution {
+                    if (androidPluginId == "com.android.library") {
+                        "Please use the 'com.android.kotlin.multiplatform.library' plugin instead of 'com.android.library' (read more: https://kotl.in/gradle/agp-new-kmp)," +
+                                " or set `android.newDsl=false` in `gradle.properties` to temporarily bypass this issue."
+                    } else {
+                        "Please change the structure of your project and move the usage of '$androidPluginId' into a separate subproject. " +
+                                "Then migrate this KMP subproject to the 'com.android.kotlin.multiplatform.library' plugin instead of '$androidPluginId' (see https://kotl.in/gradle/agp-new-kmp for guidance). " +
+                                "Or set `android.newDsl=false` in `gradle.properties` to temporarily bypass this issue."
+                    }
+                }
+                .documentationLink(URI("https://kotl.in/gradle/agp-new-kmp"))
+        }
+    }
+
+    internal object NonKmpAgpIsDeprecated : ToolingDiagnosticFactory(WARNING, DiagnosticGroup.Kgp.Misconfiguration) {
+        operator fun invoke(androidPluginId: String) = build {
+            val titleStep = title(
+                "The 'org.jetbrains.kotlin.multiplatform' plugin deprecated compatibility with Android Gradle plugin: '$androidPluginId'"
+            )
+
+            val solutionStep = if (androidPluginId == "com.android.library") {
+                titleStep
+                    .description(
+                        """
+                        |The 'org.jetbrains.kotlin.multiplatform' plugin will not be compatible with 'com.android.library' starting with Android Gradle Plugin 9.0.0.
+                        """.trimMargin()
+                    )
+                    .solution("Please use the 'com.android.kotlin.multiplatform.library' plugin instead of 'com.android.library'.")
+            } else {
+                titleStep
+                    .description(
+                        """
+                        |The 'org.jetbrains.kotlin.multiplatform' plugin will not be compatible with '$androidPluginId' starting with Android Gradle Plugin 9.0.0.
+                        |
+                        |Please change the structure of the your project and move the usage of '$androidPluginId' into a separate subproject. The new subproject should add a dependency on this KMP subproject.
+                        |
+                        |Read more: https://kotl.in/kmp-project-structure-migration
+                        """.trimMargin()
+                    )
+                    .solution("Please change the structure of your project and move the usage of '$androidPluginId' into a separate subproject.")
+            }
+            solutionStep.documentationLink(URI("https://kotl.in/gradle/agp-new-kmp"))
+        }
+    }
+
+    internal object DeprecatedKotlinAndroidPlugin : ToolingDiagnosticFactory(WARNING, DiagnosticGroup.Kgp.Deprecation) {
+        operator fun invoke(
+            projectPath: String
+        ) = build {
+            title("Deprecated 'org.jetbrains.kotlin.android' plugin usage")
+                .description("The 'org.jetbrains.kotlin.android' plugin in project '$projectPath' is no longer required for Kotlin support since AGP 9.0.")
+                .solution("Remove both `android.builtInKotlin=true` and `android.newDsl=false` from `gradle.properties`, then migrate to built-in Kotlin.")
+                .documentationLink(URI("https://kotl.in/gradle/agp-built-in-kotlin"))
         }
     }
 

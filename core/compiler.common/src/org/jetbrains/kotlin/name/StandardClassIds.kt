@@ -93,6 +93,7 @@ object StandardClassIds {
     val Number = "Number".baseId()
 
     val Function = "Function".baseId()
+    val SuspendFunction = "SuspendFunction".coroutinesId()
 
     fun byName(name: String) = name.baseId()
     fun reflectByName(name: String) = name.reflectId()
@@ -194,6 +195,7 @@ object StandardClassIds {
         val DeprecatedSinceKotlin = "DeprecatedSinceKotlin".baseId()
         val RequireKotlin = "RequireKotlin".internalId()
         val DslMarker = "DslMarker".baseId()
+        val IntroducedAt = "IntroducedAt".baseId()
 
         val ConsistentCopyVisibility = "ConsistentCopyVisibility".baseId()
         val ExposedCopyVisibility = "ExposedCopyVisibility".baseId()

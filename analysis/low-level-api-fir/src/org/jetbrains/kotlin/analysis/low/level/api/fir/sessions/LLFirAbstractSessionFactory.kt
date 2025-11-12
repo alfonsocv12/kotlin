@@ -455,9 +455,8 @@ internal abstract class LLFirAbstractSessionFactory(protected val project: Proje
             registerModuleData(moduleData)
             registerIdeComponents(project, languageVersionSettings)
             register(FirLazyDeclarationResolver::class, FirDummyCompilerLazyDeclarationResolver)
-            registerCommonComponents(languageVersionSettings)
+            registerCommonComponents(languageVersionSettings, isMetadataCompilation = false)
             registerCommonComponentsAfterExtensionsAreConfigured()
-            registerDefaultComponents()
 
             val kotlinScopeProvider = when {
                 platform.isJvm() -> FirKotlinScopeProvider(::wrapScopeWithJvmMapped)
@@ -713,9 +712,8 @@ internal abstract class LLFirAbstractSessionFactory(protected val project: Proje
 
     private fun LLFirSession.registerAllCommonComponents(languageVersionSettings: LanguageVersionSettings) {
         registerIdeComponents(project, languageVersionSettings)
-        registerCommonComponents(languageVersionSettings)
+        registerCommonComponents(languageVersionSettings, isMetadataCompilation = false)
         registerResolveComponents()
-        registerDefaultComponents()
     }
 
     private fun LLFirSession.registerSourceLikeComponents() {

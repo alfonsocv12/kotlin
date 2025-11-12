@@ -551,6 +551,11 @@ private class JsIrAstSerializer {
                 writeByte(ExpressionIds.YIELD)
                 ifNotNull(x.expression) { writeExpression(it) }
             }
+
+            override fun visitYieldStar(x: JsYieldStar) {
+                writeByte(ExpressionIds.YIELD_STAR)
+                ifNotNull(x.expression) { writeExpression(it) }
+            }
         }
 
         withComments(expression) {
@@ -576,6 +581,9 @@ private class JsIrAstSerializer {
         writeCollection(function.modifiers) { writeInt(it.ordinal) }
         ifNotNull(function.name) {
             writeInt(internalizeName(it))
+        }
+        ifNotNull(function.computedName) {
+            writeExpression(function.computedName)
         }
         writeBoolean(function.isLocal)
         writeBoolean(function.isEs6Arrow)

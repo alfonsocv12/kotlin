@@ -5,14 +5,12 @@
 
 package kotlin.reflect.jvm.internal
 
-import kotlin.LazyThreadSafetyMode.PUBLICATION
 import kotlin.metadata.Modality
 import kotlin.reflect.KParameter
 import kotlin.reflect.jvm.internal.calls.Caller
 import kotlin.reflect.jvm.internal.calls.ThrowingCaller
 
 internal abstract class KotlinKCallable<out R> : ReflectKCallable<R> {
-    abstract val allParameters: List<KParameter>
     abstract val modality: Modality
     abstract override val rawBoundReceiver: Any?
 
@@ -34,24 +32,11 @@ internal abstract class KotlinKCallable<out R> : ReflectKCallable<R> {
             return allParameters
         }
 
-    override val receiverParameters: List<KParameter>
-        get() {
-            checkLocalDelegatedPropertyOrAccessor()
-            require(allParameters.all { it.kind == KParameter.Kind.VALUE }) {
-                "Local delegated properties and their accessors can only have value parameters"
-            }
-            return emptyList()
-        }
-
     abstract override val annotations: List<Annotation>
 
     private val _absentArguments = ReflectProperties.lazySoft(::computeAbsentArguments)
 
     override fun getAbsentArguments(): Array<Any?> = _absentArguments().clone()
-
-    override val parametersNeedMFVCFlattening: Lazy<Boolean> = lazy(PUBLICATION) {
-        parameters.any { it.type.needsMultiFieldValueClassFlattening }
-    }
 
     override val caller: Caller<*>
         get() {

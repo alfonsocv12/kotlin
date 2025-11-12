@@ -12,17 +12,19 @@ import org.jetbrains.kotlin.cli.pipeline.metadata.MetadataKlibInMemorySerializer
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.diagnostics.impl.BaseDiagnosticsCollector
 import org.jetbrains.kotlin.diagnostics.impl.SimpleDiagnosticsCollector
-import org.jetbrains.kotlin.fir.pipeline.ModuleCompilerAnalyzedOutput
+import org.jetbrains.kotlin.fir.pipeline.SingleModuleFrontendOutput
+import org.jetbrains.kotlin.test.directives.ConfigurationDirectives.METADATA_ONLY_COMPILATION
 import org.jetbrains.kotlin.test.model.*
 import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.test.services.isLeafModuleInMppGraph
 import java.io.File
 
 class FirCliMetadataFrontendFacade(
-    testServices: TestServices
+    testServices: TestServices,
 ) : FirCliFacade<MetadataFrontendPipelinePhase, MetadataFrontendPipelineArtifact>(testServices, MetadataFrontendPipelinePhase) {
     companion object {
         fun shouldTransform(module: TestModule, testServices: TestServices): Boolean {
+            if (METADATA_ONLY_COMPILATION in module.directives) return true
             if (!module.languageVersionSettings.supportsFeature(LanguageFeature.MultiPlatformProjects)) return false
             return !module.isLeafModuleInMppGraph(testServices)
         }
@@ -34,7 +36,7 @@ class FirCliMetadataFrontendFacade(
 
     override fun getPartsForDependsOnModules(
         module: TestModule,
-        firOutputs: List<ModuleCompilerAnalyzedOutput>
+        firOutputs: List<SingleModuleFrontendOutput>
     ): List<FirOutputPartForDependsOnModule> {
         val analyzedModule = firOutputs.single()
         return listOf(analyzedModule.toTestOutputPart(module, testServices))

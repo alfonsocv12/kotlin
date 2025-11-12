@@ -193,9 +193,10 @@ abstract class AbstractKotlinCompile<T : CommonCompilerArguments> @Inject constr
                                     taskProvider,
                                     toolsJar,
                                     CompilerExecutionSettings(
-                                        normalizedKotlinDaemonJvmArguments.orNull,
-                                        params.second,
-                                        useDaemonFallbackStrategy.get()
+                                        daemonJvmArgs = normalizedKotlinDaemonJvmArguments.orNull,
+                                        strategy = params.second,
+                                        useDaemonFallbackStrategy = useDaemonFallbackStrategy.get(),
+                                        generateCompilerRefIndex = generateCompilerRefIndex.get(),
                                     ),
                                     params.first,
                                     workerExecutor,
@@ -204,7 +205,7 @@ abstract class AbstractKotlinCompile<T : CommonCompilerArguments> @Inject constr
                                     buildFinishedListenerService,
                                     buildIdService,
                                     buildSessionService,
-                                    buildFusService.orNull?.getFusMetricsConsumer(),
+                                    buildFusService.map { it?.getFusMetricsConsumer() },
                                     this
                                 )
                             }
@@ -239,6 +240,7 @@ abstract class AbstractKotlinCompile<T : CommonCompilerArguments> @Inject constr
                     compilerOptions,
                     separateKmpCompilation.get(),
                     firRunnerEnabled = (this as? KotlinCompile)?.useFirRunner?.get() == true,
+                    executionPolicy = compilerExecutionStrategy.get(),
                     it
                 )
             }

@@ -509,8 +509,8 @@ KtCallExpression(677,686): 'lazy {""}'
         {""} -> (KaVariableSignature:
           name = initializer
           receiverType = null
-          returnType = kotlin.Function0<kotlin.String>
-          symbol = initializer: kotlin.Function0<T>
+          returnType = () -> kotlin.String
+          symbol = initializer: () -> T
           contextParameters = []
           callableId = null)
       }
@@ -522,13 +522,13 @@ KtCallExpression(677,686): 'lazy {""}'
         signature = KaFunctionSignature:
           receiverType = null
           returnType = kotlin.Lazy<kotlin.String>
-          symbol = kotlin/lazy(initializer: kotlin.Function0<T>): kotlin.Lazy<T>
+          symbol = kotlin/lazy(initializer: () -> T): kotlin.Lazy<T>
           valueParameters = [
             KaVariableSignature:
               name = initializer
               receiverType = null
-              returnType = kotlin.Function0<kotlin.String>
-              symbol = initializer: kotlin.Function0<T>
+              returnType = () -> kotlin.String
+              symbol = initializer: () -> T
               contextParameters = []
               callableId = null
           ]
@@ -545,8 +545,8 @@ KtCallExpression(677,686): 'lazy {""}'
         {""} -> (KaVariableSignature:
           name = initializer
           receiverType = null
-          returnType = kotlin.Function0<kotlin.String>
-          symbol = initializer: kotlin.Function0<T>
+          returnType = () -> kotlin.String
+          symbol = initializer: () -> T
           contextParameters = []
           callableId = null)
       }
@@ -558,7 +558,7 @@ KtCallExpression(677,686): 'lazy {""}'
         signature = KaFunctionSignature:
           receiverType = null
           returnType = kotlin.Lazy<kotlin.String>
-          symbol = kotlin/lazy(lock: kotlin.Any?, initializer: kotlin.Function0<T>): kotlin.Lazy<T>
+          symbol = kotlin/lazy(lock: kotlin.Any?, initializer: () -> T): kotlin.Lazy<T>
           valueParameters = [
             KaVariableSignature:
               name = lock
@@ -570,8 +570,8 @@ KtCallExpression(677,686): 'lazy {""}'
             KaVariableSignature:
               name = initializer
               receiverType = null
-              returnType = kotlin.Function0<kotlin.String>
-              symbol = initializer: kotlin.Function0<T>
+              returnType = () -> kotlin.String
+              symbol = initializer: () -> T
               contextParameters = []
               callableId = null
           ]
@@ -589,8 +589,8 @@ KtCallExpression(677,686): 'lazy {""}'
         {""} -> (KaVariableSignature:
           name = initializer
           receiverType = null
-          returnType = kotlin.Function0<kotlin.String>
-          symbol = initializer: kotlin.Function0<T>
+          returnType = () -> kotlin.String
+          symbol = initializer: () -> T
           contextParameters = []
           callableId = null)
       }
@@ -602,7 +602,7 @@ KtCallExpression(677,686): 'lazy {""}'
         signature = KaFunctionSignature:
           receiverType = null
           returnType = kotlin.Lazy<kotlin.String>
-          symbol = kotlin/lazy(mode: kotlin.LazyThreadSafetyMode, initializer: kotlin.Function0<T>): kotlin.Lazy<T>
+          symbol = kotlin/lazy(mode: kotlin.LazyThreadSafetyMode, initializer: () -> T): kotlin.Lazy<T>
           valueParameters = [
             KaVariableSignature:
               name = mode
@@ -614,8 +614,8 @@ KtCallExpression(677,686): 'lazy {""}'
             KaVariableSignature:
               name = initializer
               receiverType = null
-              returnType = kotlin.Function0<kotlin.String>
-              symbol = initializer: kotlin.Function0<T>
+              returnType = () -> kotlin.String
+              symbol = initializer: () -> T
               contextParameters = []
               callableId = null
           ]
@@ -634,8 +634,8 @@ KtNameReferenceExpression(677,681): 'lazy'
         {""} -> (KaVariableSignature:
           name = initializer
           receiverType = null
-          returnType = kotlin.Function0<kotlin.String>
-          symbol = initializer: kotlin.Function0<T>
+          returnType = () -> kotlin.String
+          symbol = initializer: () -> T
           contextParameters = []
           callableId = null)
       }
@@ -647,13 +647,13 @@ KtNameReferenceExpression(677,681): 'lazy'
         signature = KaFunctionSignature:
           receiverType = null
           returnType = kotlin.Lazy<kotlin.String>
-          symbol = kotlin/lazy(initializer: kotlin.Function0<T>): kotlin.Lazy<T>
+          symbol = kotlin/lazy(initializer: () -> T): kotlin.Lazy<T>
           valueParameters = [
             KaVariableSignature:
               name = initializer
               receiverType = null
-              returnType = kotlin.Function0<kotlin.String>
-              symbol = initializer: kotlin.Function0<T>
+              returnType = () -> kotlin.String
+              symbol = initializer: () -> T
               contextParameters = []
               callableId = null
           ]
@@ -670,8 +670,8 @@ KtNameReferenceExpression(677,681): 'lazy'
         {""} -> (KaVariableSignature:
           name = initializer
           receiverType = null
-          returnType = kotlin.Function0<kotlin.String>
-          symbol = initializer: kotlin.Function0<T>
+          returnType = () -> kotlin.String
+          symbol = initializer: () -> T
           contextParameters = []
           callableId = null)
       }
@@ -683,7 +683,7 @@ KtNameReferenceExpression(677,681): 'lazy'
         signature = KaFunctionSignature:
           receiverType = null
           returnType = kotlin.Lazy<kotlin.String>
-          symbol = kotlin/lazy(lock: kotlin.Any?, initializer: kotlin.Function0<T>): kotlin.Lazy<T>
+          symbol = kotlin/lazy(lock: kotlin.Any?, initializer: () -> T): kotlin.Lazy<T>
           valueParameters = [
             KaVariableSignature:
               name = lock
@@ -695,8 +695,8 @@ KtNameReferenceExpression(677,681): 'lazy'
             KaVariableSignature:
               name = initializer
               receiverType = null
-              returnType = kotlin.Function0<kotlin.String>
-              symbol = initializer: kotlin.Function0<T>
+              returnType = () -> kotlin.String
+              symbol = initializer: () -> T
               contextParameters = []
               callableId = null
           ]
@@ -714,8 +714,8 @@ KtNameReferenceExpression(677,681): 'lazy'
         {""} -> (KaVariableSignature:
           name = initializer
           receiverType = null
-          returnType = kotlin.Function0<kotlin.String>
-          symbol = initializer: kotlin.Function0<T>
+          returnType = () -> kotlin.String
+          symbol = initializer: () -> T
           contextParameters = []
           callableId = null)
       }
@@ -727,7 +727,7 @@ KtNameReferenceExpression(677,681): 'lazy'
         signature = KaFunctionSignature:
           receiverType = null
           returnType = kotlin.Lazy<kotlin.String>
-          symbol = kotlin/lazy(mode: kotlin.LazyThreadSafetyMode, initializer: kotlin.Function0<T>): kotlin.Lazy<T>
+          symbol = kotlin/lazy(mode: kotlin.LazyThreadSafetyMode, initializer: () -> T): kotlin.Lazy<T>
           valueParameters = [
             KaVariableSignature:
               name = mode
@@ -739,8 +739,8 @@ KtNameReferenceExpression(677,681): 'lazy'
             KaVariableSignature:
               name = initializer
               receiverType = null
-              returnType = kotlin.Function0<kotlin.String>
-              symbol = initializer: kotlin.Function0<T>
+              returnType = () -> kotlin.String
+              symbol = initializer: () -> T
               contextParameters = []
               callableId = null
           ]
@@ -1597,7 +1597,7 @@ KtCallExpression(1083,1112): 'receiverVarArg<MyClass>(prop)'
       typeArgumentsMapping = {
         T -> (MyClass)
       }
-    diagnostic = ERROR<ARGUMENT_TYPE_MISMATCH: Argument type mismatch: actual type is 'String', but 'MyClass' was expected.>
+    diagnostic = ERROR<INAPPLICABLE_CANDIDATE: Inapplicable candidate(s): fun <T> receiverVarArg(vararg arg: T): Array<out T>>
     isInBestCandidates = true
 
 KtNameReferenceExpression(1083,1097): 'receiverVarArg'
@@ -1635,7 +1635,7 @@ KtNameReferenceExpression(1083,1097): 'receiverVarArg'
       typeArgumentsMapping = {
         T -> (MyClass)
       }
-    diagnostic = ERROR<ARGUMENT_TYPE_MISMATCH: Argument type mismatch: actual type is 'String', but 'MyClass' was expected.>
+    diagnostic = ERROR<INAPPLICABLE_CANDIDATE: Inapplicable candidate(s): fun <T> receiverVarArg(vararg arg: T): Array<out T>>
     isInBestCandidates = true
 
 KtTypeArgumentList(1097,1106): '<MyClass>'
@@ -1716,7 +1716,7 @@ KtCallExpression(1117,1151): 'receiverVarArg<MyClass>(constProp)'
       typeArgumentsMapping = {
         T -> (MyClass)
       }
-    diagnostic = ERROR<ARGUMENT_TYPE_MISMATCH: Argument type mismatch: actual type is 'String', but 'MyClass' was expected.>
+    diagnostic = ERROR<INAPPLICABLE_CANDIDATE: Inapplicable candidate(s): fun <T> receiverVarArg(vararg arg: T): Array<out T>>
     isInBestCandidates = true
 
 KtNameReferenceExpression(1117,1131): 'receiverVarArg'
@@ -1754,7 +1754,7 @@ KtNameReferenceExpression(1117,1131): 'receiverVarArg'
       typeArgumentsMapping = {
         T -> (MyClass)
       }
-    diagnostic = ERROR<ARGUMENT_TYPE_MISMATCH: Argument type mismatch: actual type is 'String', but 'MyClass' was expected.>
+    diagnostic = ERROR<INAPPLICABLE_CANDIDATE: Inapplicable candidate(s): fun <T> receiverVarArg(vararg arg: T): Array<out T>>
     isInBestCandidates = true
 
 KtTypeArgumentList(1131,1140): '<MyClass>'
@@ -1835,7 +1835,7 @@ KtCallExpression(1156,1189): 'receiverVarArg<MyClass>(lazyProp)'
       typeArgumentsMapping = {
         T -> (MyClass)
       }
-    diagnostic = ERROR<ARGUMENT_TYPE_MISMATCH: Argument type mismatch: actual type is 'String', but 'MyClass' was expected.>
+    diagnostic = ERROR<INAPPLICABLE_CANDIDATE: Inapplicable candidate(s): fun <T> receiverVarArg(vararg arg: T): Array<out T>>
     isInBestCandidates = true
 
 KtNameReferenceExpression(1156,1170): 'receiverVarArg'
@@ -1873,7 +1873,7 @@ KtNameReferenceExpression(1156,1170): 'receiverVarArg'
       typeArgumentsMapping = {
         T -> (MyClass)
       }
-    diagnostic = ERROR<ARGUMENT_TYPE_MISMATCH: Argument type mismatch: actual type is 'String', but 'MyClass' was expected.>
+    diagnostic = ERROR<INAPPLICABLE_CANDIDATE: Inapplicable candidate(s): fun <T> receiverVarArg(vararg arg: T): Array<out T>>
     isInBestCandidates = true
 
 KtTypeArgumentList(1170,1179): '<MyClass>'
@@ -1954,7 +1954,7 @@ KtCallExpression(1194,1229): 'receiverVarArg<MyClass>(lambdaProp)'
       typeArgumentsMapping = {
         T -> (MyClass)
       }
-    diagnostic = ERROR<ARGUMENT_TYPE_MISMATCH: Argument type mismatch: actual type is 'Function0<MyClass.InheritorObject>', but 'MyClass' was expected.>
+    diagnostic = ERROR<INAPPLICABLE_CANDIDATE: Inapplicable candidate(s): fun <T> receiverVarArg(vararg arg: T): Array<out T>>
     isInBestCandidates = true
 
 KtNameReferenceExpression(1194,1208): 'receiverVarArg'
@@ -1992,7 +1992,7 @@ KtNameReferenceExpression(1194,1208): 'receiverVarArg'
       typeArgumentsMapping = {
         T -> (MyClass)
       }
-    diagnostic = ERROR<ARGUMENT_TYPE_MISMATCH: Argument type mismatch: actual type is 'Function0<MyClass.InheritorObject>', but 'MyClass' was expected.>
+    diagnostic = ERROR<INAPPLICABLE_CANDIDATE: Inapplicable candidate(s): fun <T> receiverVarArg(vararg arg: T): Array<out T>>
     isInBestCandidates = true
 
 KtTypeArgumentList(1208,1217): '<MyClass>'
@@ -2030,8 +2030,8 @@ KtNameReferenceExpression(1218,1228): 'lambdaProp'
         signature = KaVariableSignature:
           name = lambdaProp
           receiverType = null
-          returnType = kotlin.Function0<MyClass.InheritorObject>
-          symbol = val lambdaProp: kotlin.Function0<MyClass.InheritorObject>
+          returnType = () -> MyClass.InheritorObject
+          symbol = val lambdaProp: () -> MyClass.InheritorObject
           contextParameters = []
           callableId = /MyClass.Companion.lambdaProp
       simpleAccess = Read
@@ -2073,7 +2073,7 @@ KtCallExpression(1234,1268): 'receiverVarArg<MyClass>(superProp)'
       typeArgumentsMapping = {
         T -> (MyClass)
       }
-    diagnostic = ERROR<ARGUMENT_TYPE_MISMATCH: Argument type mismatch: actual type is 'String', but 'MyClass' was expected.>
+    diagnostic = ERROR<INAPPLICABLE_CANDIDATE: Inapplicable candidate(s): fun <T> receiverVarArg(vararg arg: T): Array<out T>>
     isInBestCandidates = true
 
 KtNameReferenceExpression(1234,1248): 'receiverVarArg'
@@ -2111,7 +2111,7 @@ KtNameReferenceExpression(1234,1248): 'receiverVarArg'
       typeArgumentsMapping = {
         T -> (MyClass)
       }
-    diagnostic = ERROR<ARGUMENT_TYPE_MISMATCH: Argument type mismatch: actual type is 'String', but 'MyClass' was expected.>
+    diagnostic = ERROR<INAPPLICABLE_CANDIDATE: Inapplicable candidate(s): fun <T> receiverVarArg(vararg arg: T): Array<out T>>
     isInBestCandidates = true
 
 KtTypeArgumentList(1248,1257): '<MyClass>'

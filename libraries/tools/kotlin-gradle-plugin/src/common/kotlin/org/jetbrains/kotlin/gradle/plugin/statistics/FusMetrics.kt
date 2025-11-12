@@ -25,6 +25,7 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeCompilation
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.report.TaskExecutionResult
 import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrOutputGranularity
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompilerExecutionStrategy
 import org.jetbrains.kotlin.gradle.utils.addConfigurationMetrics
 import org.jetbrains.kotlin.gradle.utils.runMetricMethodSafely
 import org.jetbrains.kotlin.konan.target.HostManager
@@ -257,6 +258,7 @@ internal object CompileKotlinTaskMetrics : FusMetrics {
         compilerOptions: KotlinCommonCompilerOptions,
         separateKmpCompilationEnabled: Boolean,
         firRunnerEnabled: Boolean, // jvm only as of 2.2.20
+        executionPolicy: KotlinCompilerExecutionStrategy,
         metricsContainer: StatisticsValuesConsumer,
     ) {
         metricsContainer.report(BooleanMetrics.KOTLIN_PROGRESSIVE_MODE, compilerOptions.progressiveMode.get())
@@ -276,6 +278,7 @@ internal object CompileKotlinTaskMetrics : FusMetrics {
         if (firRunnerEnabled) {
             metricsContainer.report(BooleanMetrics.KOTLIN_INCREMENTAL_FIR_RUNNER_ENABLED, true)
         }
+        metricsContainer.report(StringMetrics.KOTLIN_COMPILER_EXECUTION_POLICY, executionPolicy.propertyValue)
     }
 }
 
@@ -373,7 +376,9 @@ internal object KotlinStdlibConfigurationMetrics : FusMetrics {
 internal object KotlinCrossCompilationMetrics : FusMetrics {
     internal fun collectMetrics(project: Project, compilation: KotlinNativeCompilation) {
         val crossCompilationEnabled = project.kotlinPropertiesProvider.enableKlibsCrossCompilation
-        val isSupportedHost = HostManager().isEnabled(compilation.target.konanTarget)
+        val isSupportedHost = runCatching {
+            HostManager().isEnabled(compilation.target.konanTarget)
+        }.getOrDefault(false)
 
         if (isSupportedHost || !crossCompilationEnabled) return
 
@@ -384,5 +389,11 @@ internal object KotlinCrossCompilationMetrics : FusMetrics {
                 }
             }
         }
+    }
+}
+
+internal object KotlinCompilerRefIndexMetrics : FusMetrics {
+    internal fun collectMetrics(enabled: Boolean, metricsConsumer: StatisticsValuesConsumer) {
+        metricsConsumer.report(BooleanMetrics.ENABLED_COMPILER_REFERENCE_INDEX, enabled)
     }
 }

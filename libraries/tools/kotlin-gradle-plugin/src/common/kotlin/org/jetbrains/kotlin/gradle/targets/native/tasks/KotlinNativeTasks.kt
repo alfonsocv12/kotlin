@@ -45,7 +45,6 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilationInfo
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilerArgumentsProducer.CreateCompilerArgumentsContext
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilerArgumentsProducer.CreateCompilerArgumentsContext.Companion.create
-import org.jetbrains.kotlin.gradle.plugin.cocoapods.asValidFrameworkName
 import org.jetbrains.kotlin.gradle.plugin.mpp.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.useXcodeMessageStyle
 import org.jetbrains.kotlin.gradle.plugin.statistics.NativeCompilerOptionMetrics
@@ -179,7 +178,7 @@ abstract class AbstractKotlinNativeCompile<
     @get:Classpath
     override val libraries: ConfigurableFileCollection by providerFactory.provider {
         val nativeCompilation = compilation.tcs.compilation as AbstractKotlinNativeCompilation
-        if (nativeCompilation.crossCompilationOnCurrentHostSupported.getOrThrow()) {
+        if (nativeCompilation.crossCompilationOnCurrentHostSupported) {
             objectFactory.fileCollection().from({ compilation.compileDependencyFiles })
         } else {
             objectFactory.fileCollection()
@@ -231,7 +230,7 @@ abstract class AbstractKotlinNativeCompile<
             val filename = "$prefix${baseName}$suffix".let {
                 when {
                     outputKind == FRAMEWORK ->
-                        it.asValidFrameworkName()
+                        it.asValidFrameworkName
 
                     outputKind in listOf(STATIC, DYNAMIC) ->
                         it.replace('-', '_')
@@ -513,9 +512,13 @@ internal constructor(
             /* Shared native compilations in K2 still use -Xcommon-sources and klib dependencies */
             if (compilerOptions.usesK2.get() && sharedCompilationData == null) {
                 args.fragmentSources = multiplatformStructure.fragmentSourcesCompilerArgs(sources.files, sourceFileFilter)
-                args.fragmentDependencies = if (separateKmpCompilation.get()) {
-                    multiplatformStructure.fragmentDependenciesCompilerArgs
-                } else emptyArray()
+                if (separateKmpCompilation.get()) {
+                    args.fragmentDependencies = multiplatformStructure.fragmentDependenciesCompilerArgs
+                    args.fragmentFriendDependencies = multiplatformStructure.fragmentFriendsCompilerArgs
+                } else {
+                    args.fragmentDependencies = emptyArray()
+                    args.fragmentFriendDependencies = emptyArray()
+                }
             } else {
                 args.commonSources = commonSourcesTree.files.takeIf { it.isNotEmpty() }?.toPathsArray()
             }

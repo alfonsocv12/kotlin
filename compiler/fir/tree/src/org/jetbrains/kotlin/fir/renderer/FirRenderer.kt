@@ -7,7 +7,6 @@ package org.jetbrains.kotlin.fir.renderer
 
 import org.jetbrains.kotlin.builtins.functions.AllowedToUsedOnlyInK1
 import org.jetbrains.kotlin.builtins.functions.FunctionTypeKindExtractor
-import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget
 import org.jetbrains.kotlin.fir.FirAnnotationContainer
 import org.jetbrains.kotlin.fir.FirElement
@@ -16,7 +15,6 @@ import org.jetbrains.kotlin.fir.contracts.FirContractDescription
 import org.jetbrains.kotlin.fir.contracts.FirEffectDeclaration
 import org.jetbrains.kotlin.fir.contracts.description.ConeContractRenderer
 import org.jetbrains.kotlin.fir.declarations.*
-import org.jetbrains.kotlin.fir.declarations.utils.visibility
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.expressions.impl.FirElseIfTrueCondition
 import org.jetbrains.kotlin.fir.expressions.impl.FirExpressionStub
@@ -25,6 +23,7 @@ import org.jetbrains.kotlin.fir.expressions.impl.FirUnitExpression
 import org.jetbrains.kotlin.fir.isCatchParameter
 import org.jetbrains.kotlin.fir.references.*
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirLocalPropertySymbol
 import org.jetbrains.kotlin.fir.symbols.impl.RenderingInternals
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.visitors.FirVisitorVoid
@@ -290,7 +289,7 @@ class FirRenderer(
                 print(".")
             }
             when (callableDeclaration) {
-                is FirSimpleFunction -> {
+                is FirNamedFunction -> {
                     idRenderer.renderCallableId(callableDeclaration.symbol.callableId)
                 }
                 is FirVariable -> {
@@ -377,7 +376,7 @@ class FirRenderer(
 
         override fun visitProperty(property: FirProperty) {
             visitVariable(property)
-            if (property.isLocal || property.visibility == Visibilities.Local) return
+            if (property.symbol is FirLocalPropertySymbol) return
             propertyAccessorRenderer?.render(property)
         }
 
@@ -410,8 +409,8 @@ class FirRenderer(
             receiverParameter.typeRef.accept(this)
         }
 
-        override fun visitSimpleFunction(simpleFunction: FirSimpleFunction) {
-            visitFunction(simpleFunction)
+        override fun visitNamedFunction(namedFunction: FirNamedFunction) {
+            visitFunction(namedFunction)
         }
 
         override fun visitConstructor(constructor: FirConstructor) {
@@ -572,7 +571,7 @@ class FirRenderer(
             print("^")
             val target = returnExpression.target
             val labeledElement = target.labeledElement
-            if (labeledElement is FirSimpleFunction) {
+            if (labeledElement is FirNamedFunction) {
                 print("${labeledElement.name}")
             } else {
                 val labelName = target.labelName

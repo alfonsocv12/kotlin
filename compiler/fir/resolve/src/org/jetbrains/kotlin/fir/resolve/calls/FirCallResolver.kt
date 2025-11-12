@@ -51,7 +51,6 @@ import org.jetbrains.kotlin.fir.types.builder.buildStarProjection
 import org.jetbrains.kotlin.fir.types.builder.buildTypeProjectionWithVariance
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.SpecialNames
-import org.jetbrains.kotlin.resolve.calls.results.TypeSpecificityComparator
 import org.jetbrains.kotlin.resolve.calls.tasks.ExplicitReceiverKind
 import org.jetbrains.kotlin.resolve.calls.tower.ApplicabilityDetail
 import org.jetbrains.kotlin.resolve.calls.tower.CandidateApplicability
@@ -59,6 +58,7 @@ import org.jetbrains.kotlin.resolve.calls.tower.isSuccess
 import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.util.OperatorNameConventions
 import org.jetbrains.kotlin.utils.addToStdlib.runIf
+import org.jetbrains.kotlin.utils.addToStdlib.shouldNotBeCalled
 
 class FirCallResolver(
     private val components: FirAbstractBodyResolveTransformer.BodyResolveTransformerComponents,
@@ -74,7 +74,7 @@ class FirCallResolver(
     }
 
     val conflictResolver: ConeCallConflictResolver =
-        session.callConflictResolverFactory.create(TypeSpecificityComparator.NONE, session.inferenceComponents, components)
+        session.callConflictResolverFactory.create(session.inferenceComponents, components)
 
     fun resolveCallAndSelectCandidate(
         functionCall: FirFunctionCall,
@@ -116,6 +116,9 @@ class FirCallResolver(
         )
 
         functionCall.replaceCalleeReference(nameReference)
+        if (result.forwardedDiagnostics.isNotEmpty()) {
+            functionCall.replaceNonFatalDiagnostics(functionCall.nonFatalDiagnostics + convertForwardedDiagnostics(result))
+        }
         val candidate = (nameReference as? FirNamedReferenceWithCandidate)?.candidate
         candidate?.updateSourcesOfReceivers()
 
@@ -149,8 +152,19 @@ class FirCallResolver(
         return resultFunctionCall
     }
 
+    private fun convertForwardedDiagnostics(result: ResolutionResult): List<ConeDiagnostic> =
+        result.forwardedDiagnostics.map {
+            when (it) {
+                is ImplicitPropertyTypeMakesBehaviorOrderDependant -> ConeImplicitPropertyTypeMakesBehaviorOrderDependant(it.candidateSymbol)
+                else -> shouldNotBeCalled("Implement conversion of the $it forwarded diagnostic")
+            }
+        }
+
     private data class ResolutionResult(
-        val info: CallInfo, val applicability: CandidateApplicability, val candidates: Collection<Candidate>,
+        val info: CallInfo,
+        val applicability: CandidateApplicability,
+        val candidates: Collection<Candidate>,
+        val forwardedDiagnostics: List<ResolutionDiagnostic>,
     )
 
     /** WARNING: This function is public for the analysis API and should only be used there. */
@@ -235,11 +249,11 @@ class FirCallResolver(
             else -> CandidateFactory.createForCollectionLiterals(resolutionContext, containingCallCandidateForBaseCS, info)
         }
 
-        val result = towerResolver.runResolver(info, resolutionContext, collector, candidateFactory)
-        var (reducedCandidates, applicability) = reduceCandidates(result, explicitReceiver, resolutionContext)
+        val resultCollector: CandidateCollector = towerResolver.runResolver(info, resolutionContext, collector, candidateFactory)
+        var (reducedCandidates, applicability) = reduceCandidates(resultCollector, explicitReceiver, resolutionContext)
         reducedCandidates = overloadByLambdaReturnTypeResolver.reduceCandidates(qualifiedAccess, reducedCandidates, reducedCandidates)
 
-        return ResolutionResult(info, applicability, reducedCandidates)
+        return ResolutionResult(info, applicability, reducedCandidates, resultCollector.forwardedDiagnostics())
     }
 
     /**
@@ -736,7 +750,7 @@ class FirCallResolver(
             scope = null
         )
         val applicability = components.resolutionStageRunner.processCandidate(candidate, transformer.resolutionContext)
-        return ResolutionResult(callInfo, applicability, listOf(candidate))
+        return ResolutionResult(callInfo, applicability, candidates = listOf(candidate), forwardedDiagnostics = emptyList())
     }
 
     private fun selectDelegatingConstructorCall(

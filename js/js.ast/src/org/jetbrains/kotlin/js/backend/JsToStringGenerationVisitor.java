@@ -27,6 +27,7 @@ public class JsToStringGenerationVisitor extends JsVisitor {
     private static final char[] CHARS_CONSTRUCTOR = "constructor".toCharArray();
     private static final char[] CHARS_CONTINUE = "continue".toCharArray();
     private static final char[] CHARS_YIELD = "yield".toCharArray();
+    private static final char[] CHARS_YIELD_STAR = "yield*".toCharArray();
     private static final char[] CHARS_DEBUGGER = "debugger".toCharArray();
     private static final char[] CHARS_DEFAULT = "default".toCharArray();
     private static final char[] CHARS_DO = "do".toCharArray();
@@ -356,6 +357,24 @@ public class JsToStringGenerationVisitor extends JsVisitor {
         popSourceInfo();
     }
 
+    @Override
+    public void visitYieldStar(@NotNull JsYieldStar x) {
+        pushSourceInfo(x.getSource());
+        printCommentsBeforeNode(x);
+
+        p.print(CHARS_YIELD_STAR);
+
+        JsExpression expression = x.getExpression();
+
+        if (expression != null) {
+            space();
+            accept(x.getExpression());
+        }
+
+        printCommentsAfterNode(x);
+        popSourceInfo();
+    }
+
     private void continueOrBreakLabel(JsContinue x) {
         JsNameRef label = x.getLabel();
         if (label != null) {
@@ -408,16 +427,6 @@ public class JsToStringGenerationVisitor extends JsVisitor {
         space();
         leftParen();
         nameDef(x.getParameter().getName());
-
-        // Optional catch condition.
-        //
-        JsExpression catchCond = x.getCondition();
-        if (catchCond != null) {
-            space();
-            _if();
-            space();
-            accept(catchCond);
-        }
 
         rightParen();
         space();
@@ -703,7 +712,7 @@ public class JsToStringGenerationVisitor extends JsVisitor {
         rightParen();
     }
 
-    // [static?] [get|set?] name(<params>) { <body> }
+    // [static?] [get|set?] [name|computedName](<params>) { <body> }
     private void printFunction(@NotNull JsFunction x) {
         if (x.isStatic()) {
             p.print(CHARS_STATIC);
@@ -722,7 +731,13 @@ public class JsToStringGenerationVisitor extends JsVisitor {
             p.print(CHARS_GENERATOR);
         }
 
-        if (x.getName() != null) {
+        JsExpression computedName = x.getComputedName();
+
+        if (computedName != null) {
+            leftSquare();
+            accept(computedName);
+            rightSquare();
+        } else if (x.getName() != null) {
             nameOf(x);
         }
 

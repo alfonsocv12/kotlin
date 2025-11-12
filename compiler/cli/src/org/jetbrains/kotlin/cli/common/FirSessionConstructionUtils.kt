@@ -34,7 +34,9 @@ import org.jetbrains.kotlin.platform.wasm.WasmTarget
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.resolve.multiplatform.hmppModuleName
 import org.jetbrains.kotlin.resolve.multiplatform.isCommonSource
+import org.jetbrains.kotlin.utils.addToStdlib.shouldNotBeCalled
 import org.jetbrains.kotlin.wasm.config.WasmConfigurationKeys
+import org.jetbrains.kotlin.wasm.config.wasmTarget
 
 val isCommonSourceForPsi: (KtFile) -> Boolean = { it.isCommonSource == true }
 val fileBelongsToModuleForPsi: (KtFile, String) -> Boolean = { file, moduleName -> file.hmppModuleName == moduleName }
@@ -169,13 +171,13 @@ fun <F> prepareWasmSessions(
         WasmTarget.WASI -> WasmPlatforms.wasmWasi
     }
     return prepareKlibSessions(
-        FirWasmSessionFactory, platform, files, configuration, rootModuleName, resolvedLibraries, libraryList, extensionRegistrars,
+        FirWasmSessionFactory.of(configuration.wasmTarget), platform, files, configuration, rootModuleName, resolvedLibraries, libraryList, extensionRegistrars,
         isCommonSource, fileBelongsToModule, metadataCompilationMode = false, icData,
     )
 }
 
 private fun <F> prepareKlibSessions(
-    sessionFactory: AbstractFirKlibSessionFactory<*, *>,
+    sessionFactory: AbstractFirKlibSessionFactory<*>,
     platform: TargetPlatform,
     files: List<F>,
     configuration: CompilerConfiguration,
@@ -191,7 +193,13 @@ private fun <F> prepareKlibSessions(
     return SessionConstructionUtils.prepareSessions(
         files, configuration, rootModuleName, platform,
         metadataCompilationMode, libraryList, extensionRegistrars, isCommonSource, isScript = { false }, fileBelongsToModule,
-        createSharedLibrarySession = { ->
+        createMetadataSessionFactoryContextForHmppCommonLibrarySession = {
+            AbstractFirMetadataSessionFactory.Context(
+                createJvmContext = { shouldNotBeCalled() },
+                createJsContext = { FirJsSessionFactory.Context(configuration) }
+            )
+        },
+        createSharedLibrarySession = {
             sessionFactory.createSharedLibrarySession(
                 rootModuleName,
                 configuration,
@@ -216,7 +224,10 @@ private fun <F> prepareKlibSessions(
                 icData = icData,
                 init = sessionConfigurator,
             )
-        }
+        },
+        additionalProvidersForMetadataLibrarySessionsInHmppMode = { session, moduleDataProvider, scopeProvider, libraries ->
+            sessionFactory.createAdditionalDependencyProviders(session, moduleDataProvider, scopeProvider, libraries)
+        },
     )
 }
 
@@ -240,18 +251,33 @@ fun <F> prepareMetadataSessions(
 ): List<SessionWithSources<F>> {
     val packagePartProvider = projectEnvironment.getPackagePartProvider(librariesScope) as PackageAndMetadataPartProvider
     val languageVersionSettings = configuration.languageVersionSettings
+    val targetPlatform = configuration.targetPlatform ?: CommonPlatforms.defaultCommonPlatform
+    val sessionFactory = FirMetadataSessionFactory(targetPlatform)
+    val context = AbstractFirMetadataSessionFactory.Context(
+        createJvmContext = {
+            FirJvmSessionFactory.Context(
+                configuration,
+                projectEnvironment,
+                librariesScope,
+                registerJvmDeserializationExtension = false,
+            )
+        },
+        createJsContext = { FirJsSessionFactory.Context(configuration) },
+    )
     return SessionConstructionUtils.prepareSessions(
-        files, configuration, rootModuleName, CommonPlatforms.defaultCommonPlatform,
+        files, configuration, rootModuleName, targetPlatform,
         metadataCompilationMode = true, libraryList, extensionRegistrars, isCommonSource, isScript = { false }, fileBelongsToModule,
-        createSharedLibrarySession = { ->
-            FirMetadataSessionFactory.createSharedLibrarySession(
+        createMetadataSessionFactoryContextForHmppCommonLibrarySession = { context },
+        createSharedLibrarySession = {
+            sessionFactory.createSharedLibrarySession(
                 rootModuleName,
                 languageVersionSettings,
                 extensionRegistrars,
+                context,
             )
         },
         createLibrarySession = { sharedLibrarySession ->
-            FirMetadataSessionFactory.createLibrarySession(
+            sessionFactory.createLibrarySession(
                 sharedLibrarySession,
                 libraryList.moduleDataProvider,
                 extensionRegistrars,
@@ -262,15 +288,17 @@ fun <F> prepareMetadataSessions(
                 ),
                 resolvedLibraries,
                 languageVersionSettings,
+                context,
             )
         },
         createSourceSession = { moduleFiles, moduleData, isForLeafHmppModule, sessionConfigurator ->
-            FirMetadataSessionFactory.createSourceSession(
+            sessionFactory.createSourceSession(
                 moduleData,
                 projectEnvironment,
                 incrementalCompilationContext = createProviderAndScopeForIncrementalCompilation(moduleFiles),
                 extensionRegistrars,
                 configuration,
+                context,
                 isForLeafHmppModule,
                 init = sessionConfigurator
             )
@@ -308,9 +336,11 @@ object SessionConstructionUtils {
         isCommonSource: (F) -> Boolean,
         isScript: (F) -> Boolean,
         fileBelongsToModule: (F, String) -> Boolean,
+        createMetadataSessionFactoryContextForHmppCommonLibrarySession: () -> AbstractFirMetadataSessionFactory.Context,
         createSharedLibrarySession: () -> FirSession,
         createLibrarySession: (sharedLibrarySession: FirSession) -> FirSession,
         createSourceSession: FirSessionProducer<F>,
+        additionalProvidersForMetadataLibrarySessionsInHmppMode: AdditionalProvidersSupplier? = null,
     ): List<SessionWithSources<F>> {
         val languageVersionSettings = configuration.languageVersionSettings
         val (scripts, nonScriptFiles) = when (configuration.dontCreateSeparateSessionForScripts) {
@@ -355,7 +385,8 @@ object SessionConstructionUtils {
             languageVersionSettings.getFlag(AnalysisFlags.hierarchicalMultiplatformCompilation) -> createSessionsForHierarchicalMppProject(
                 nonScriptFiles, rootModuleName, hmppModuleStructure, libraryList, configuration,
                 extensionRegistrars, sharedLibrarySession, targetPlatform,
-                sessionConfigurator, fileBelongsToModule, createSourceSession
+                sessionConfigurator, fileBelongsToModule, createMetadataSessionFactoryContextForHmppCommonLibrarySession,
+                createSourceSession, additionalProvidersForMetadataLibrarySessionsInHmppMode,
             )
 
             else -> createSessionsForMppProject(
@@ -522,10 +553,13 @@ object SessionConstructionUtils {
         targetPlatform: TargetPlatform,
         sessionConfigurator: FirSessionConfigurator.() -> Unit,
         fileBelongsToModule: (F, String) -> Boolean,
+        createMetadataSessionFactoryContextForHmppCommonLibrarySession: () -> AbstractFirMetadataSessionFactory.Context,
         createFirSession: FirSessionProducer<F>,
+        additionalProvidersForMetadataLibrarySessions: AdditionalProvidersSupplier?,
     ): List<SessionWithSources<F>> {
         val moduleDataForHmppModule = LinkedHashMap<HmppCliModule, FirModuleData>()
 
+        val metadataSessionFactoryContext = createMetadataSessionFactoryContextForHmppCommonLibrarySession()
         for ((index, module) in hmppModuleStructure.modules.withIndex()) {
             val dependencies = hmppModuleStructure.sourceDependencies[module]
                 ?.map { moduleDataForHmppModule.getValue(it) }
@@ -568,13 +602,17 @@ object SessionConstructionUtils {
                     dependencies(libPaths)
                     friendDependencies(friendLibPaths)
                 }.also { libraryList ->
-                    FirMetadataSessionFactoryForHmppCompilation.createLibrarySession(
+                    FirMetadataSessionFactoryForHmppCompilation(
+                        configuration.targetPlatform ?: CommonPlatforms.defaultCommonPlatform
+                    ).createLibrarySession(
                         sharedLibrarySession,
                         libraryList.moduleDataProvider,
                         extensionRegistrars,
                         jarMetadataProviderComponents = null,
                         klibs,
                         configuration.languageVersionSettings,
+                        metadataSessionFactoryContext,
+                        additionalProvidersForMetadataLibrarySessions,
                     )
                 }
             }

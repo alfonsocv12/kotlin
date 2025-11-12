@@ -29,7 +29,7 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinGradlePluginDsl
  *
  * Note that this DSL is experimental, and it will likely change in future versions until it is stable.
  *
- * @since 2.1.20
+ * @since 2.2.0
  */
 /*
 We can't mark top level extensions with @ExperimentalAbiValidation because
@@ -54,51 +54,9 @@ interface AbiValidationExtension : AbiValidationVariantSpec {
     val enabled: Property<Boolean>
 
     /**
-     * All ABI validation report variants that are available in this project.
-     *
-     * See [AbiValidationVariantSpec] for more details about report variants.
-     *
-     * By default, each project always has one variant, called the main variant. It is named [AbiValidationVariantSpec.MAIN_VARIANT_NAME] and is configured in the `kotlin {}` block:
-     *
-     * ```kotlin
-     * kotlin {
-     *     abiValidation {
-     *         // main variant configuration
-     *     }
-     * }
-     * ```
-     *
-     * This is a live mutable collection. New custom variants can be created using special functions such as [NamedDomainObjectContainer.create] or [NamedDomainObjectContainer.register].
-     * Variants can also be configured at the time of their creation:
-     *
-     * ```kotlin
-     * kotlin {
-     *     abiValidation {
-     *         variants.register("my") {
-     *             // 'my' variant configuration, not main
-     *         }
-     *     }
-     * }
-     * ```
-     * Or later:
-     *
-     * ```kotlin
-     * kotlin {
-     *     abiValidation {
-     *         variants.register("my")
-     *     }
-     * }
-     * //
-     * kotlin {
-     *     abiValidation {
-     *         variants.getByName("my").filters {
-     *             // configure filters for 'my' variant
-     *         }
-     *     }
-     * }
-     * ```
+     * @deprecated Variants DSL was removed and is no longer supported.
      */
-    @ExperimentalAbiValidation
+    @Deprecated("Variants DSL was removed and is no longer supported.", level = DeprecationLevel.ERROR)
     val variants: NamedDomainObjectContainer<AbiValidationVariantSpec>
 }
 
@@ -139,7 +97,7 @@ interface AbiValidationExtension : AbiValidationVariantSpec {
  *
  * Note that this DSL is experimental, and it will likely change in future versions until it is stable.
  *
- * @since 2.1.20
+ * @since 2.2.0
  */
 /*
 We can't mark top level extensions with @ExperimentalAbiValidation because
@@ -149,7 +107,7 @@ which cannot be suppressed.
 See Gradle issue https://github.com/gradle/gradle/issues/32019
  */
 @KotlinGradlePluginDsl
-interface AbiValidationVariantSpec : Named {
+interface AbiValidationVariantSpec {
     /**
      * A set of filtering rules that restrict Application Binary Interface (ABI) declarations from being included in a dump.
      *
@@ -159,12 +117,12 @@ interface AbiValidationVariantSpec : Named {
      * ```kotlin
      * abiValidation {
      *     filters {
-     *         excluded {
+     *         exclude {
      *             byNames.add("foo.Bar")
      *             annotatedWith.add("foo.ExcludeAbi")
      *         }
      *
-     *         included {
+     *         include {
      *             byNames.add("foo.api.**")
      *             annotatedWith.add("foo.PublicApi")
      *         }
@@ -211,22 +169,9 @@ interface AbiValidationVariantSpec : Named {
     @ExperimentalAbiValidation
     companion object {
         /**
-         * The report variant name for the variant configured in the `kotlin {}` block:
-         *
-         * ```kotlin
-         * kotlin {
-         *     abiValidation {
-         *         // main variant
-         *     }
-         * }
-         * ```
-
-         *
-         * This variant is also called the "main variant".
-         *
-         * See [AbiValidationVariantSpec] for more details about report variants.
+         * @deprecated Variants DSL was removed and is no longer supported.
          */
-        @ExperimentalAbiValidation
+        @Deprecated("Variants DSL was removed and is no longer supported.", level = DeprecationLevel.ERROR)
         const val MAIN_VARIANT_NAME = "main"
     }
 }

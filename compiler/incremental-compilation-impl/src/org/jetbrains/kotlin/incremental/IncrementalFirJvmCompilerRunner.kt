@@ -38,7 +38,7 @@ import org.jetbrains.kotlin.cli.jvm.plugins.PluginCliParser
 import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporterFactory
 import org.jetbrains.kotlin.fir.backend.jvm.JvmFir2IrExtensions
-import org.jetbrains.kotlin.fir.pipeline.FirResult
+import org.jetbrains.kotlin.fir.pipeline.AllModulesFrontendOutput
 import org.jetbrains.kotlin.fir.session.environment.AbstractProjectFileSearchScope
 import org.jetbrains.kotlin.incremental.components.ExpectActualTracker
 import org.jetbrains.kotlin.incremental.components.ICFileMappingTracker
@@ -50,6 +50,7 @@ import org.jetbrains.kotlin.metadata.deserialization.MetadataVersion
 import org.jetbrains.kotlin.metadata.jvm.deserialization.JvmProtoBufUtil
 import org.jetbrains.kotlin.modules.TargetId
 import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
 import org.jetbrains.kotlin.progress.CompilationCanceledException
 import org.jetbrains.kotlin.util.PhaseType
 import java.io.File
@@ -62,6 +63,7 @@ open class IncrementalFirJvmCompilerRunner(
     classpathChanges: ClasspathChanges,
     kotlinSourceFilesExtensions: Set<String> = DEFAULT_KOTLIN_SOURCE_FILES_EXTENSIONS,
     icFeatures: IncrementalCompilationFeatures = IncrementalCompilationFeatures.DEFAULT_CONFIGURATION,
+    generateCompilerRefIndex: Boolean = false,
 ) : IncrementalJvmCompilerRunner(
     workingDir,
     reporter,
@@ -69,6 +71,7 @@ open class IncrementalFirJvmCompilerRunner(
     classpathChanges,
     kotlinSourceFilesExtensions,
     icFeatures,
+    generateCompilerRefIndex,
 ) {
 
     override fun runCompiler(
@@ -102,6 +105,7 @@ open class IncrementalFirJvmCompilerRunner(
             val configuration = CompilerConfiguration().apply {
 
                 put(CLIConfigurationKeys.ORIGINAL_MESSAGE_COLLECTOR_KEY, messageCollector)
+                this.targetPlatform = JvmPlatforms.defaultJvmPlatform
                 this.messageCollector = collector
 
                 setupCommonArguments(args) { MetadataVersion(*it) }
@@ -203,7 +207,7 @@ open class IncrementalFirJvmCompilerRunner(
 
             var incrementalExcludesScope: AbstractProjectFileSearchScope? = null
 
-            fun firIncrementalCycle(): FirResult? {
+            fun firIncrementalCycle(): AllModulesFrontendOutput? {
                 while (true) {
                     val dirtySourcesByModuleName = sourcesByModuleName.mapValues { (_, sources) ->
                         sources.filterTo(mutableSetOf()) { dirtySources.any { df -> df.path == it.path } }

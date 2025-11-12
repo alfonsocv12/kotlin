@@ -21,9 +21,12 @@ import org.gradle.api.tasks.SourceSet
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.api.tasks.testing.Test
 import org.gradle.kotlin.dsl.dependencies
+import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.project
 import org.gradle.kotlin.dsl.register
 import org.jetbrains.kotlin.build.project.tests.CollectTestDataTask
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.plugin.attributes.KlibPackaging
 import java.io.File
 
 abstract class ProjectTestsExtension(val project: Project) {
@@ -61,6 +64,26 @@ abstract class ProjectTestsExtension(val project: Project) {
     val testJsRuntimeForTests: Configuration = project.configurations.create("testJsRuntimeForTests") {
         isTransitive = false
     }
+    val stdlibWasmJsRuntimeForTests: Configuration = project.configurations.create("stdlibWasmJsRuntimeForTests") {
+        isTransitive = false
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        attributes.attribute(KlibPackaging.ATTRIBUTE, project.objects.named(KlibPackaging.NON_PACKED))
+    }
+    val stdlibWasmWasiRuntimeForTests: Configuration = project.configurations.create("stdlibWasmWasiRuntimeForTests") {
+        isTransitive = false
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        attributes.attribute(KlibPackaging.ATTRIBUTE, project.objects.named(KlibPackaging.NON_PACKED))
+    }
+    val testWasmJsRuntimeForTests: Configuration = project.configurations.create("testWasmJsRuntimeForTests") {
+        isTransitive = false
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        attributes.attribute(KlibPackaging.ATTRIBUTE, project.objects.named(KlibPackaging.NON_PACKED))
+    }
+    val testWasmWasiRuntimeForTests: Configuration = project.configurations.create("testWasmWasiRuntimeForTests") {
+        isTransitive = false
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        attributes.attribute(KlibPackaging.ATTRIBUTE, project.objects.named(KlibPackaging.NON_PACKED))
+    }
 
     private val noOp = project.kotlinBuildProperties.isInJpsBuildIdeaSync
     private fun add(configuration: Configuration, dependency: DependencyHandler.() -> ProjectDependency) {
@@ -97,6 +120,13 @@ abstract class ProjectTestsExtension(val project: Project) {
 
     fun withTestJsRuntime() {
         add(testJsRuntimeForTests) { project(":kotlin-test", "jsRuntimeElements") }
+    }
+
+    fun withWasmRuntime() {
+        add(stdlibWasmJsRuntimeForTests) { project(":kotlin-stdlib", "wasmJsRuntimeElements") }
+        add(stdlibWasmWasiRuntimeForTests) { project(":kotlin-stdlib", "wasmWasiRuntimeElements") }
+        add(testWasmJsRuntimeForTests) { project(":kotlin-test", "wasmJsRuntimeElements") }
+        add(testWasmWasiRuntimeForTests) { project(":kotlin-test", "wasmWasiRuntimeElements") }
     }
 
     fun withScriptingPlugin() {
@@ -233,6 +263,7 @@ abstract class ProjectTestsExtension(val project: Project) {
         taskName: String = "generateTests",
         doNotSetFixturesSourceSetDependency: Boolean = false,
         generateTestsInBuildDirectory: Boolean = false,
+        skipCollectDataTask: Boolean = false,
         configure: JavaExec.() -> Unit = {}
     ) {
         val fixturesSourceSet = if (doNotSetFixturesSourceSetDependency) {
@@ -242,13 +273,17 @@ abstract class ProjectTestsExtension(val project: Project) {
         }
         val generationPath = when (generateTestsInBuildDirectory) {
             false -> project.layout.projectDirectory.dir("tests-gen")
-            true -> project.layout.buildDirectory.dir("tests-gen").get().also {
-                project.sourceSets.named(SourceSet.TEST_SOURCE_SET_NAME) {
-                    generatedDir(project, it)
-                }
-            }
+            true -> project.layout.buildDirectory.dir("tests-gen").get()
         }
-        val generatorTask = project.generator(taskName, fqName, fixturesSourceSet) {
+        val generatorTask = project.generator(
+            taskName = taskName,
+            fqName = fqName,
+            sourceSet = fixturesSourceSet ?: project.testSourceSet,
+            inputKind = when (doNotSetFixturesSourceSetDependency) {
+                true -> GeneratorInputKind.RuntimeClasspath
+                false -> GeneratorInputKind.SourceSetJar
+            }
+        ) {
             this.args = buildList {
                 add(generationPath.asFile.absolutePath)
                 if (generateTestsInBuildDirectory) {
@@ -265,7 +300,10 @@ abstract class ProjectTestsExtension(val project: Project) {
             }
             configure()
         }
-        if (generateTestsInBuildDirectory) {
+        if (generateTestsInBuildDirectory && !skipCollectDataTask) {
+            project.sourceSets.named(SourceSet.TEST_SOURCE_SET_NAME) {
+                generatedDir(project, generatorTask.map { generationPath })
+            }
             configureCollectTestDataTask(generatorTask)
         }
     }

@@ -51,6 +51,7 @@ fastutil = "8.5.14-jb1"
 rwmutex-idea = "0.0.7"
 # Wasm specific
 wasmedge = "0.14.0"
+wasmtime = "38.0.3"
 jscSequoia = "299490"
 jscLinux = "299491"
 jscWindows = "299491"
@@ -67,11 +68,12 @@ commons-beanutils = "1.11.0"
 commons-compress = "1.27.1"
 commons-io = "2.18.0"
 commons-lang = "3.18.0"
-dataframe-dev = "1.0.0-dev-8729"
+dataframe-dev = "1.0.0-dev-8762"
 org-jetbrains-syntax-api = "0.3.340"
 org-jetbrains-annotations = "26.0.2"
 schema-kenerator = "2.1.2"
 kotlinpoet = "2.2.0"
+antlr = "4.13.2"
 
 [libraries]
 dexMemberList = { module = "com.jakewharton.dex:dex-member-list", version.ref = "dexMemberList" }
@@ -107,6 +109,7 @@ apache-commons-compress = { module = "org.apache.commons:commons-compress", vers
 apache-commons-io = { module = "commons-io:commons-io", version.ref = "commons-io" }
 apache-commons-lang = { module = "org.apache.commons:commons-lang3", version.ref = "commons-lang" }
 
+ktor-http = { module = "io.ktor:ktor-http", version.ref = "ktor" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
@@ -175,6 +178,9 @@ schema-kenerator-serialization = { module = "io.github.smiley4:schema-kenerator-
 schema-kenerator-jsonschema = { module = "io.github.smiley4:schema-kenerator-jsonschema", version.ref="schema-kenerator" }
 
 kotlinpoet = { module = "com.squareup:kotlinpoet", version.ref = "kotlinpoet" }
+
+antlr = { module = "org.antlr:antlr4", version.ref = "antlr" }
+antlr-runtime = { module = "org.antlr:antlr4-runtime", version.ref = "antlr" }
 
 [plugins]
 jetbrains-ideaExt = { id = "org.jetbrains.gradle.plugin.idea-ext", version.ref = "jetbrains-ideaExt" }

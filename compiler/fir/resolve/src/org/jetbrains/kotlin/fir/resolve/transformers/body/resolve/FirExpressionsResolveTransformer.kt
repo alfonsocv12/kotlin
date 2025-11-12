@@ -14,6 +14,7 @@ import org.jetbrains.kotlin.fir.declarations.utils.isExternal
 import org.jetbrains.kotlin.fir.diagnostics.*
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.expressions.FirOperation.*
+import org.jetbrains.kotlin.fir.expressions.InaccessibleReceiverKind.ClassHeader
 import org.jetbrains.kotlin.fir.expressions.InaccessibleReceiverKind.OuterClassOfNonInner
 import org.jetbrains.kotlin.fir.expressions.InaccessibleReceiverKind.SecondaryConstructor
 import org.jetbrains.kotlin.fir.expressions.builder.*
@@ -124,7 +125,7 @@ open class FirExpressionsResolveTransformer(transformer: FirAbstractBodyResolveT
             is FirThisReference -> {
                 val labelName = callee.labelName
                 val allMatchingImplicitReceivers = implicitValueStorage[labelName]
-                val implicitReceiver = allMatchingImplicitReceivers.singleWithoutDuplicatingContextReceiversOrNull() ?: run {
+                val implicitReceiver = allMatchingImplicitReceivers.singleOrNull() ?: run {
                     val diagnostic = allMatchingImplicitReceivers.ambiguityDiagnosticFor(labelName)
                     qualifiedAccessExpression.resultType = ConeErrorType(diagnostic)
                     callee.replaceDiagnostic(diagnostic)
@@ -142,7 +143,10 @@ open class FirExpressionsResolveTransformer(transformer: FirAbstractBodyResolveT
                 val resultType: ConeKotlinType = when {
                     implicitReceiver is InaccessibleImplicitReceiverValue -> ConeErrorType(
                         when (implicitReceiver.kind) {
-                            SecondaryConstructor -> ConeInstanceAccessBeforeSuperCall("<this>")
+                            @OptIn(OnlyForDefaultLanguageFeatureDisabled::class)
+                            SecondaryConstructor,
+                            ClassHeader,
+                                -> ConeInstanceAccessBeforeSuperCall("<this>")
                             OuterClassOfNonInner -> ConeInaccessibleOuterClass(implicitReceiver.boundSymbol)
                         }
                     )
@@ -657,6 +661,7 @@ open class FirExpressionsResolveTransformer(transformer: FirAbstractBodyResolveT
                 constructorSymbol.fir,
                 originScope = null,
                 callSiteIsOperatorCall = false,
+                lookInContextParameters = false,
             )
             val argumentsToParameters = mapping.toArgumentToParameterMapping().unwrapAtoms()
 

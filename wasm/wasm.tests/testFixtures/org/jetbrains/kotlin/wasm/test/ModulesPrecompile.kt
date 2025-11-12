@@ -6,7 +6,6 @@
 package org.jetbrains.kotlin.wasm.test
 
 import org.jetbrains.kotlin.K1Deprecation
-import org.jetbrains.kotlin.backend.wasm.writeCompilationResult
 import org.jetbrains.kotlin.cli.common.arguments.K2JSCompilerArguments
 import org.jetbrains.kotlin.cli.common.arguments.toLanguageVersionSettings
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
@@ -33,8 +32,8 @@ import java.io.File
 private val outputDir: File
     get() = File(System.getProperty("kotlin.wasm.test.root.out.dir") ?: error("Please set output dir path"))
 
-const val precompiledStdlibOutputName: String = "_kotlin_"
-const val precompiledKotlinTestOutputName: String = "_kotlin-test_"
+const val precompiledStdlibOutputName: String = "kotlin-kotlin-stdlib"
+const val precompiledKotlinTestOutputName: String = "kotlin-kotlin-test"
 
 val precompiledStdlibOutputDir: File
     get() = File(outputDir, "out/precompile/$precompiledStdlibOutputName")
@@ -66,6 +65,7 @@ fun precompileWasmModules() {
         it.put(WasmConfigurationKeys.WASM_ENABLE_ARRAY_RANGE_CHECKS, true)
         it.put(WasmConfigurationKeys.WASM_TARGET, WasmTarget.JS)
         it.put(WasmConfigurationKeys.WASM_GENERATE_WAT, debugMode >= DebugMode.DEBUG)
+        it.put(JSConfigurationKeys.USE_DEBUGGER_CUSTOM_FORMATTERS, debugMode >= DebugMode.DEBUG)
         it.languageVersionSettings = languageSettings
     }
 
@@ -101,13 +101,11 @@ fun precompileWasmModules() {
             this.includes = includes
         }
 
-        val compiledWasm = WasmBackendPipelinePhase.compileNonIncrementally(
+        WasmBackendPipelinePhase.compileNonIncrementally(
             configuration = configuration,
             module = module,
             mainCallArguments = null
         ) ?: error("Fail to precompile $includes")
-
-        writeCompilationResult(compiledWasm.result, compiledWasm.outputDir, outputName)
 
         if (debugMode >= DebugMode.DEBUG) {
             println(" ------ Wat  file://${outputDir.canonicalPath}/$outputName.wat")
@@ -123,6 +121,14 @@ fun precompileWasmModules() {
         outputName = precompiledStdlibOutputName,
         outputDir = precompiledStdlibOutputDir,
     )
+
+    val relativeStdlibPath = precompiledStdlibOutputDir.relativeTo(precompiledKotlinTestOutputDir).path.replace('\\', '/')
+
+    val rawResolutionMap = "<kotlin>:$relativeStdlibPath/$precompiledStdlibOutputName"
+    with(configuration) {
+        put<String>(WasmConfigurationKeys.WASM_DEPENDENCY_RESOLUTION_MAP, rawResolutionMap)
+    }
+
     compileWasmModule(
         includes = kotlinTestPath,
         libraries = listOf(stdlibPath, kotlinTestPath),

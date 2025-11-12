@@ -53,6 +53,12 @@ public class FirStandaloneNormalAnalysisSourceModuleCollectDiagnosticsTestGenera
   }
 
   @Test
+  @TestMetadata("baseConditionsOnDeclarationSite.kt")
+  public void testBaseConditionsOnDeclarationSite() {
+    runTest("analysis/analysis-api/testData/components/diagnosticsProvider/diagnostics/baseConditionsOnDeclarationSite.kt");
+  }
+
+  @Test
   @TestMetadata("callablesFromScript.kt")
   public void testCallablesFromScript() {
     runTest("analysis/analysis-api/testData/components/diagnosticsProvider/diagnostics/callablesFromScript.kt");
@@ -74,6 +80,12 @@ public class FirStandaloneNormalAnalysisSourceModuleCollectDiagnosticsTestGenera
   @TestMetadata("contracts.kt")
   public void testContracts() {
     runTest("analysis/analysis-api/testData/components/diagnosticsProvider/diagnostics/contracts.kt");
+  }
+
+  @Test
+  @TestMetadata("contractsOnAccessorsAllowed.kt")
+  public void testContractsOnAccessorsAllowed() {
+    runTest("analysis/analysis-api/testData/components/diagnosticsProvider/diagnostics/contractsOnAccessorsAllowed.kt");
   }
 
   @Test
@@ -316,6 +328,12 @@ public class FirStandaloneNormalAnalysisSourceModuleCollectDiagnosticsTestGenera
     runTest("analysis/analysis-api/testData/components/diagnosticsProvider/diagnostics/varargParameterFromLibraryWithFunctionalType.kt");
   }
 
+  @Test
+  @TestMetadata("withOperatorFunction.kt")
+  public void testWithOperatorFunction() {
+    runTest("analysis/analysis-api/testData/components/diagnosticsProvider/diagnostics/withOperatorFunction.kt");
+  }
+
   @Nested
   @TestMetadata("analysis/analysis-api/testData/components/diagnosticsProvider/diagnostics/mustUseReturnValue")
   @TestDataPath("$PROJECT_ROOT")
@@ -347,6 +365,58 @@ public class FirStandaloneNormalAnalysisSourceModuleCollectDiagnosticsTestGenera
     @TestMetadata("mustUseReturnValueHalfEnabledFromLibrary.kt")
     public void testMustUseReturnValueHalfEnabledFromLibrary() {
       runTest("analysis/analysis-api/testData/components/diagnosticsProvider/diagnostics/mustUseReturnValue/mustUseReturnValueHalfEnabledFromLibrary.kt");
+    }
+  }
+
+  @Nested
+  @TestMetadata("analysis/analysis-api/testData/components/diagnosticsProvider/diagnostics/noRuntime")
+  @TestDataPath("$PROJECT_ROOT")
+  public class NoRuntime {
+    @Test
+    public void testAllFilesPresentInNoRuntime() {
+      KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("analysis/analysis-api/testData/components/diagnosticsProvider/diagnostics/noRuntime"), Pattern.compile("^(.+)\\.kt$"), null, true);
+    }
+
+    @Test
+    @TestMetadata("anonymousObjectWithMissingAny.kt")
+    public void testAnonymousObjectWithMissingAny() {
+      runTest("analysis/analysis-api/testData/components/diagnosticsProvider/diagnostics/noRuntime/anonymousObjectWithMissingAny.kt");
+    }
+
+    @Test
+    @TestMetadata("companionObjectWithMissingAny.kt")
+    public void testCompanionObjectWithMissingAny() {
+      runTest("analysis/analysis-api/testData/components/diagnosticsProvider/diagnostics/noRuntime/companionObjectWithMissingAny.kt");
+    }
+
+    @Test
+    @TestMetadata("objectWithMissingAny.kt")
+    public void testObjectWithMissingAny() {
+      runTest("analysis/analysis-api/testData/components/diagnosticsProvider/diagnostics/noRuntime/objectWithMissingAny.kt");
+    }
+
+    @Test
+    @TestMetadata("objectWithResolvedSuperInterfaceAndMissingAny.kt")
+    public void testObjectWithResolvedSuperInterfaceAndMissingAny() {
+      runTest("analysis/analysis-api/testData/components/diagnosticsProvider/diagnostics/noRuntime/objectWithResolvedSuperInterfaceAndMissingAny.kt");
+    }
+
+    @Test
+    @TestMetadata("objectWithResolvedSuperclassAndMissingAny.kt")
+    public void testObjectWithResolvedSuperclassAndMissingAny() {
+      runTest("analysis/analysis-api/testData/components/diagnosticsProvider/diagnostics/noRuntime/objectWithResolvedSuperclassAndMissingAny.kt");
+    }
+
+    @Test
+    @TestMetadata("objectWithUnresolvedSuperInterfaceAndMissingAny.kt")
+    public void testObjectWithUnresolvedSuperInterfaceAndMissingAny() {
+      runTest("analysis/analysis-api/testData/components/diagnosticsProvider/diagnostics/noRuntime/objectWithUnresolvedSuperInterfaceAndMissingAny.kt");
+    }
+
+    @Test
+    @TestMetadata("objectWithUnresolvedSuperclassAndMissingAny.kt")
+    public void testObjectWithUnresolvedSuperclassAndMissingAny() {
+      runTest("analysis/analysis-api/testData/components/diagnosticsProvider/diagnostics/noRuntime/objectWithUnresolvedSuperclassAndMissingAny.kt");
     }
   }
 

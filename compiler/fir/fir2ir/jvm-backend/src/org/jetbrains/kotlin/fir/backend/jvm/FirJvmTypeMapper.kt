@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.impl.ConeTypeParameterTypeImpl
 import org.jetbrains.kotlin.load.kotlin.TypeMappingMode
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.ClassIdBasedLocality
 import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.types.AbstractTypeMapper
@@ -82,6 +83,8 @@ class FirJvmTypeMapper(override val session: FirSession) : FirSessionComponent, 
         override fun getClassInternalName(typeConstructor: TypeConstructorMarker): String {
             require(typeConstructor is ConeClassLikeLookupTag)
             val classId = typeConstructor.classId
+
+            @OptIn(ClassIdBasedLocality::class)
             val name = if (classId.isLocal) safeShortClassName(classId) else classId.asString()
             return name.replace(".", "$")
         }
@@ -144,7 +147,7 @@ class FirJvmTypeMapper(override val session: FirSession) : FirSessionComponent, 
         }
 
         private fun ConeClassLikeType.parentClassOrNull(): FirRegularClassSymbol? {
-            val parentClassId = classId?.outerClassId ?: return null
+            val parentClassId = classId.outerClassId ?: return null
             return session.symbolProvider.getClassLikeSymbolByClassId(parentClassId) as? FirRegularClassSymbol?
         }
 
@@ -224,6 +227,7 @@ class FirJvmTypeMapper(override val session: FirSession) : FirSessionComponent, 
     }
 
     internal fun getJvmShortName(classId: ClassId): String {
+        @OptIn(ClassIdBasedLocality::class)
         val result = runUnless(classId.isLocal) {
             classId.asSingleFqName().toUnsafe().let { JavaToKotlinClassMap.mapKotlinToJava(it)?.shortClassName?.asString() }
         }

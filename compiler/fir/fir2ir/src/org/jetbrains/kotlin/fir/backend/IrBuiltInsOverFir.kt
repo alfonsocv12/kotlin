@@ -122,16 +122,16 @@ class IrBuiltInsOverFir(
     override val longClass: IrClassSymbol get() = fir2irBuiltins.longClass
     override val longType: IrType get() = fir2irBuiltins.longType
 
-    override val ubyteClass: IrClassSymbol get() = fir2irBuiltins.ubyteClass
+    override val ubyteClass: IrClassSymbol? get() = fir2irBuiltins.ubyteClass
     override val ubyteType: IrType get() = fir2irBuiltins.ubyteType
 
-    override val ushortClass: IrClassSymbol get() = fir2irBuiltins.ushortClass
+    override val ushortClass: IrClassSymbol? get() = fir2irBuiltins.ushortClass
     override val ushortType: IrType get() = fir2irBuiltins.ushortType
 
-    override val uintClass: IrClassSymbol get() = fir2irBuiltins.uintClass
+    override val uintClass: IrClassSymbol? get() = fir2irBuiltins.uintClass
     override val uintType: IrType get() = fir2irBuiltins.uintType
 
-    override val ulongClass: IrClassSymbol get() = fir2irBuiltins.ulongClass
+    override val ulongClass: IrClassSymbol? get() = fir2irBuiltins.ulongClass
     override val ulongType: IrType get() = fir2irBuiltins.ulongType
 
     override val floatClass: IrClassSymbol get() = fir2irBuiltins.floatClass
@@ -254,6 +254,9 @@ class IrBuiltInsOverFir(
     }
 
     override val enumClass: IrClassSymbol by lazy { fir2irBuiltins.loadClass(StandardClassIds.Enum) }
+
+    override val deprecatedSymbol: IrClassSymbol by lazy { fir2irBuiltins.loadClass(StandardClassIds.Annotations.Deprecated) }
+    override val deprecationLevelSymbol: IrClassSymbol by lazy { fir2irBuiltins.loadClass(StandardClassIds.DeprecationLevel) }
 
     @OptIn(UnsafeDuringIrConstructionAPI::class)
     override val intPlusSymbol: IrSimpleFunctionSymbol

@@ -31,6 +31,7 @@ private val jvmFilePhases = createFilePhases(
     ::TypeAliasAnnotationMethodsLowering,
     ::ProvisionalFunctionExpressionLowering,
 
+    ::JvmVersionOverloadsLowering,
     ::JvmOverloadsAnnotationLowering,
     ::MainMethodGenerationLowering,
 
@@ -49,6 +50,7 @@ private val jvmFilePhases = createFilePhases(
     ::SuspendLambdaLowering,
     ::PropertyReferenceDelegationLowering,
     ::SingletonOrConstantDelegationLowering,
+    ::JvmUpgradeCallableReferences,
     ::PropertyReferenceLowering,
     ::ArrayConstructorLowering,
 
@@ -74,9 +76,8 @@ private val jvmFilePhases = createFilePhases(
     ::AssertionLowering,
     ::JvmReturnableBlockLowering,
     ::SingletonReferencesLowering,
-    ::SharedVariablesLowering,
+    ::JvmSharedVariablesLowering,
 
-    ::JvmUpgradeCallableReferences,
     ::JvmInventNamesForLocalFunctions,
     ::JvmLocalDeclarationsLowering,
     ::JvmLocalDeclarationPopupLowering,

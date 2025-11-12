@@ -691,17 +691,29 @@ public abstract interface class org/jetbrains/kotlin/gradle/dsl/abi/AbiFilterSet
 }
 
 public abstract interface class org/jetbrains/kotlin/gradle/dsl/abi/AbiFiltersSpec {
+	public abstract fun exclude (Lkotlin/jvm/functions/Function1;)V
+	public abstract fun exclude (Lorg/gradle/api/Action;)V
 	public abstract fun excluded (Lkotlin/jvm/functions/Function1;)V
 	public abstract fun excluded (Lorg/gradle/api/Action;)V
+	public abstract fun getExclude ()Lorg/jetbrains/kotlin/gradle/dsl/abi/AbiFilterSetSpec;
 	public abstract fun getExcluded ()Lorg/jetbrains/kotlin/gradle/dsl/abi/AbiFilterSetSpec;
+	public abstract fun getInclude ()Lorg/jetbrains/kotlin/gradle/dsl/abi/AbiFilterSetSpec;
 	public abstract fun getIncluded ()Lorg/jetbrains/kotlin/gradle/dsl/abi/AbiFilterSetSpec;
+	public abstract fun include (Lkotlin/jvm/functions/Function1;)V
+	public abstract fun include (Lorg/gradle/api/Action;)V
 	public abstract fun included (Lkotlin/jvm/functions/Function1;)V
 	public abstract fun included (Lorg/gradle/api/Action;)V
 }
 
 public final class org/jetbrains/kotlin/gradle/dsl/abi/AbiFiltersSpec$DefaultImpls {
+	public static fun exclude (Lorg/jetbrains/kotlin/gradle/dsl/abi/AbiFiltersSpec;Lkotlin/jvm/functions/Function1;)V
+	public static fun exclude (Lorg/jetbrains/kotlin/gradle/dsl/abi/AbiFiltersSpec;Lorg/gradle/api/Action;)V
 	public static fun excluded (Lorg/jetbrains/kotlin/gradle/dsl/abi/AbiFiltersSpec;Lkotlin/jvm/functions/Function1;)V
 	public static fun excluded (Lorg/jetbrains/kotlin/gradle/dsl/abi/AbiFiltersSpec;Lorg/gradle/api/Action;)V
+	public static fun getExcluded (Lorg/jetbrains/kotlin/gradle/dsl/abi/AbiFiltersSpec;)Lorg/jetbrains/kotlin/gradle/dsl/abi/AbiFilterSetSpec;
+	public static fun getIncluded (Lorg/jetbrains/kotlin/gradle/dsl/abi/AbiFiltersSpec;)Lorg/jetbrains/kotlin/gradle/dsl/abi/AbiFilterSetSpec;
+	public static fun include (Lorg/jetbrains/kotlin/gradle/dsl/abi/AbiFiltersSpec;Lkotlin/jvm/functions/Function1;)V
+	public static fun include (Lorg/jetbrains/kotlin/gradle/dsl/abi/AbiFiltersSpec;Lorg/gradle/api/Action;)V
 	public static fun included (Lorg/jetbrains/kotlin/gradle/dsl/abi/AbiFiltersSpec;Lkotlin/jvm/functions/Function1;)V
 	public static fun included (Lorg/jetbrains/kotlin/gradle/dsl/abi/AbiFiltersSpec;Lorg/gradle/api/Action;)V
 }
@@ -750,7 +762,7 @@ public final class org/jetbrains/kotlin/gradle/dsl/abi/AbiValidationMultiplatfor
 	public static fun legacyDump (Lorg/jetbrains/kotlin/gradle/dsl/abi/AbiValidationMultiplatformVariantSpec;Lorg/gradle/api/Action;)V
 }
 
-public abstract interface class org/jetbrains/kotlin/gradle/dsl/abi/AbiValidationVariantSpec : org/gradle/api/Named {
+public abstract interface class org/jetbrains/kotlin/gradle/dsl/abi/AbiValidationVariantSpec {
 	public static final field Companion Lorg/jetbrains/kotlin/gradle/dsl/abi/AbiValidationVariantSpec$Companion;
 	public static final field MAIN_VARIANT_NAME Ljava/lang/String;
 	public abstract fun filters (Lorg/gradle/api/Action;)V
@@ -1466,6 +1478,9 @@ public abstract interface class org/jetbrains/kotlin/gradle/plugin/attributes/Kl
 }
 
 public final class org/jetbrains/kotlin/gradle/plugin/attributes/KlibPackaging$Companion {
+}
+
+public abstract interface annotation class org/jetbrains/kotlin/gradle/plugin/mpp/KotlinNativeCacheApi : java/lang/annotation/Annotation {
 }
 
 public final class org/jetbrains/kotlin/gradle/plugin/mpp/NativeBuildType : java/lang/Enum, org/gradle/api/Named {

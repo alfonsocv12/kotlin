@@ -515,6 +515,18 @@ public class Fe10IdeNormalAnalysisSourceModuleSymbolByPsiTestGenerated extends A
   }
 
   @Test
+  @TestMetadata("returnValueStatusCheck.kt")
+  public void testReturnValueStatusCheck() {
+    runTest("analysis/analysis-api/testData/symbols/symbolByPsi/returnValueStatusCheck.kt");
+  }
+
+  @Test
+  @TestMetadata("returnValueStatusFull.kt")
+  public void testReturnValueStatusFull() {
+    runTest("analysis/analysis-api/testData/symbols/symbolByPsi/returnValueStatusFull.kt");
+  }
+
+  @Test
   @TestMetadata("similarGenericSignature.kt")
   public void testSimilarGenericSignature() {
     runTest("analysis/analysis-api/testData/symbols/symbolByPsi/similarGenericSignature.kt");
@@ -623,6 +635,28 @@ public class Fe10IdeNormalAnalysisSourceModuleSymbolByPsiTestGenerated extends A
     @TestMetadata("similarSignatures.kt")
     public void testSimilarSignatures() {
       runTest("analysis/analysis-api/testData/symbols/symbolByPsi/contextReceivers/similarSignatures.kt");
+    }
+  }
+
+  @Nested
+  @TestMetadata("analysis/analysis-api/testData/symbols/symbolByPsi/contracts")
+  @TestDataPath("$PROJECT_ROOT")
+  public class Contracts {
+    @Test
+    @TestMetadata("accessorsAllowed.kt")
+    public void testAccessorsAllowed() {
+      runTest("analysis/analysis-api/testData/symbols/symbolByPsi/contracts/accessorsAllowed.kt");
+    }
+
+    @Test
+    public void testAllFilesPresentInContracts() {
+      KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("analysis/analysis-api/testData/symbols/symbolByPsi/contracts"), Pattern.compile("^(.+)\\.kt$"), null, true, "withTestCompilerPluginEnabled");
+    }
+
+    @Test
+    @TestMetadata("baseConditions.kt")
+    public void testBaseConditions() {
+      runTest("analysis/analysis-api/testData/symbols/symbolByPsi/contracts/baseConditions.kt");
     }
   }
 

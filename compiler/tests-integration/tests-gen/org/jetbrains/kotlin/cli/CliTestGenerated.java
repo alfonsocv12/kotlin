@@ -84,6 +84,16 @@ public class CliTestGenerated extends AbstractCliTest {
       runTest("compiler/testData/cli/jvm/plugins/firAllOpenPlugin_modern.args");
     }
 
+    @TestMetadata("lombok.args")
+    public void testLombok() {
+      runTest("compiler/testData/cli/jvm/plugins/lombok.args");
+    }
+
+    @TestMetadata("lombokDisabledExpFeatureWarnings.args")
+    public void testLombokDisabledExpFeatureWarnings() {
+      runTest("compiler/testData/cli/jvm/plugins/lombokDisabledExpFeatureWarnings.args");
+    }
+
     @TestMetadata("mixingModernAndLegacyArgs.args")
     public void testMixingModernAndLegacyArgs() {
       runTest("compiler/testData/cli/jvm/plugins/mixingModernAndLegacyArgs.args");
@@ -1561,6 +1571,11 @@ public class CliTestGenerated extends AbstractCliTest {
       runTest("compiler/testData/cli/jvm/globalWarningSuppression_incorrect.args");
     }
 
+    @TestMetadata("headerMode.args")
+    public void testHeaderMode() {
+      runTest("compiler/testData/cli/jvm/headerMode.args");
+    }
+
     @TestMetadata("help.args")
     public void testHelp() {
       runTest("compiler/testData/cli/jvm/help.args");
@@ -1659,6 +1674,16 @@ public class CliTestGenerated extends AbstractCliTest {
     @TestMetadata("legacySmartCastsAfterTry.args")
     public void testLegacySmartCastsAfterTry() {
       runTest("compiler/testData/cli/jvm/legacySmartCastsAfterTry.args");
+    }
+
+    @TestMetadata("localTypeAliasesEnabled.args")
+    public void testLocalTypeAliasesEnabled() {
+      runTest("compiler/testData/cli/jvm/localTypeAliasesEnabled.args");
+    }
+
+    @TestMetadata("localTypeAliasesError.args")
+    public void testLocalTypeAliasesError() {
+      runTest("compiler/testData/cli/jvm/localTypeAliasesError.args");
     }
 
     @TestMetadata("modulesWithDependencyCycle.args")
@@ -1932,6 +1957,11 @@ public class CliTestGenerated extends AbstractCliTest {
     @TestMetadata("compilationWarningPublicAccessorExplicitAPIMode.args")
     public void testCompilationWarningPublicAccessorExplicitAPIMode() {
       runTest("compiler/testData/cli/js/compilationWarningPublicAccessorExplicitAPIMode.args");
+    }
+
+    @TestMetadata("compilationWarningPublicAccessorExplicitAPIMode2ndStage.args")
+    public void testCompilationWarningPublicAccessorExplicitAPIMode2ndStage() {
+      runTest("compiler/testData/cli/js/compilationWarningPublicAccessorExplicitAPIMode2ndStage.args");
     }
 
     @TestMetadata("createMetadata.args")

@@ -11,6 +11,7 @@ import org.jetbrains.kotlin.builtins.StandardNames.HASHCODE_NAME
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.Modality
+import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.descriptors.annotations.KotlinTarget
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
 import org.jetbrains.kotlin.diagnostics.SourceElementPositioningStrategy
@@ -226,7 +227,7 @@ fun FirMemberDeclaration.redundantModalities(defaultModality: Modality): Set<Mod
 }
 
 private fun FirDeclaration.hasBody(): Boolean = when (this) {
-    is FirSimpleFunction -> this.body != null && this.body !is FirEmptyExpressionBlock
+    is FirNamedFunction -> this.body != null && this.body !is FirEmptyExpressionBlock
     is FirProperty -> this.setter?.body !is FirEmptyExpressionBlock? || this.getter?.body !is FirEmptyExpressionBlock?
     else -> false
 }
@@ -654,11 +655,17 @@ fun FirFunctionSymbol<*>.isFunctionForExpectTypeFromCastFeature(): Boolean {
 private val FirCallableDeclaration.isMember get() = dispatchReceiverType != null
 
 @OptIn(SymbolInternals::class)
+context(sessionHolder: SessionHolder)
 fun getActualTargetList(container: FirBasedSymbol<*>): AnnotationTargetList {
-    return getActualTargetList(container.fir)
+    return getActualTargetList(container.fir, sessionHolder.session)
 }
 
+context(sessionHolder: SessionHolder)
 fun getActualTargetList(container: FirAnnotationContainer): AnnotationTargetList {
+    return getActualTargetList(container, sessionHolder.session)
+}
+
+fun getActualTargetList(container: FirAnnotationContainer, session: FirSession): AnnotationTargetList {
     val annotated =
         if (container is FirBackingField) {
             when {
@@ -685,9 +692,13 @@ fun getActualTargetList(container: FirAnnotationContainer): AnnotationTargetList
         )
         is FirProperty -> {
             when {
-                annotated.isLocal ->
+                annotated.symbol is FirLocalPropertySymbol ->
                     when {
-                        annotated.name == SpecialNames.DESTRUCT -> TargetLists.T_DESTRUCTURING_DECLARATION
+                        annotated.name == SpecialNames.DESTRUCT -> if (session.languageVersionSettings.supportsFeature(LanguageFeature.LocalVariableTargetedAnnotationOnDestructuring)) {
+                            TargetLists.T_DESTRUCTURING_DECLARATION_NEW
+                        } else {
+                            TargetLists.T_DESTRUCTURING_DECLARATION
+                        }
                         annotated.isCatchParameter == true -> TargetLists.T_CATCH_PARAMETER
                         annotated.isForLoopParameter == true -> TargetLists.T_VALUE_PARAMETER_WITHOUT_VAL
                         else -> TargetLists.T_LOCAL_VARIABLE
@@ -712,9 +723,9 @@ fun getActualTargetList(container: FirAnnotationContainer): AnnotationTargetList
         is FirAnonymousFunction -> {
             TargetLists.T_FUNCTION_EXPRESSION
         }
-        is FirSimpleFunction -> {
+        is FirNamedFunction -> {
             when {
-                annotated.isLocal -> TargetLists.T_LOCAL_FUNCTION
+                annotated.status.visibility == Visibilities.Local -> TargetLists.T_LOCAL_FUNCTION
                 annotated.isMember -> TargetLists.T_MEMBER_FUNCTION
                 else -> TargetLists.T_TOP_LEVEL_FUNCTION
             }
@@ -846,10 +857,24 @@ private fun FirCallableSymbol<*>.containingClassUnsubstitutedScope(): FirTypeSco
     return containingClass.unsubstitutedScope()
 }
 
-val CheckerContext.closestNonLocal: FirBasedSymbol<*>? get() = containingDeclarations.takeWhile { it.isNonLocal }.lastOrNull()
+val CheckerContext.closestNonLocal: FirBasedSymbol<*>?
+    get() {
+        for (symbol in containingDeclarations) {
+            if (symbol is FirCallableSymbol || symbol is FirAnonymousInitializerSymbol) {
+                return symbol
+            }
+        }
+        return containingDeclarations.lastOrNull()
+    }
 
-fun CheckerContext.closestNonLocalWith(declaration: FirDeclaration): FirBasedSymbol<*>? =
-    (containingDeclarations + declaration.symbol).takeWhile { it.isNonLocal }.lastOrNull()
+fun CheckerContext.closestNonLocalWith(declaration: FirDeclaration): FirBasedSymbol<*>? {
+    for (symbol in containingDeclarations + declaration.symbol) {
+        if (symbol is FirCallableSymbol || symbol is FirAnonymousInitializerSymbol) {
+            return symbol
+        }
+    }
+    return declaration.symbol
+}
 
 val CheckerContext.isTopLevel: Boolean get() = containingDeclarations.lastOrNull().let { it is FirFileSymbol || it is FirScriptSymbol }
 

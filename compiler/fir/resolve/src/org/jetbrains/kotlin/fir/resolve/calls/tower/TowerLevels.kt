@@ -9,18 +9,17 @@ import org.jetbrains.kotlin.KtFakeSourceElementKind
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.fakeElement
 import org.jetbrains.kotlin.fir.*
-import org.jetbrains.kotlin.fir.declarations.*
+import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
+import org.jetbrains.kotlin.fir.declarations.hasAnnotationWithClassId
 import org.jetbrains.kotlin.fir.declarations.utils.isStatic
 import org.jetbrains.kotlin.fir.expressions.FirExpression
 import org.jetbrains.kotlin.fir.expressions.FirSmartCastExpression
 import org.jetbrains.kotlin.fir.expressions.FirThisReceiverExpression
 import org.jetbrains.kotlin.fir.resolve.*
 import org.jetbrains.kotlin.fir.resolve.calls.*
-import org.jetbrains.kotlin.fir.resolve.calls.ExpressionReceiverValue
 import org.jetbrains.kotlin.fir.resolve.calls.candidate.CallInfo
 import org.jetbrains.kotlin.fir.resolve.calls.stages.isSuperCall
 import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
-import org.jetbrains.kotlin.fir.resolve.toImplicitResolvedQualifierReceiver
 import org.jetbrains.kotlin.fir.scopes.*
 import org.jetbrains.kotlin.fir.scopes.impl.FirActualizingScope
 import org.jetbrains.kotlin.fir.scopes.impl.FirDefaultStarImportingScope
@@ -63,7 +62,7 @@ abstract class TowerLevel {
 class DispatchReceiverMemberScopeTowerLevel(
     private val bodyResolveComponents: BodyResolveComponents,
     val dispatchReceiverValue: ReceiverValue,
-    private val givenExtensionReceiverOptions: List<FirExpression>,
+    private val givenExtensionReceiver: FirExpression?,
     private val skipSynthetics: Boolean,
 ) : TowerLevel() {
     private val scopeSession: ScopeSession get() = bodyResolveComponents.scopeSession
@@ -90,7 +89,7 @@ class DispatchReceiverMemberScopeTowerLevel(
                 output.consumeCandidate(
                     candidate,
                     dispatchReceiverValue.receiverExpression,
-                    givenExtensionReceiverOptions,
+                    givenExtensionReceiver,
                     scope,
                     isFromOriginalTypeInPresenceOfSmartCast = false
                 )
@@ -126,7 +125,7 @@ class DispatchReceiverMemberScopeTowerLevel(
             consumeCandidates(output, candidatesWithSmartcast = map)
         }
 
-        if (givenExtensionReceiverOptions.isEmpty() && !skipSynthetics) {
+        if (givenExtensionReceiver == null && !skipSynthetics) {
             val dispatchReceiverType = dispatchReceiverValue.type
 
             val useSiteForSyntheticScope: FirTypeScope
@@ -166,7 +165,7 @@ class DispatchReceiverMemberScopeTowerLevel(
                 output.consumeCandidate(
                     symbol,
                     dispatchReceiverValue.receiverExpression,
-                    givenExtensionReceiverOptions = emptyList(),
+                    givenExtensionReceiver = null,
                     scope
                 )
             }
@@ -228,7 +227,7 @@ class DispatchReceiverMemberScopeTowerLevel(
         var result = ProcessResult.SCOPE_EMPTY
         processScopeMembers { candidate ->
             result = ProcessResult.FOUND
-            if (candidate.hasConsistentExtensionReceiver(givenExtensionReceiverOptions)) {
+            if (candidate.hasConsistentExtensionReceiver(givenExtensionReceiver)) {
                 candidateProcessor(candidate)
             }
         }
@@ -247,7 +246,7 @@ class DispatchReceiverMemberScopeTowerLevel(
         for (scopeWithSmartcast in candidatesWithSmartcast.values) {
             val (candidate, scope) = scopeWithSmartcast.memberWithBaseScope
 
-            if (candidate.hasConsistentExtensionReceiver(givenExtensionReceiverOptions)) {
+            if (candidate.hasConsistentExtensionReceiver(givenExtensionReceiver)) {
                 val dispatchReceiverToUse = scopeWithSmartcast.dispatchReceiverToUse
                 val isFromOriginalTypeInPresenceOfSmartCast = dispatchReceiverToUse.unwrapSmartcast
                 val dispatchReceiver = when {
@@ -258,7 +257,7 @@ class DispatchReceiverMemberScopeTowerLevel(
                 val applicability = output.consumeCandidate(
                     candidate,
                     dispatchReceiver,
-                    givenExtensionReceiverOptions,
+                    givenExtensionReceiver,
                     scope,
                     isFromOriginalTypeInPresenceOfSmartCast = isFromOriginalTypeInPresenceOfSmartCast
                 )
@@ -267,7 +266,7 @@ class DispatchReceiverMemberScopeTowerLevel(
                     output.consumeCandidate(
                         candidate,
                         dispatchReceiverValue.receiverExpression,
-                        givenExtensionReceiverOptions,
+                        givenExtensionReceiver,
                         scope,
                         isFromOriginalTypeInPresenceOfSmartCast = false
                     )
@@ -321,30 +320,8 @@ class DispatchReceiverMemberScopeTowerLevel(
         return ProcessResult.FOUND
     }
 
-    private fun FirCallableSymbol<*>.hasConsistentExtensionReceiver(givenExtensionReceivers: List<FirExpression>): Boolean {
-        return givenExtensionReceivers.isNotEmpty() == hasExtensionReceiver()
-    }
-}
-
-class ContextReceiverGroupMemberScopeTowerLevel(
-    bodyResolveComponents: BodyResolveComponents,
-    contextReceiverGroup: ContextReceiverGroup,
-    givenExtensionReceiverOptions: List<FirExpression> = emptyList(),
-) : TowerLevel() {
-    private val dispatchReceiverMemberScopeTowerLevels = contextReceiverGroup.map {
-        DispatchReceiverMemberScopeTowerLevel(bodyResolveComponents, it, givenExtensionReceiverOptions, false)
-    }
-
-    override fun processFunctionsByName(info: CallInfo, processor: TowerLevelProcessor): ProcessResult {
-        return dispatchReceiverMemberScopeTowerLevels.minOf { it.processFunctionsByName(info, processor) }
-    }
-
-    override fun processPropertiesByName(info: CallInfo, processor: TowerLevelProcessor): ProcessResult {
-        return dispatchReceiverMemberScopeTowerLevels.minOf { it.processPropertiesByName(info, processor) }
-    }
-
-    override fun processObjectsByName(info: CallInfo, processor: TowerLevelProcessor): ProcessResult {
-        return dispatchReceiverMemberScopeTowerLevels.minOf { it.processObjectsByName(info, processor) }
+    private fun FirCallableSymbol<*>.hasConsistentExtensionReceiver(givenExtensionReceiver: FirExpression?): Boolean {
+        return (givenExtensionReceiver != null) == hasExtensionReceiver()
     }
 }
 
@@ -358,7 +335,7 @@ class ContextReceiverGroupMemberScopeTowerLevel(
 internal class ScopeBasedTowerLevel(
     private val bodyResolveComponents: BodyResolveComponents,
     givenScope: FirScope,
-    private val givenExtensionReceiverOptions: List<FirExpression>,
+    private val givenExtensionReceiver: FirExpression?,
     private val withHideMembersOnly: Boolean,
     private val constructorFilter: ConstructorFilter,
     private val dispatchReceiverForStatics: ExpressionReceiverValue?
@@ -366,12 +343,12 @@ internal class ScopeBasedTowerLevel(
     override val session: FirSession get() = bodyResolveComponents.session
 
     private val scope = if (LanguageFeature.MultiPlatformProjects.isEnabled()) {
-        FirActualizingScope(givenScope)
+        FirActualizingScope(givenScope, session)
     } else {
         givenScope
     }
 
-    fun areThereExtensionReceiverOptions(): Boolean = givenExtensionReceiverOptions.isNotEmpty()
+    fun areThereExtensionReceiverOptions(): Boolean = givenExtensionReceiver != null
 
     // For static entries we may return here FirResolvedQualifier, wrapped in ExpressionReceiverValue
     private fun dispatchReceiverValue(candidate: FirCallableSymbol<*>, callInfo: CallInfo): ReceiverValue? {
@@ -412,22 +389,20 @@ internal class ScopeBasedTowerLevel(
         if (scope !is FirDefaultStarImportingScope || !areThereExtensionReceiverOptions()) return false
 
         val declarationReceiverType = candidate.resolvedReceiverType as? ConeClassLikeType ?: return false
-        val startProjectedDeclarationReceiverType = declarationReceiverType.lookupTag.constructClassType(
+        val starProjectedDeclarationReceiverType = declarationReceiverType.lookupTag.constructClassType(
             declarationReceiverType.typeArguments.map { ConeStarProjection }.toTypedArray(),
             isMarkedNullable = true
         )
 
-        return givenExtensionReceiverOptions.none { extensionReceiver ->
-            val extensionReceiverType = extensionReceiver.resolvedType
-            // If some receiver is non class like, we should not skip it
-            if (extensionReceiverType !is ConeClassLikeType) return@none true
+        val extensionReceiverType = givenExtensionReceiver?.resolvedType
+        // If some receiver is non class like, we should not skip it
+        if (extensionReceiverType !is ConeClassLikeType) return false
 
-            AbstractTypeChecker.isSubtypeOf(
-                session.typeContext,
-                extensionReceiverType,
-                startProjectedDeclarationReceiverType
-            )
-        }
+        return !AbstractTypeChecker.isSubtypeOf(
+            session.typeContext,
+            extensionReceiverType,
+            starProjectedDeclarationReceiverType
+        )
     }
 
     private fun consumeCallableCandidate(
@@ -452,7 +427,7 @@ internal class ScopeBasedTowerLevel(
         processor.consumeCandidate(
             unwrappedCandidate,
             dispatchReceiverValue?.receiverExpression,
-            givenExtensionReceiverOptions,
+            givenExtensionReceiver,
             scope
         )
     }
@@ -502,7 +477,7 @@ internal class ScopeBasedTowerLevel(
             empty = false
             processor.consumeCandidate(
                 it, dispatchReceiver = null,
-                givenExtensionReceiverOptions = emptyList(),
+                givenExtensionReceiver = null,
                 scope = scope,
                 objectsByName = true
             )

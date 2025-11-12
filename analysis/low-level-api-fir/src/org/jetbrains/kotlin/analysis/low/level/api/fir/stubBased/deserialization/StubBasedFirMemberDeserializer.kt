@@ -274,6 +274,14 @@ internal class StubBasedFirMemberDeserializer(
         }
     }
 
+    private fun FirContractDescriptionOwner.loadContracts(local: StubBasedFirDeserializationContext) {
+        val declaration = (source as? KtRealPsiSourceElement)?.psi as? KtDeclarationWithBody ?: return
+        val resolvedDescription = StubBasedFirContractDeserializer(this, local.typeDeserializer).loadContract(declaration)
+        if (resolvedDescription != null) {
+            replaceContractDescription(resolvedDescription)
+        }
+    }
+
     private fun loadPropertySetter(
         setter: KtPropertyAccessor?,
         classSymbol: FirClassSymbol<*>?,
@@ -380,6 +388,7 @@ internal class StubBasedFirMemberDeserializer(
             }
 
             status = resolvedStatus
+            isLocal = false
 
             resolvePhase = FirResolvePhase.ANALYZED_DEPENDENCIES
             typeParameters += local.typeDeserializer.ownTypeParameters.map { it.fir }
@@ -455,8 +464,12 @@ internal class StubBasedFirMemberDeserializer(
             }
 
             setLazyPublishedVisibility(c.session)
+
             this.getter?.setLazyPublishedVisibility(annotations, this, c.session)
+            this.getter?.loadContracts(local)
+
             this.setter?.setLazyPublishedVisibility(annotations, this, c.session)
+            this.setter?.loadContracts(local)
 
             replaceDeprecationsProvider(getDeprecationsProvider(c.session))
         }
@@ -529,13 +542,13 @@ internal class StubBasedFirMemberDeserializer(
         classSymbol: FirClassSymbol<*>? = null,
         session: FirSession,
         existingSymbol: FirNamedFunctionSymbol? = null,
-    ): FirSimpleFunction {
+    ): FirNamedFunction {
         val callableName = function.nameAsSafeName
         val callableId = CallableId(c.packageFqName, c.relativeClassName, callableName)
         val symbol = existingSymbol ?: FirNamedFunctionSymbol(callableId)
         val local = c.childContext(function, containingDeclarationSymbol = symbol)
 
-        val simpleFunction = buildSimpleFunction {
+        val simpleFunction = buildNamedFunction {
             moduleData = c.moduleData
             origin = initialOrigin
             source = KtRealPsiSourceElement(function)
@@ -559,6 +572,7 @@ internal class StubBasedFirMemberDeserializer(
                 isSuspend = function.hasModifier(KtTokens.SUSPEND_KEYWORD)
                 setSpecialFlags(function.modifierList)
             }
+            isLocal = false
             this.symbol = symbol
             dispatchReceiverType = c.dispatchReceiver
             resolvePhase = FirResolvePhase.ANALYZED_DEPENDENCIES
@@ -580,11 +594,7 @@ internal class StubBasedFirMemberDeserializer(
             }
         }.apply {
             setLazyPublishedVisibility(c.session)
-        }
-
-        val resolvedDescription = StubBasedFirContractDeserializer(simpleFunction, local.typeDeserializer).loadContract(function)
-        if (resolvedDescription != null) {
-            simpleFunction.replaceContractDescription(resolvedDescription)
+            loadContracts(local)
         }
 
         return simpleFunction
@@ -635,6 +645,7 @@ internal class StubBasedFirMemberDeserializer(
                 this.isInner = isInner
                 setSpecialFlags(constructor.modifierList)
             }
+            isLocal = false
             this.symbol = symbol
             dispatchReceiverType =
                 if (!isInner) null
@@ -754,6 +765,7 @@ internal class StubBasedFirMemberDeserializer(
             ).apply {
                 isStatic = true
             }
+            isLocal = false
             resolvePhase = FirResolvePhase.ANALYZED_DEPENDENCIES
         }.apply {
             containingClassForStaticMemberAttr = c.dispatchReceiver!!.lookupTag

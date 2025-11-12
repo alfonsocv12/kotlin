@@ -10,6 +10,8 @@ import org.jetbrains.kotlin.konan.file.zipDirAs
 import org.jetbrains.kotlin.konan.properties.Properties
 import org.jetbrains.kotlin.konan.properties.saveToFile
 import org.jetbrains.kotlin.library.*
+import org.jetbrains.kotlin.library.components.KlibIrComponentLayout
+import org.jetbrains.kotlin.library.components.KlibMetadataComponentLayout
 
 const val KLIB_DEFAULT_COMPONENT_NAME = "default"
 
@@ -17,7 +19,7 @@ open class KotlinLibraryLayoutForWriter(
     override val libFile: File,
     val unzippedDir: File,
     override val component: String = KLIB_DEFAULT_COMPONENT_NAME
-) : KotlinLibraryLayout, MetadataKotlinLibraryLayout, IrKotlinLibraryLayout {
+) : KotlinLibraryLayout {
     override val componentDir: File
         get() = File(unzippedDir, component)
     override val pre_1_4_manifest: File
@@ -95,7 +97,7 @@ class BaseWriterImpl(
 /**
  * Requires non-null [target].
  */
-class KotlinLibraryWriterImpl(
+private class KotlinLibraryWriterImpl(
     moduleName: String,
     versions: KotlinLibraryVersioning,
     builtInsPlatform: BuiltInsPlatform,
@@ -104,9 +106,7 @@ class KotlinLibraryWriterImpl(
     shortName: String? = null,
     val layout: KotlinLibraryLayoutForWriter,
     val base: BaseWriter = BaseWriterImpl(layout, moduleName, versions, builtInsPlatform, nativeTargets, nopack, shortName),
-    metadata: MetadataWriter = MetadataWriterImpl(layout),
-    ir: IrWriter = IrWriterImpl(layout)
-) : BaseWriter by base, MetadataWriter by metadata, IrWriter by ir, KotlinLibraryWriter
+) : BaseWriter by base, KotlinLibraryWriter
 
 fun buildKotlinLibrary(
     linkDependencies: List<KotlinLibrary>,
@@ -123,8 +123,8 @@ fun buildKotlinLibrary(
 
     val klibFile = File(output)
     val unzippedKlibDir = if (nopack) klibFile.also { it.isDirectory } else org.jetbrains.kotlin.konan.file.createTempDir(moduleName)
+
     val layout = KotlinLibraryLayoutForWriter(klibFile, unzippedKlibDir)
-    val irWriter = IrWriterImpl(layout)
     val library = KotlinLibraryWriterImpl(
         moduleName,
         versions,
@@ -132,46 +132,29 @@ fun buildKotlinLibrary(
         nativeTargets,
         nopack,
         layout = layout,
-        ir = irWriter
     )
-
-    library.addMetadata(metadata)
-
-    if (ir != null) {
-        library.addIr(ir)
-    }
 
     manifestProperties?.let { library.addManifestAddend(it) }
     library.addLinkDependencies(linkDependencies)
 
+    val metadataWriter = KlibMetadataWriterImpl(KlibMetadataComponentLayout(unzippedKlibDir))
+    metadataWriter.writeMetadata(metadata)
+
+    if (ir != null) {
+        val mainIrWriter = KlibIrWriterImpl.ForMainIr(KlibIrComponentLayout.createForMainIr(unzippedKlibDir))
+        mainIrWriter.writeMainIr(ir.files)
+    }
+
+    ir?.fileWithPreparedInlinableFunctions?.let { inlinableFunctionsFile ->
+        val inlinableFunctionsWriter = KlibIrWriterImpl.ForInlinableFunctionsIr(
+            layout = KlibIrComponentLayout.createForInlinableFunctionsIr(unzippedKlibDir)
+        )
+        inlinableFunctionsWriter.writeInlinableFunctionsIr(inlinableFunctionsFile)
+    }
+
     library.commit()
+
     return library.layout
-}
-
-class KotlinLibraryOnlyIrWriter(output: String, moduleName: String, versions: KotlinLibraryVersioning, platform: BuiltInsPlatform, nativeTargets: List<String>) {
-    val outputDir = File(output)
-    val library = createLibrary(moduleName, versions, platform, nativeTargets, outputDir)
-
-    private fun createLibrary(
-        moduleName: String,
-        versions: KotlinLibraryVersioning,
-        platform: BuiltInsPlatform,
-        nativeTargets: List<String>,
-        directory: File
-    ): KotlinLibraryWriterImpl {
-        val layout = KotlinLibraryLayoutForWriter(directory, directory)
-        val irWriter = IrWriterImpl(layout)
-        return KotlinLibraryWriterImpl(moduleName, versions, platform, nativeTargets, nopack = true, layout = layout, ir = irWriter)
-    }
-
-    fun invalidate() {
-        outputDir.deleteRecursively()
-        library.layout.mainIr.dir.mkdirs()
-    }
-
-    fun writeIr(serializedIrModule: SerializedIrModule) {
-        library.addIr(serializedIrModule)
-    }
 }
 
 enum class BuiltInsPlatform {
