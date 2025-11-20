@@ -145,7 +145,8 @@ fun Project.configureKotlinCompilationOptions() {
             if (project.path != ":native:kotlin-test-native-xctest" &&
                 !project.path.startsWith(":native:objcexport-header-generator") &&
                 !project.path.startsWith(":libraries:tools:analysis-api-based-klib-reader") &&
-                !project.path.startsWith(":native:external-projects-test-utils")
+                !project.path.startsWith(":native:external-projects-test-utils") &&
+                !project.path.startsWith(":plugins:plugin-sandbox:plugin-annotations")
             ) {
                 doFirst {
                     if (!useAbsolutePathsInKlib && this !is KotlinJvmCompile && this !is KotlinCompileCommon) {
@@ -333,7 +334,8 @@ fun Project.configureTests() {
             ":examples:scripting-jvm-simple-script-host",
             ":generators",
             ":generators:analysis-api-generator:generator-kotlin-native",
-            ":js:js.tests",
+            ":js:js.tests",                    // Drop this line after KT-81098
+            ":js:js.tests:klib-compatibility", // Drop this line after KT-81098
             ":jps:jps-common",
             ":jps:jps-plugin",
             ":kotlin-allopen-compiler-plugin",

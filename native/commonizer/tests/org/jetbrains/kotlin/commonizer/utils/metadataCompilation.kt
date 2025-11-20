@@ -37,6 +37,7 @@ import org.jetbrains.kotlin.ir.backend.js.moduleName
 import org.jetbrains.kotlin.library.KotlinAbiVersion
 import org.jetbrains.kotlin.library.SerializedMetadata
 import org.jetbrains.kotlin.library.loader.KlibLoader
+import org.jetbrains.kotlin.metadata.deserialization.MetadataVersion
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.platform.CommonPlatforms
 import org.jetbrains.kotlin.platform.TargetPlatform
@@ -69,7 +70,7 @@ fun loadStdlibMetadata() = loadStdlibMetadata(KotlinTestUtils.newConfiguration()
 
 fun loadStdlibMetadata(configuration: CompilerConfiguration): NamedMetadata {
     val kotlinLoaderResult = KlibLoader {
-        libraryPaths(stdlibPath().absolutePath)
+        libraryPaths(stdlibPath())
         maxPermittedAbiVersion(KotlinAbiVersion.CURRENT)
     }.load()
         .apply { reportLoadingProblemsIfAny(configuration, allAsErrors = true) }
@@ -164,6 +165,8 @@ fun serializeModuleToMetadata(
             LanguageFeature.MultiPlatformProjects to LanguageFeature.State.ENABLED
         ),
     )
+
+    configuration.metadataVersion = MetadataVersion.INSTANCE
 
     configuration.targetPlatform = targetPlatform
     configuration.renderDiagnosticInternalName = true

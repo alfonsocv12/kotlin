@@ -15,6 +15,7 @@ import org.jetbrains.kotlin.diagnostics.impl.BaseDiagnosticsCollector
 import org.jetbrains.kotlin.fir.pipeline.AllModulesFrontendOutput
 import org.jetbrains.kotlin.library.SerializedMetadata
 import org.jetbrains.kotlin.metadata.builtins.BuiltInsBinaryVersion
+import org.jetbrains.kotlin.metadata.deserialization.BinaryVersion
 
 data class MetadataFrontendPipelineArtifact(
     override val frontendOutput: AllModulesFrontendOutput,
@@ -22,9 +23,14 @@ data class MetadataFrontendPipelineArtifact(
     override val diagnosticCollector: BaseDiagnosticsCollector,
     val sourceFiles: List<KtSourceFile>,
 ) : FrontendPipelineArtifact() {
-    val metadataVersion: BuiltInsBinaryVersion = configuration.metadataVersion as? BuiltInsBinaryVersion ?: BuiltInsBinaryVersion.INSTANCE
-    override fun withNewDiagnosticCollectorImpl(newDiagnosticsCollector: BaseDiagnosticsCollector) =
-        copy(diagnosticCollector = newDiagnosticsCollector)
+    val metadataVersion: BinaryVersion = configuration.metadataVersion ?: BuiltInsBinaryVersion.INSTANCE
+    override fun withNewDiagnosticCollectorImpl(newDiagnosticsCollector: BaseDiagnosticsCollector): MetadataFrontendPipelineArtifact {
+        return copy(diagnosticCollector = newDiagnosticsCollector)
+    }
+
+    override fun withNewFrontendOutputImpl(newFrontendOutput: AllModulesFrontendOutput): FrontendPipelineArtifact {
+        return copy(frontendOutput = newFrontendOutput)
+    }
 }
 
 data class MetadataInMemorySerializationArtifact(

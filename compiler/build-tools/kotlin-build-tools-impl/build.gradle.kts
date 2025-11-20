@@ -3,7 +3,6 @@ import com.github.jengelman.gradle.plugins.shadow.transformers.DontIncludeResour
 
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("generated-sources")
 }
 
@@ -17,7 +16,7 @@ dependencies {
     compileOnly(project(":kotlin-daemon-client"))
     compileOnly(project(":compiler:incremental-compilation-impl"))
     compileOnly(project(":kotlin-compiler-runner-unshaded"))
-    compileOnly(project(":compiler:build-tools:kotlin-build-tools-cri-impl"))
+    implementation(project(":compiler:build-tools:kotlin-build-tools-cri-impl"))
     compileOnly(intellijCore())
     compileOnly(project(":kotlin-scripting-compiler"))
     compileOnly(commonDependency("org.jetbrains.kotlin:kotlin-reflect")) { isTransitive = false }

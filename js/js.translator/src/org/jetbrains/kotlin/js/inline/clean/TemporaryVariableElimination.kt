@@ -321,8 +321,8 @@ internal class TemporaryVariableElimination(private val function: JsFunction) {
                 invalidateTemporaries()
             }
 
-            override fun visitForIn(x: JsForIn) {
-                handleExpression(x.objectExpression)
+            override fun visitIterableLoop(x: JsIterableLoop) {
+                handleExpression(x.iterableExpression)
                 invalidateTemporaries()
                 accept(x.body)
                 invalidateTemporaries()
@@ -540,7 +540,7 @@ internal class TemporaryVariableElimination(private val function: JsFunction) {
                             ctx.addPrevious(JsExpressionStatement(accept(initializer)).apply { synthetic = true })
                         }
                     } else {
-                        ctx.addPrevious(JsVars(*subList.toTypedArray()).apply { synthetic = true })
+                        ctx.addPrevious(JsVars(JsVars.Variant.Var, *subList.toTypedArray()).apply { synthetic = true })
                     }
                 }
                 ctx.removeMe()

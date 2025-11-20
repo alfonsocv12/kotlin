@@ -28253,6 +28253,18 @@ public class JsCodegenSplittingInlineWithInlinedFunInKlibTestGenerated extends A
       }
 
       @Test
+      @TestMetadata("inlineFunctionOverridesAbstractMethodWithDefaultValue.kt")
+      public void testInlineFunctionOverridesAbstractMethodWithDefaultValue() {
+        runTest("compiler/testData/codegen/box/inline/inlineFunctionOverridesAbstractMethodWithDefaultValue.kt");
+      }
+
+      @Test
+      @TestMetadata("inlineFunctionOverridesAbstractMethodWithDefaultValueWithIrInlinerBeforeKlibSerializationEnabled.kt")
+      public void testInlineFunctionOverridesAbstractMethodWithDefaultValueWithIrInlinerBeforeKlibSerializationEnabled() {
+        runTest("compiler/testData/codegen/box/inline/inlineFunctionOverridesAbstractMethodWithDefaultValueWithIrInlinerBeforeKlibSerializationEnabled.kt");
+      }
+
+      @Test
       @TestMetadata("inlinedLambdaWithErasedParamType.kt")
       public void testInlinedLambdaWithErasedParamType() {
         runTest("compiler/testData/codegen/box/inline/inlinedLambdaWithErasedParamType.kt");
@@ -58138,6 +58150,12 @@ public class JsCodegenSplittingInlineWithInlinedFunInKlibTestGenerated extends A
         }
 
         @Test
+        @TestMetadata("kt82316_topLevelCallableContainer.kt")
+        public void testKt82316_topLevelCallableContainer() {
+          runTest("compiler/testData/codegen/box/reflection/typeParameters/kt82316_topLevelCallableContainer.kt");
+        }
+
+        @Test
         @TestMetadata("typeParametersAndNames.kt")
         public void testTypeParametersAndNames() {
           runTest("compiler/testData/codegen/box/reflection/typeParameters/typeParametersAndNames.kt");
@@ -69854,6 +69872,12 @@ public class JsCodegenSplittingInlineWithInlinedFunInKlibTestGenerated extends A
       @Test
       public void testAllFilesPresentInLambdaTransformation() {
         KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/codegen/boxInline/lambdaTransformation"), Pattern.compile("^(.+)\\.kt$"), null, true);
+      }
+
+      @Test
+      @TestMetadata("kt82044.kt")
+      public void testKt82044() {
+        runTest("compiler/testData/codegen/boxInline/lambdaTransformation/kt82044.kt");
       }
 
       @Test

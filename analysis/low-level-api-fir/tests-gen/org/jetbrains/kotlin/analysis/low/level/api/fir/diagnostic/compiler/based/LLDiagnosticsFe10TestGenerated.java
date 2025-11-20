@@ -729,6 +729,18 @@ public class LLDiagnosticsFe10TestGenerated extends AbstractLLDiagnosticsTest {
     }
 
     @Test
+    @TestMetadata("falseNegativeUpperBoundViolated.kt")
+    public void testFalseNegativeUpperBoundViolated() {
+      runTest("compiler/testData/diagnostics/tests/falseNegativeUpperBoundViolated.kt");
+    }
+
+    @Test
+    @TestMetadata("falseNegativeUpperBoundViolated_WithPlaceholderAndOuterFunction.kt")
+    public void testFalseNegativeUpperBoundViolated_WithPlaceholderAndOuterFunction() {
+      runTest("compiler/testData/diagnostics/tests/falseNegativeUpperBoundViolated_WithPlaceholderAndOuterFunction.kt");
+    }
+
+    @Test
     @TestMetadata("falsePositiveRedundantVisibility.kt")
     public void testFalsePositiveRedundantVisibility() {
       runTest("compiler/testData/diagnostics/tests/falsePositiveRedundantVisibility.kt");
@@ -44752,6 +44764,12 @@ public class LLDiagnosticsFe10TestGenerated extends AbstractLLDiagnosticsTest {
       }
 
       @Test
+      @TestMetadata("leadingZerosInIntegerLiterals.kt")
+      public void testLeadingZerosInIntegerLiterals() {
+        runTest("compiler/testData/diagnostics/tests/syntax/leadingZerosInIntegerLiterals.kt");
+      }
+
+      @Test
       @TestMetadata("legacyHeaderAndImplKeywordsInEnumDefinition.kt")
       public void testLegacyHeaderAndImplKeywordsInEnumDefinition() {
         runTest("compiler/testData/diagnostics/tests/syntax/legacyHeaderAndImplKeywordsInEnumDefinition.kt");
@@ -54759,6 +54777,12 @@ public class LLDiagnosticsFe10TestGenerated extends AbstractLLDiagnosticsTest {
       @TestMetadata("upperBoundViolated2.kt")
       public void testUpperBoundViolated2() {
         runTest("compiler/testData/diagnostics/testsWithStdLib/typealias/upperBoundViolated2.kt");
+      }
+
+      @Test
+      @TestMetadata("upperBoundViolated3.kt")
+      public void testUpperBoundViolated3() {
+        runTest("compiler/testData/diagnostics/testsWithStdLib/typealias/upperBoundViolated3.kt");
       }
     }
 

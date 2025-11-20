@@ -461,6 +461,7 @@ enum class LanguageFeature(
     ForbidInitializationBeforeDeclarationInAnonymous(KOTLIN_2_4, enabledInProgressiveMode = true, "KTLC-290"),
     ForbidUpperBoundsViolationOnTypeOperatorAndParameterBounds(KOTLIN_2_4, enabledInProgressiveMode = true, "KTLC-358"),
     AllowReifiedTypeInCatchClause(KOTLIN_2_4, issue = "KT-54363"),
+    ApproximateLocalTypesInPublicDeclarations(KOTLIN_2_4, issue = "KT-82454"),
     LocalVariableTargetedAnnotationOnDestructuring(KOTLIN_2_4, "KT-81408"),
     ForbidGetSetValueWithTooManyParameters(KOTLIN_2_4, enabledInProgressiveMode = true, issue = "KTLC-289"),
     ForbidReturnInExpressionBodyWithoutExplicitTypeEdgeCases(KOTLIN_2_4, enabledInProgressiveMode = true, "KTLC-288"),
@@ -469,6 +470,8 @@ enum class LanguageFeature(
     ProhibitExtendingAnnotationClasses(KOTLIN_2_4, enabledInProgressiveMode = true, "KTLC-374"),
     RefinedVarargConversionRulesForCallableReferences(KOTLIN_2_4, enabledInProgressiveMode = false, "KT-39697"), // And KT-81841
     CheckOptInOnPureEnumEntries(KOTLIN_2_4, enabledInProgressiveMode = true, "KTLC-359"),
+    ProperlyCheckUpperBoundsViolationsWhenCreatingFreshVariables(KOTLIN_2_4, enabledInProgressiveMode = true, "KT-82318"),
+    ReportUpperBoundViolatedInCallArgumentInteractions(KOTLIN_2_4, enabledInProgressiveMode = true, "KTLC-373"),
     CheckPackageInfoNullnessAnnotations(KOTLIN_2_4, enabledInProgressiveMode = true, "KT-77729"),
     ForbidTypeAliasWithMissingDependencyType(KOTLIN_2_4, enabledInProgressiveMode = true, "KT-79781"),
     ForbidImplicitTypeAnnotationWithMissingDependency(KOTLIN_2_4, enabledInProgressiveMode = true, "KT-80247"),

@@ -6,16 +6,16 @@
 package org.jetbrains.kotlin.library.loader
 
 import org.jetbrains.kotlin.konan.file.ZipFileSystemAccessor
+import org.jetbrains.kotlin.konan.file.ZipFileSystemInPlaceAccessor
 import org.jetbrains.kotlin.library.KotlinAbiVersion
 import org.jetbrains.kotlin.library.KotlinLibrary
-import org.jetbrains.kotlin.library.KotlinLibraryVersioning
-import org.jetbrains.kotlin.library.impl.KLIB_DEFAULT_COMPONENT_NAME
-import org.jetbrains.kotlin.library.impl.createKotlinLibrary
+import org.jetbrains.kotlin.library.impl.KlibImpl
 import org.jetbrains.kotlin.library.isAnyPlatformStdlib
 import org.jetbrains.kotlin.library.loader.KlibLoaderResult.ProblemCase.IncompatibleAbiVersion
 import org.jetbrains.kotlin.library.loader.KlibLoaderResult.ProblemCase.InvalidLibraryFormat
 import org.jetbrains.kotlin.library.loader.KlibLoaderResult.ProblemCase.LibraryNotFound
 import org.jetbrains.kotlin.library.loader.KlibLoaderResult.ProblematicLibrary
+import java.io.File
 import java.nio.file.InvalidPathException
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -54,6 +54,14 @@ class KlibLoader(init: KlibLoaderSpec.() -> Unit) {
 
             override fun libraryPaths(vararg paths: String) {
                 libraryPaths += paths
+            }
+
+            override fun libraryPaths(vararg paths: File) {
+                paths.mapTo(libraryPaths) { it.path }
+            }
+
+            override fun libraryPaths(vararg paths: Path) {
+                paths.mapTo(libraryPaths) { it.toString() }
             }
 
             override fun platformChecker(checker: KlibPlatformChecker) {
@@ -107,18 +115,14 @@ class KlibLoader(init: KlibLoaderSpec.() -> Unit) {
             if (!visitedCanonicalPaths.add(canonicalPath))
                 return@forEachLibraryPath
 
-            val library = createKotlinLibrary(
-                KFile(validPath),
-                component = KLIB_DEFAULT_COMPONENT_NAME,
-                zipAccessor = zipFileSystemAccessor
-            )
-
-            val libraryVersions: KotlinLibraryVersioning = try {
-                // Important: We wrap the first read operation with try-catch, as this is the simplest way
-                // to check the correctness of the library layout. If the manifest, which is the essential
-                // part of KLIB, is not available or corrupted, we immediately treat this library as problematic.
-                // All later reads can be done outside the try-catch block.
-                library.versions
+            val library = try {
+                // Important: Initialization of a KlibImpl instance always triggers reading and parsing
+                // of the manifest file. If the manifest, which is the essential part of KLIB, is not available
+                // or is corrupted, an exception is thrown. We immediately treat such library as problematic.
+                KlibImpl(
+                    location = KFile(validPath),
+                    zipFileSystemAccessor = zipFileSystemAccessor ?: ZipFileSystemInPlaceAccessor,
+                )
             } catch (_: Exception) {
                 problematicLibraries += ProblematicLibrary(rawPath, InvalidLibraryFormat)
                 return@forEachLibraryPath
@@ -130,12 +134,12 @@ class KlibLoader(init: KlibLoaderSpec.() -> Unit) {
             }
 
             if (maxPermittedAbiVersion != null) {
-                val libraryAbiVersion: KotlinAbiVersion? = libraryVersions.abiVersion
+                val libraryAbiVersion: KotlinAbiVersion? = library.versions.abiVersion
                 if (libraryAbiVersion == null || !libraryAbiVersion.isAtMost(maxPermittedAbiVersion)) {
                     problematicLibraries += ProblematicLibrary(
                         rawPath,
                         IncompatibleAbiVersion(
-                            libraryVersions = libraryVersions,
+                            libraryVersions = library.versions,
                             minPermittedAbiVersion = null,
                             maxPermittedAbiVersion = maxPermittedAbiVersion
                         )
@@ -161,6 +165,9 @@ class KlibLoader(init: KlibLoaderSpec.() -> Unit) {
 interface KlibLoaderSpec {
     fun libraryPaths(paths: List<String>)
     fun libraryPaths(vararg paths: String)
+    fun libraryPaths(vararg paths: File)
+    fun libraryPaths(vararg paths: Path)
+
     fun platformChecker(checker: KlibPlatformChecker)
     fun maxPermittedAbiVersion(abiVersion: KotlinAbiVersion)
     fun zipFileSystemAccessor(accessor: ZipFileSystemAccessor)

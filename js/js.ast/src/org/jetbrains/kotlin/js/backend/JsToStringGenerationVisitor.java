@@ -42,6 +42,7 @@ public class JsToStringGenerationVisitor extends JsVisitor {
     private static final char[] CHARS_SET = "set".toCharArray();
     private static final char[] CHARS_IF = "if".toCharArray();
     private static final char[] CHARS_IN = "in".toCharArray();
+    private static final char[] CHARS_OF = "of".toCharArray();
     private static final char[] CHARS_NEW = "new".toCharArray();
     private static final char[] CHARS_NULL = "null".toCharArray();
     private static final char[] CHARS_RETURN = "return".toCharArray();
@@ -54,6 +55,8 @@ public class JsToStringGenerationVisitor extends JsVisitor {
     private static final char[] CHARS_TRUE = "true".toCharArray();
     private static final char[] CHARS_TRY = "try".toCharArray();
     private static final char[] CHARS_VAR = "var".toCharArray();
+    private static final char[] CHARS_LET = "let".toCharArray();
+    private static final char[] CHARS_CONST = "const".toCharArray();
     private static final char[] CHARS_WHILE = "while".toCharArray();
     private static final char[] HEX_DIGITS = {
             '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
@@ -642,6 +645,15 @@ public class JsToStringGenerationVisitor extends JsVisitor {
 
     @Override
     public void visitForIn(@NotNull JsForIn x) {
+        visitIterableLoop(x, CHARS_IN);
+    }
+
+    @Override
+    public void visitForOf(@NotNull JsForOf x) {
+        visitIterableLoop(x, CHARS_OF);
+    }
+
+    private void visitIterableLoop(@NotNull JsIterableLoop x, char[] separatorChars) {
         pushSourceInfo(x.getSource());
         printCommentsBeforeNode(x);
 
@@ -649,28 +661,33 @@ public class JsToStringGenerationVisitor extends JsVisitor {
         space();
         leftParen();
 
-        if (x.getIterVarName() != null) {
-            var();
-            space();
-            nameDef(x.getIterVarName());
+        JsName name = x.getBindingVarName();
+        JsVars.Variant variant = x.getBindingVarVariant();
+        JsExpression bindingExpression = x.getBindingExpression();
+        JsExpression iterableExpression = x.getIterableExpression();
 
-            if (x.getIterExpression() != null) {
+        if (name != null && variant != null) {
+            varModifier(variant);
+            space();
+            nameDef(name);
+
+            if (bindingExpression != null) {
                 space();
                 assignment();
                 space();
-                accept(x.getIterExpression());
+                accept(bindingExpression);
             }
         }
         else {
             // Just a name ref.
             //
-            accept(x.getIterExpression());
+            accept(bindingExpression);
         }
 
         space();
-        p.print(CHARS_IN);
+        p.print(separatorChars);
         space();
-        accept(x.getObjectExpression());
+        accept(iterableExpression);
 
         rightParen();
 
@@ -706,7 +723,9 @@ public class JsToStringGenerationVisitor extends JsVisitor {
         sourceLocationConsumer.pushSourceInfo(null);
         for (JsParameter param : parameters) {
             notFirst = sepCommaSpace(notFirst);
+            printCommentsBeforeNode(param);
             accept(param);
+            printCommentsAfterNode(param);
         }
         sourceLocationConsumer.popSourceInfo();
         rightParen();
@@ -1301,7 +1320,7 @@ public class JsToStringGenerationVisitor extends JsVisitor {
         pushSourceInfo(vars.getSource());
         printCommentsBeforeNode(vars);
 
-        var();
+        varModifier(vars.getVariant());
         space();
         boolean sep = false;
         for (JsVar var : vars) {
@@ -1829,8 +1848,24 @@ public class JsToStringGenerationVisitor extends JsVisitor {
         return false;
     }
 
+    private void varModifier(JsVars.Variant variant) {
+        switch (variant) {
+            case Var: var(); break;
+            case Let: let(); break;
+            case Const: _const(); break;
+        }
+    }
+
     private void var() {
         p.print(CHARS_VAR);
+    }
+
+    private void let() {
+        p.print(CHARS_LET);
+    }
+
+    private void _const() {
+        p.print(CHARS_CONST);
     }
 
     private void _while() {

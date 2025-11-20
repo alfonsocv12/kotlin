@@ -2,7 +2,6 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("java-test-fixtures")
     id("project-tests-convention")
 }
@@ -34,7 +33,10 @@ dependencies {
 
 sourceSets {
     "main" { projectDefault() }
-    "test" { generatedTestDir() }
+    "test" {
+        projectDefault()
+        generatedTestDir()
+    }
     "testFixtures" { projectDefault() }
 }
 

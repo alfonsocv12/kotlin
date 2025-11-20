@@ -217,6 +217,16 @@ private class JsIrAstDeserializer(private val source: ByteArray) {
                         }
                         FOR_IN -> {
                             JsForIn(
+                                ifTrue { jsVarVariants[readInt()] },
+                                ifTrue { nameTable[readInt()] },
+                                ifTrue { readExpression() },
+                                readExpression(),
+                                readStatement()
+                            )
+                        }
+                        FOR_OF -> {
+                            JsForOf(
+                                ifTrue { jsVarVariants[readInt()] },
                                 ifTrue { nameTable[readInt()] },
                                 ifTrue { readExpression() },
                                 readExpression(),
@@ -290,6 +300,7 @@ private class JsIrAstDeserializer(private val source: ByteArray) {
     private val jsBinaryOperatorValues get() = JsBinaryOperator.entries
     private val jsUnaryOperatorValues get() = JsUnaryOperator.entries
     private val jsFunctionModifiersValues get() = JsFunction.Modifier.entries
+    private val jsVarVariants get() = JsVars.Variant.entries
 
     private fun readExpression(): JsExpression {
         return withComments {
@@ -458,7 +469,8 @@ private class JsIrAstDeserializer(private val source: ByteArray) {
     }
 
     private fun readVars(): JsVars {
-        return JsVars(readBoolean()).apply {
+        val variant = jsVarVariants[readInt()]
+        return JsVars(variant, readBoolean()).apply {
             readRepeated {
                 vars += withLocation {
                     JsVars.JsVar(nameTable[readInt()], ifTrue { readExpression() })

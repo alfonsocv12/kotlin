@@ -326,6 +326,7 @@ include ":kotlin-script-runtime",
         ":compiler:build-tools:kotlin-build-statistics",
         ":gradle:android-test-fixes",
         ":gradle:documentation",
+        ":gradle:generators:native-cache-kotlin-version",
         ":gradle:gradle-warnings-detector",
         ":gradle:kotlin-compiler-args-properties",
         ":gradle:regression-benchmark-templates",
@@ -373,8 +374,6 @@ include ":kotlin-script-runtime",
         ":examples:scripting-jvm-maven-deps",
         ":examples:scripting-jvm-maven-deps-host",
         ":examples:scripting-jvm-embeddable-host",
-        ":pill:pill-importer",
-        ":pill:generate-all-tests",
         ":libraries:kotlin-prepush-hook",
         ":libraries:tools:mutability-annotations-compat",
         ":plugins:jvm-abi-gen",
@@ -938,6 +937,7 @@ project(':kotlin-gradle-plugins-bom').projectDir = "$rootDir/libraries/tools/kot
 project(':kotlin-privacy-manifests-plugin').projectDir = "$rootDir/libraries/tools/kotlin-privacy-manifests-plugin" as File
 project(':gradle:android-test-fixes').projectDir = "$rootDir/libraries/tools/gradle/android-test-fixes" as File
 project(':gradle:documentation').projectDir = "$rootDir/libraries/tools/gradle/documentation" as File
+project(':gradle:generators:native-cache-kotlin-version').projectDir = "$rootDir/libraries/tools/gradle/generators/native-cache-kotlin-version" as File
 project(':gradle:gradle-warnings-detector').projectDir = "$rootDir/libraries/tools/gradle/gradle-warnings-detector" as File
 project(':gradle:kotlin-compiler-args-properties').projectDir = "$rootDir/libraries/tools/gradle/kotlin-compiler-args-properties" as File
 project(":gradle:regression-benchmark-templates").projectDir = "$rootDir/libraries/tools/gradle/regression-benchmark-templates" as File
@@ -984,9 +984,6 @@ project(':examples:scripting-jvm-simple-script-host').projectDir = "$rootDir/lib
 project(':examples:scripting-jvm-maven-deps').projectDir = "$rootDir/libraries/examples/scripting/jvm-maven-deps/script" as File
 project(':examples:scripting-jvm-maven-deps-host').projectDir = "$rootDir/libraries/examples/scripting/jvm-maven-deps/host" as File
 project(':examples:scripting-jvm-embeddable-host').projectDir = "$rootDir/libraries/examples/scripting/jvm-embeddable-host" as File
-project(':pill').projectDir = "$rootDir/plugins/pill" as File
-project(':pill:pill-importer').projectDir = "$rootDir/plugins/pill/pill-importer" as File
-project(':pill:generate-all-tests').projectDir = "$rootDir/plugins/pill/generate-all-tests" as File
 project(':libraries:kotlin-prepush-hook').projectDir = "$rootDir/libraries/tools/kotlin-prepush-hook" as File
 project(':plugins:jvm-abi-gen').projectDir = "$rootDir/plugins/jvm-abi-gen" as File
 project(':plugins:jvm-abi-gen-embeddable').projectDir = "$rootDir/plugins/jvm-abi-gen/embeddable" as File

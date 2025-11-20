@@ -28250,6 +28250,18 @@ public class LLBlackBoxTestGenerated extends AbstractLLBlackBoxTest {
     }
 
     @Test
+    @TestMetadata("inlineFunctionOverridesAbstractMethodWithDefaultValue.kt")
+    public void testInlineFunctionOverridesAbstractMethodWithDefaultValue() {
+      runTest("compiler/testData/codegen/box/inline/inlineFunctionOverridesAbstractMethodWithDefaultValue.kt");
+    }
+
+    @Test
+    @TestMetadata("inlineFunctionOverridesAbstractMethodWithDefaultValueWithIrInlinerBeforeKlibSerializationEnabled.kt")
+    public void testInlineFunctionOverridesAbstractMethodWithDefaultValueWithIrInlinerBeforeKlibSerializationEnabled() {
+      runTest("compiler/testData/codegen/box/inline/inlineFunctionOverridesAbstractMethodWithDefaultValueWithIrInlinerBeforeKlibSerializationEnabled.kt");
+    }
+
+    @Test
     @TestMetadata("inlinedLambdaWithErasedParamType.kt")
     public void testInlinedLambdaWithErasedParamType() {
       runTest("compiler/testData/codegen/box/inline/inlinedLambdaWithErasedParamType.kt");
@@ -57864,6 +57876,12 @@ public class LLBlackBoxTestGenerated extends AbstractLLBlackBoxTest {
       @TestMetadata("javaGenericTypeConstructor.kt")
       public void testJavaGenericTypeConstructor() {
         runTest("compiler/testData/codegen/box/reflection/typeParameters/javaGenericTypeConstructor.kt");
+      }
+
+      @Test
+      @TestMetadata("kt82316_topLevelCallableContainer.kt")
+      public void testKt82316_topLevelCallableContainer() {
+        runTest("compiler/testData/codegen/box/reflection/typeParameters/kt82316_topLevelCallableContainer.kt");
       }
 
       @Test

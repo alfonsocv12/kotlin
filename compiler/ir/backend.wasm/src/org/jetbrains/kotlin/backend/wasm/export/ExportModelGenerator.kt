@@ -6,17 +6,15 @@
 package org.jetbrains.kotlin.backend.wasm.export
 
 import org.jetbrains.kotlin.backend.wasm.WasmBackendContext
+import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.ir.backend.js.JsLoweredDeclarationOrigin
+import org.jetbrains.kotlin.ir.backend.js.ir.getExportedIdentifier
 import org.jetbrains.kotlin.ir.backend.js.tsexport.*
-import org.jetbrains.kotlin.ir.backend.js.utils.getDeprecated
-import org.jetbrains.kotlin.ir.backend.js.utils.getFqNameWithJsNameWhenAvailable
-import org.jetbrains.kotlin.ir.backend.js.utils.isExplicitlyExported
-import org.jetbrains.kotlin.ir.backend.js.utils.realOverrideTarget
-import org.jetbrains.kotlin.ir.backend.js.utils.typeScriptInnerClassReference
+import org.jetbrains.kotlin.ir.backend.js.utils.*
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
@@ -204,7 +202,12 @@ class ExportModelGenerator(val context: WasmBackendContext) {
             nonNullType == jsRelatedSymbols.jsAnyType -> ExportedType.Primitive.Unknown
             nonNullType.isUnit() || nonNullType == context.wasmSymbols.voidType -> ExportedType.Primitive.Unit
             nonNullType.isFunction() -> ExportedType.Function(
-                parameterTypes = nonNullType.arguments.dropLast(1).memoryOptimizedMap { exportTypeArgument(it) },
+                parameters = nonNullType.arguments.dropLast(1).memoryOptimizedMap {
+                    ExportedParameter(
+                        name = (it as? IrTypeProjection)?.type?.getAnnotationArgumentValue(StandardNames.FqNames.parameterName, "name"),
+                        type = exportTypeArgument(it),
+                    )
+                },
                 returnType = exportTypeArgument(nonNullType.arguments.last())
             )
             nonNullType.isNothing() -> ExportedType.Primitive.Nothing
@@ -331,6 +334,7 @@ class ExportModelGenerator(val context: WasmBackendContext) {
                 nestedClasses = emptyList(),
                 originalClassId = declaration.classId,
                 innerClassReference = runIf(declaration.isInner) { declaration.typeScriptInnerClassReference() },
+                isFinal = declaration.modality == Modality.FINAL,
             )
         }
 

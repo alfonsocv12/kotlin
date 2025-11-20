@@ -7383,6 +7383,12 @@ public class PsiJsBoxTestGenerated extends AbstractPsiJsBoxTest {
     }
 
     @Test
+    @TestMetadata("arrowFunctions.kt")
+    public void testArrowFunctions() {
+      runTest("js/js.translator/testData/box/jsCode/arrowFunctions.kt");
+    }
+
+    @Test
     @TestMetadata("break.kt")
     public void testBreak() {
       runTest("js/js.translator/testData/box/jsCode/break.kt");
@@ -7446,6 +7452,12 @@ public class PsiJsBoxTestGenerated extends AbstractPsiJsBoxTest {
     @TestMetadata("forIn.kt")
     public void testForIn() {
       runTest("js/js.translator/testData/box/jsCode/forIn.kt");
+    }
+
+    @Test
+    @TestMetadata("forOf.kt")
+    public void testForOf() {
+      runTest("js/js.translator/testData/box/jsCode/forOf.kt");
     }
 
     @Test
@@ -7638,6 +7650,12 @@ public class PsiJsBoxTestGenerated extends AbstractPsiJsBoxTest {
     @TestMetadata("tryCatchFinally.kt")
     public void testTryCatchFinally() {
       runTest("js/js.translator/testData/box/jsCode/tryCatchFinally.kt");
+    }
+
+    @Test
+    @TestMetadata("varDeclaration.kt")
+    public void testVarDeclaration() {
+      runTest("js/js.translator/testData/box/jsCode/varDeclaration.kt");
     }
 
     @Test

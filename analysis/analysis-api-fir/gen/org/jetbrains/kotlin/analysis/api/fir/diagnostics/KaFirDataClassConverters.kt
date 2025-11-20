@@ -224,6 +224,12 @@ internal val KT_DIAGNOSTIC_CONVERTER = KaDiagnosticConverterBuilder.buildConvert
             token,
         )
     }
+    add(FirErrors.INT_LITERAL_WITH_LEADING_ZEROS) { firDiagnostic ->
+        IntLiteralWithLeadingZerosImpl(
+            firDiagnostic as KtPsiDiagnostic,
+            token,
+        )
+    }
     add(FirErrors.FLOAT_LITERAL_OUT_OF_RANGE) { firDiagnostic ->
         FloatLiteralOutOfRangeImpl(
             firDiagnostic as KtPsiDiagnostic,
@@ -6627,8 +6633,8 @@ internal val KT_DIAGNOSTIC_CONVERTER = KaDiagnosticConverterBuilder.buildConvert
             token,
         )
     }
-    add(FirJvmErrors.WRONG_NULLABILITY_FOR_JAVA_OVERRIDE) { firDiagnostic ->
-        WrongNullabilityForJavaOverrideImpl(
+    add(FirJvmErrors.WRONG_TYPE_FOR_JAVA_OVERRIDE) { firDiagnostic ->
+        WrongTypeForJavaOverrideImpl(
             firSymbolBuilder.callableBuilder.buildCallableSymbol(firDiagnostic.a),
             firSymbolBuilder.callableBuilder.buildCallableSymbol(firDiagnostic.b),
             firDiagnostic as KtPsiDiagnostic,
@@ -6696,8 +6702,16 @@ internal val KT_DIAGNOSTIC_CONVERTER = KaDiagnosticConverterBuilder.buildConvert
             token,
         )
     }
-    add(FirJvmErrors.NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS) { firDiagnostic ->
-        NullabilityMismatchBasedOnJavaAnnotationsImpl(
+    add(FirJvmErrors.RECEIVER_MUTABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS) { firDiagnostic ->
+        ReceiverMutabilityMismatchBasedOnJavaAnnotationsImpl(
+            firSymbolBuilder.typeBuilder.buildKtType(firDiagnostic.a),
+            firDiagnostic.b,
+            firDiagnostic as KtPsiDiagnostic,
+            token,
+        )
+    }
+    add(FirJvmErrors.TYPE_MISMATCH_BASED_ON_JAVA_ANNOTATIONS) { firDiagnostic ->
+        TypeMismatchBasedOnJavaAnnotationsImpl(
             firSymbolBuilder.typeBuilder.buildKtType(firDiagnostic.a),
             firSymbolBuilder.typeBuilder.buildKtType(firDiagnostic.b),
             firDiagnostic.c,

@@ -26,6 +26,7 @@ import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.analysis.api.useSiteSession
 import org.jetbrains.kotlin.analysis.api.utils.getApiKClassOf
 import org.jetbrains.kotlin.analysis.utils.printer.prettyPrint
+import org.jetbrains.kotlin.kdoc.psi.api.KDocCommentDescriptor
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
@@ -39,6 +40,7 @@ import kotlin.reflect.KVisibility
 import kotlin.reflect.full.hasAnnotation
 import kotlin.reflect.full.memberProperties
 
+@OptIn(KtNonPublicApi::class)
 context(_: KaSession)
 internal fun stringRepresentation(any: Any?): String = with(any) {
     fun KaType.render() = toString().replace('/', '.')
@@ -109,6 +111,15 @@ internal fun stringRepresentation(any: Any?): String = with(any) {
         is Name -> asString()
         is CallableId -> toString()
         is KaCallableSignature<*> -> stringRepresentation(this)
+        is KDocCommentDescriptor -> buildString {
+            appendLine("<primary tag=\"${primaryTag.name}\" subject=\"${primaryTag.getSubjectName()}\">")
+            append(primaryTag.getContent())
+            additionalSections.forEach { section ->
+                appendLine()
+                appendLine("<section=\"${section.name}\" subject=\"${section.getSubjectName()}\">")
+                append(section.getContent())
+            }
+        }
         else -> buildString {
             val className = renderFrontendIndependentKClassNameOf(this@with)
             append(className)

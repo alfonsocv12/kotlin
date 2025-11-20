@@ -58,7 +58,6 @@ plugins {
     id("org.jetbrains.gradle.plugin.idea-ext") version "1.0.1" // this version should be in sync with repo/buildsrc-compat/build.gradle.kts
     id("build-time-report")
     id("java-instrumentation")
-    id("jps")
     id("modularized-test-configurations")
     id("resolve-dependencies")
     id("org.gradle.crypto.checksum") version "1.4.0"
@@ -755,9 +754,14 @@ tasks.register("createIdeaHomeForTests") {
 
 tasks {
     register("compileAll") {
+        /*
+         * Build cache tests don't work properly with KMP projects,
+         * so such projects are temporary excluded from them (KTI-2822)
+         */
         val excludedNativePrefixes = listOf(
             ":native",
             ":libraries:tools:analysis-api-based-klib-reader:testProject",
+            ":plugins:plugin-sandbox:plugin-annotations",
         )
         allprojects
             .filter {
@@ -799,7 +803,7 @@ tasks {
         "coreLibsTest", "check",
         coreLibsBuildable + listOfNotNull(
             ":kotlin-stdlib:samples",
-            ":kotlin-test:kotlin-test-js-it".takeIf { !kotlinBuildProperties.isInJpsBuildIdeaSync },
+            ":kotlin-test:kotlin-test-js-it",
             ":tools:binary-compatibility-validator",
             ":tools:jdk-api-validator",
         )
@@ -859,6 +863,7 @@ tasks {
     // ...
     register("nativeCompilerTest") {
         dependsOn(":kotlin-atomicfu-compiler-plugin:nativeTest")
+        dependsOn(":plugins:plugin-sandbox:nativeTest")
         dependsOn(":libraries:tools:analysis-api-based-klib-reader:check")
         dependsOn(":native:native.tests:test")
         dependsOn(":native:native.tests:cli-tests:check")

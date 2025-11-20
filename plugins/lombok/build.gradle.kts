@@ -2,7 +2,6 @@ description = "Lombok compiler plugin"
 
 plugins {
     kotlin("jvm")
-    id("jps-compatible")
     id("java-test-fixtures")
     id("project-tests-convention")
 }
@@ -61,7 +60,10 @@ sourceSets {
 }
 
 projectTests {
-    testTask(jUnitMode = JUnitMode.JUnit5) {
+    testTask(
+        jUnitMode = JUnitMode.JUnit5,
+        defineJDKEnvVariables = listOf(JdkMajorVersion.JDK_17_0)
+    ) {
         dependsOn(":dist")
         workingDir = rootDir
 

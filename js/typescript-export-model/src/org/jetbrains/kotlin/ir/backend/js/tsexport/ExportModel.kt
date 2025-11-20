@@ -100,6 +100,7 @@ public data class ExportedRegularClass(
     override val originalClassId: ClassId?,
     val innerClassReference: String? = null,
     override val isExternal: Boolean,
+    val isFinal: Boolean = false,
 ) : ExportedClass() {
     override val isCompanion: Boolean
         get() = false
@@ -119,7 +120,7 @@ public data class ExportedObject(
 ) : ExportedClass()
 
 public class ExportedParameter(
-    public val name: String,
+    public val name: String?,
     public val type: ExportedType,
     public val hasDefaultValue: Boolean = false
 )
@@ -162,7 +163,7 @@ public sealed class ExportedType {
     }
 
     public class Function(
-        public val parameterTypes: List<ExportedType>,
+        public val parameters: List<ExportedParameter>,
         public val returnType: ExportedType
     ) : ExportedType()
 
@@ -195,6 +196,8 @@ public sealed class ExportedType {
     public class InlineInterfaceType(
         public val members: List<ExportedDeclaration>
     ) : ExportedType()
+
+    public class InlineArrayType(public val elements: List<ExportedType>) : ExportedType()
 
     public class UnionType(public val lhs: ExportedType, public val rhs: ExportedType) : ExportedType()
 

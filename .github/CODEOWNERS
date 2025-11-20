@@ -186,6 +186,7 @@
 /compiler/tests-common/ @JetBrains/kotlin-compiler
 /compiler/tests-common/testFixtures/org/jetbrains/kotlin/asJava/ @JetBrains/kotlin-analysis-api
 /compiler/tests-common-new/ @JetBrains/kotlin-frontend
+/compiler/tests-common-new/testFixtures/org/jetbrains/kotlin/test/klib/ @JetBrains/kotlin-common-backend
 /compiler/tests-common-new/testFixtures/org/jetbrains/kotlin/test/directives/WasmEnvironmentConfigurationDirectives.kt @JetBrains/kotlin-wasm
 /compiler/tests-common-new/testFixtures/org/jetbrains/kotlin/test/services/configuration/WasmEnvironmentConfigurator.kt @JetBrains/kotlin-wasm
 /compiler/tests-common-new/testFixtures/org/jetbrains/kotlin/test/directives/JsEnvironmentConfigurationDirectives.kt @JetBrains/kotlin-js
@@ -251,6 +252,8 @@
 
 /js/ @JetBrains/kotlin-js
 /js/js.sourcemap/ @JetBrains/kotlin-js @JetBrains/kotlin-wasm
+/js/js.tests/klib-compatibility/ @JetBrains/kotlin-common-backend
+/js/js.tests/testFixtures/org/jetbrains/kotlin/js/test/klib/ @JetBrains/kotlin-common-backend
 /js/js.translator/testData/ @JetBrains/kotlin-js @JetBrains/kotlin-wasm
 
 /kotlin-js-store/ ilya.goncharov@jetbrains.com
@@ -393,7 +396,6 @@
 /plugins/lombok/ @JetBrains/kotlin-frontend
 /plugins/noarg/ @JetBrains/kotlin-frontend
 /plugins/parcelize/ nikitanazarov@google.com jobay@google.com troels@google.com jpaupore@google.com jsjeon@google.com jaebaek@google.com laszio@google.com
-/plugins/pill/ yan.zhulanow@jetbrains.com @JetBrains/kotlin-build-infrastructure
 /plugins/power-assert/ brian.norman@jetbrains.com @JetBrains/kotlin-common-backend sergej.jaskiewicz@jetbrains.com
 /plugins/sam-with-receiver/ @JetBrains/kotlin-frontend
 /plugins/scripting/ @JetBrains/kotlin-frontend

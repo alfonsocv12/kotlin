@@ -66,15 +66,24 @@ class KotlinDeclarationInCompiledFileSearcher {
                 ?.firstOrNull { doParametersMatch(member, it) }
         }
 
-        val declarations = container.declarations
+        val (regularDeclarations, companionDeclarations) = if (container is KtClass && member.hasModifierProperty(PsiModifier.STATIC)) {
+            // Compiled code cannot have more than one companion object, so we can pick the first one
+            container.declarations to container.companionObjects.firstOrNull()?.declarations.orEmpty()
+        } else {
+            container.declarations to emptyList()
+        }
+
+        val declarations = regularDeclarations + companionDeclarations
         return when (member) {
             is PsiMethod -> {
                 val names = SmartList(memberName)
                 val setter = if (JvmAbi.isGetterName(memberName) && PsiTypes.voidType() != member.returnType) {
                     propertyNameByGetMethodName(Name.identifier(memberName))?.let { names.add(it.identifier) }
+                    memberName.removePrefix("get").takeIf { it != memberName }?.let { names.add(it) }
                     false
                 } else if (JvmAbi.isSetterName(memberName) && PsiTypes.voidType() == member.returnType) {
                     propertyNamesBySetMethodName(Name.identifier(memberName)).forEach { names.add(it.identifier) }
+                    memberName.removePrefix("set").takeIf { it != memberName }?.let { names.add(it) }
                     true
                 } else null
                 declarations
@@ -107,19 +116,11 @@ class KotlinDeclarationInCompiledFileSearcher {
 
                 val declarations = when {
                     container is KtFile || container is KtObjectDeclaration -> declarations
-                    member.hasModifier(JvmModifier.STATIC) -> {
-                        val nonPropertyDeclarations = declarations.filter { it is KtEnumEntry || it is KtObjectDeclaration }
-
-                        // Fields for properties from companion objects are materialized in the containing class
-                        // Compiled code cannot have more than one companion object, so we can pick the first one
-                        val propertiesFromCompanion = (container as? KtClass)?.companionObjects
-                            ?.firstOrNull()
-                            ?.declarations
-                            ?.filterIsInstance<KtProperty>()
-                            .orEmpty()
-
-                        nonPropertyDeclarations + propertiesFromCompanion
-                    }
+                    member.hasModifier(JvmModifier.STATIC) ->
+                        // Enum entries and companion objects are materialized in the containing class as fields
+                        regularDeclarations.filter { it is KtEnumEntry || it is KtObjectDeclaration && it.isCompanion() } +
+                                // Fields for properties from companion objects are materialized in the containing class
+                                companionDeclarations.filterIsInstance<KtProperty>()
 
                     else -> declarations
                 }
@@ -163,9 +164,9 @@ class KotlinDeclarationInCompiledFileSearcher {
     }
 
     private fun KtCallableDeclaration.extractContextParameters(to: MutableList<KtTypeReference>) {
-        modifierList?.contextReceiverList?.let { contextReceiverList ->
-            contextReceiverList.contextReceivers().forEach { to.add(it.typeReference()!!) }
-            contextReceiverList.contextParameters().forEach { to.add(it.typeReference!!) }
+        modifierList?.contextParameterList?.let { contextParameterList ->
+            contextParameterList.contextReceivers().forEach { to.add(it.typeReference()!!) }
+            contextParameterList.contextParameters.forEach { to.add(it.typeReference!!) }
         }
 
         receiverTypeReference?.let { to.add(it) }

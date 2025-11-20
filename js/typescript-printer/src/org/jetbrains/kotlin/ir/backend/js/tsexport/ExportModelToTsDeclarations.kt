@@ -369,7 +369,7 @@ public class ExportModelToTsDeclarations(private val moduleKind: ModuleKind) {
             generateMetadataNamespace(listOf(constructorProperty))
         })
 
-        val realNestedDeclarations = metadataNamespace + namespaceMembers + nonInnerClasses + innerClasses.map { it.withProtectedConstructors() }
+        val realNestedDeclarations = metadataNamespace + namespaceMembers + nonInnerClasses + innerClasses.map { it.withProtectedConstructorsForInnerClass() }
 
         val klassExport =
             "$prefix$modifiers$keyword $name$renderedTypeParameters$superClassClause$superInterfacesClause {\n$bodyString}${
@@ -428,13 +428,12 @@ public class ExportModelToTsDeclarations(private val moduleKind: ModuleKind) {
         }
     }
 
-    private fun ExportedClass.withProtectedConstructors(): ExportedRegularClass {
+    private fun ExportedClass.withProtectedConstructorsForInnerClass(): ExportedRegularClass {
         return (this as ExportedRegularClass).copy(members = members.map {
-            if (it !is ExportedConstructor || it.isProtected) {
-                it
-            } else {
-                it.copy(visibility = ExportedVisibility.PROTECTED)
-            }
+            if (it !is ExportedConstructor) return@map it
+            val visibility = if (isFinal) ExportedVisibility.PRIVATE else ExportedVisibility.PROTECTED
+            val parameters = if (visibility == ExportedVisibility.PRIVATE) emptyList() else it.parameters
+            it.copy(parameters = parameters, visibility = visibility)
         })
     }
 
@@ -469,15 +468,17 @@ public class ExportModelToTsDeclarations(private val moduleKind: ModuleKind) {
 
     private fun List<ExportedParameter>.generateTypeScriptString(indent: String): String {
         var couldBeOptional = true
-        val parameters = foldRight(mutableListOf<String>()) { it, acc ->
-            if (!it.hasDefaultValue) couldBeOptional = false
-            acc.apply { add(0, it.toTypeScript(indent, couldBeOptional)) }
-        }
-        return parameters.joinToString(", ")
+        return asReversed()
+            .mapIndexed { index, parameter ->
+                if (!parameter.hasDefaultValue) couldBeOptional = false
+                parameter.toTypeScript(indent, size - index - 1, couldBeOptional)
+            }
+            .asReversed()
+            .joinToString()
     }
 
-    private fun ExportedParameter.toTypeScript(indent: String, couldBeOptional: Boolean): String {
-        val name = makeValidES5Identifier(name, withHash = false)
+    private fun ExportedParameter.toTypeScript(indent: String, index: Int, couldBeOptional: Boolean): String {
+        val name = name?.let { makeValidES5Identifier(it, withHash = false) } ?: "p$index"
         val type = if (hasDefaultValue && !couldBeOptional) {
             ExportedType.UnionType(type, ExportedType.Primitive.Undefined)
         } else type
@@ -490,11 +491,8 @@ public class ExportModelToTsDeclarations(private val moduleKind: ModuleKind) {
         is ExportedType.Array -> "Array<${elementType.toTypeScript(indent, isInCommentContext)}>"
         is ExportedType.ObjectsParentType -> "$ObjectInheritanceIntrinsic<${constructor.toTypeScript(indent, isInCommentContext)}>()"
 
-        is ExportedType.Function -> "(" + parameterTypes
-            .withIndex()
-            .joinToString(", ") { (index, type) ->
-                "p$index: ${type.toTypeScript(indent, isInCommentContext)}"
-            } + ") => " + returnType.toTypeScript(indent, isInCommentContext)
+        is ExportedType.Function ->
+            "(" + parameters.generateTypeScriptString(indent) + ") => " + returnType.toTypeScript(indent, isInCommentContext)
 
         is ExportedType.ConstructorType ->
             "abstract new " + (if (typeParameters.isNotEmpty()) "<${
@@ -520,6 +518,10 @@ public class ExportModelToTsDeclarations(private val moduleKind: ModuleKind) {
         is ExportedType.NonNullable -> "$NonNullable<" + baseType.toTypeScript(indent, isInCommentContext) + ">"
         is ExportedType.InlineInterfaceType -> {
             members.joinToString(prefix = "{\n", postfix = "$indent}", separator = "") { it.toTypeScript("$indent    ") + "\n" }
+        }
+
+        is ExportedType.InlineArrayType -> {
+            elements.joinToString(prefix = "[", postfix = "]", separator = ", ") { it.toTypeScript(indent, isInCommentContext) }
         }
 
         is ExportedType.IntersectionType -> {
