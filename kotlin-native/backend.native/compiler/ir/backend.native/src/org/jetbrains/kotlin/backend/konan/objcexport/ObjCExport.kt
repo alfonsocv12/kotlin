@@ -85,7 +85,7 @@ internal fun produceObjCExportInterface(
     val additionalImports = context.config.configuration.getNotNull(KonanConfigKeys.FRAMEWORK_IMPORT_HEADERS)
     val headerGenerator = ObjCExportHeaderGenerator.createInstance(
             moduleDescriptors, mapper, namer, problemCollector, objcGenerics, objcExportBlockExplicitParameterNames, shouldExportKDoc = shouldExportKDoc,
-            additionalImports = additionalImports)
+            additionalImports = additionalImports, context.config.threadsCount)
     headerGenerator.translateModule()
     return headerGenerator.buildInterface()
 }

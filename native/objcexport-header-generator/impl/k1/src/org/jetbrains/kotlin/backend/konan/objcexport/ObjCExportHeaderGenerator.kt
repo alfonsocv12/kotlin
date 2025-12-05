@@ -24,9 +24,8 @@ abstract class ObjCExportHeaderGenerator @InternalKotlinNativeApi constructor(
     val objcGenerics: Boolean,
     val objcExportBlockExplicitParameterNames: Boolean,
     problemCollector: ObjCExportProblemCollector,
+    val threadsCount: Int = Runtime.getRuntime().availableProcessors()
 ) {
-    // TODO pipe context
-    private val nThreads = Runtime.getRuntime().availableProcessors()
     private val stubs = mutableListOf<ObjCExportStub>()
 
     private val classForwardDeclarations = linkedSetOf<ObjCClassForwardDeclaration>()
@@ -123,8 +122,8 @@ abstract class ObjCExportHeaderGenerator @InternalKotlinNativeApi constructor(
 
         val classesToTranslate = java.util.Collections.synchronizedList(mutableListOf<ClassDescriptor>())
 
-        val executor = if (packageFragments.size > 16 && nThreads > 1) {
-            Executors.newFixedThreadPool(nThreads)
+        val executor = if (threadsCount > 1) {
+            Executors.newFixedThreadPool(threadsCount)
         } else {
             null
         }
@@ -268,6 +267,7 @@ abstract class ObjCExportHeaderGenerator @InternalKotlinNativeApi constructor(
             objcExportBlockExplicitParameterNames: Boolean,
             shouldExportKDoc: Boolean,
             additionalImports: List<String>,
+            threadsCount: Int = Runtime.getRuntime().availableProcessors()
         ): ObjCExportHeaderGenerator = ObjCExportHeaderGeneratorImpl(
             moduleDescriptors,
             mapper,
@@ -276,7 +276,8 @@ abstract class ObjCExportHeaderGenerator @InternalKotlinNativeApi constructor(
             objcGenerics,
             objcExportBlockExplicitParameterNames,
             shouldExportKDoc,
-            additionalImports
+            additionalImports,
+            threadsCount
         )
     }
 }
