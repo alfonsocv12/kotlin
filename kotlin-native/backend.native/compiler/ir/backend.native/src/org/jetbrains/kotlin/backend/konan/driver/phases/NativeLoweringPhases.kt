@@ -11,6 +11,7 @@ import org.jetbrains.kotlin.backend.common.FileLoweringPass
 import org.jetbrains.kotlin.backend.common.ir.PreSerializationSymbols
 import org.jetbrains.kotlin.backend.common.lower.*
 import org.jetbrains.kotlin.backend.common.lower.coroutines.AddContinuationToNonLocalSuspendFunctionsLowering
+import org.jetbrains.kotlin.backend.common.lower.inline.InlineCallCycleCheckerLowering
 import org.jetbrains.kotlin.backend.common.lower.inline.LocalClassesInInlineLambdasLowering
 import org.jetbrains.kotlin.backend.common.lower.optimizations.PropertyAccessorInlineLowering
 import org.jetbrains.kotlin.backend.common.lower.optimizations.LivenessAnalysis
@@ -75,6 +76,12 @@ internal val validateIrBeforeLowering = createSimpleNamedCompilerPhase<NativeGen
         name = "ValidateIrBeforeLowering",
         op = { context, module -> KlibIrValidationBeforeLoweringPhase(context.context).lower(module) }
 )
+
+internal val checkInlineCallCyclesPhase = createSimpleNamedCompilerPhase<NativeGenerationState, IrModuleFragment>(
+        name = "InlineCallCycleChecker",
+        op = { context, module -> InlineCallCycleCheckerLowering(context.context).lower(module) }
+)
+
 
 internal val validateIrAfterInliningOnlyPrivateFunctions = createSimpleNamedCompilerPhase<NativeGenerationState, IrModuleFragment>(
         name = "ValidateIrAfterInliningOnlyPrivateFunctions",
@@ -266,9 +273,19 @@ private val finallyBlocksPhase = createFileLoweringPhase(
         prerequisite = setOf(initializersPhase, localFunctionsPhase, tailrecPhase)
 )
 
-private val testProcessorPhase = createFileLoweringPhase(
+internal val testProcessorModulePhase = makeIrModulePhase(
         lowering = ::TestProcessor,
         name = "TestProcessor",
+)
+
+private val testProcessorPhase = createFileLoweringPhase(
+        lowering = { context: Context -> TestProcessor(context, context.sourcesModules) },
+        name = "TestProcessor",
+)
+
+private val initTestsPhase = createFileLoweringPhase(
+        lowering = ::TestsInitializer,
+        name = "TestsInitializer",
 )
 
 private val dumpTestsPhase = createFileLoweringPhase(
@@ -590,6 +607,7 @@ internal fun KonanConfig.getLoweringsAfterInlining(): LoweringList = listOfNotNu
         specializeSharedVariableBoxes,
         interopPhase,
         specialInteropIntrinsicsPhase,
+        initTestsPhase,
         dumpTestsPhase.takeIf { this.configuration.getNotNull(KonanConfigKeys.GENERATE_TEST_RUNNER) != TestRunnerKind.NONE },
         removeExpectDeclarationsPhase,
         stripTypeAliasDeclarationsPhase,

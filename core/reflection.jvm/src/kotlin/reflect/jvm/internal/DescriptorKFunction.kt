@@ -36,6 +36,7 @@ import kotlin.reflect.jvm.internal.calls.AnnotationConstructorCaller.CallMode.CA
 import kotlin.reflect.jvm.internal.calls.AnnotationConstructorCaller.CallMode.POSITIONAL_CALL
 import kotlin.reflect.jvm.internal.calls.AnnotationConstructorCaller.Origin.JAVA
 import kotlin.reflect.jvm.internal.calls.AnnotationConstructorCaller.Origin.KOTLIN
+import kotlin.reflect.jvm.internal.types.DescriptorKType
 
 internal class DescriptorKFunction private constructor(
     override val container: KDeclarationContainerImpl,
@@ -178,9 +179,6 @@ internal class DescriptorKFunction private constructor(
         return null
     }
 
-    private val boundReceiver: Any?
-        get() = rawBoundReceiver.coerceToExpectedReceiverType(this, descriptor)
-
     // boundReceiver is unboxed receiver when the receiver is inline class.
     // However, when the expected dispatch receiver type is an interface,
     // the member belongs to the interface/DefaultImpls, so the receiver should not be unboxed.
@@ -215,6 +213,11 @@ internal class DescriptorKFunction private constructor(
                 CallerImpl.Constructor(member)
         }
     }
+
+    override fun computeReturnType(): DescriptorKType =
+        DescriptorKType(descriptor.returnType!!) {
+            extractContinuationArgument() ?: caller.returnType
+        }
 
     override val arity: Int get() = caller.arity
 

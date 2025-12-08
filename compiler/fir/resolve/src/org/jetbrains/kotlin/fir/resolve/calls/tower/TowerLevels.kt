@@ -64,21 +64,21 @@ class DispatchReceiverMemberScopeTowerLevel(
     val dispatchReceiverValue: ReceiverValue,
     private val givenExtensionReceiver: FirExpression?,
     private val skipSynthetics: Boolean,
-) : TowerLevel() {
-    private val scopeSession: ScopeSession get() = bodyResolveComponents.scopeSession
-    private val session: FirSession get() = bodyResolveComponents.session
+) : TowerLevel(), SessionAndScopeSessionHolder by bodyResolveComponents {
 
     private fun <T : FirCallableSymbol<*>> processMembers(
         info: CallInfo,
         output: TowerLevelProcessor,
-        processScopeMembers: FirScope.(processor: (T) -> Unit) -> Unit
+        processScopeMembers: FirScope.(processor: (T) -> Unit) -> Unit,
     ): ProcessResult {
-        val scope = dispatchReceiverValue.scope(session, scopeSession) ?: return ProcessResult.SCOPE_EMPTY
+        val scope = when (dispatchReceiverValue) {
+            is ExpressionReceiverValue if LanguageFeature.CacheLocalVariableScopes.isEnabled() ->
+                dispatchReceiverValue.cachedScopeIfAvailable()
+            else -> dispatchReceiverValue.scope()
+        } ?: return ProcessResult.SCOPE_EMPTY
 
         val receiverTypeWithoutSmartCast = getOriginalReceiverExpressionIfStableSmartCast()?.resolvedType
         val scopeWithoutSmartcast = receiverTypeWithoutSmartCast?.scope(
-            session,
-            scopeSession,
             bodyResolveComponents.returnTypeCalculator.callableCopyTypeCalculator,
             requiredMembersPhase = FirResolvePhase.STATUS,
         )
@@ -140,8 +140,6 @@ class DispatchReceiverMemberScopeTowerLevel(
             if (dispatchReceiverType.isRaw()) {
                 typeForSyntheticScope = dispatchReceiverType.convertToNonRawVersion()
                 useSiteForSyntheticScope = typeForSyntheticScope.scope(
-                    session,
-                    scopeSession,
                     CallableCopyTypeCalculator.DoNothing,
                     requiredMembersPhase = FirResolvePhase.STATUS,
                 ) ?: errorWithAttachment("No scope for flexible type scope, while it's not null") {
@@ -171,6 +169,23 @@ class DispatchReceiverMemberScopeTowerLevel(
             }
         }
         return processResult
+    }
+
+    private fun ExpressionReceiverValue.cachedScopeIfAvailable(): FirTypeScope? {
+        fun FirThisReceiverExpression.implicitReceiverScope(): FirTypeScope? {
+            return calleeReference.boundSymbol
+                ?.let { bodyResolveComponents.implicitValueStorage.getBySymbol(it) as? ReceiverValue }
+                ?.scope()
+        }
+
+        fun ExpressionReceiverValue.cachedLocalVariableScopeIfAvailable(): FirTypeScope? {
+            return bodyResolveComponents.towerDataContext.localVariableScopeStorage.getScope(this) {
+                bodyResolveComponents.dataFlowAnalyzer.getOrCreateVariable(receiverExpression)
+            }
+        }
+
+        return (receiverExpression as? FirThisReceiverExpression)?.implicitReceiverScope()
+            ?: cachedLocalVariableScopeIfAvailable()
     }
 
     /**
@@ -288,7 +303,7 @@ class DispatchReceiverMemberScopeTowerLevel(
         return processMembers(info, processor) { consumer ->
             lookupTracker?.recordCallLookup(info, dispatchReceiverValue.type)
             this.processFunctionsAndConstructorsByName(
-                info, session, bodyResolveComponents,
+                info, bodyResolveComponents,
                 ConstructorFilter.OnlyInner,
                 processor = {
                     lookupTracker?.recordCallableCandidateAsLookup(it, info.callSite.source, info.containingFile.source)
@@ -441,7 +456,6 @@ internal class ScopeBasedTowerLevel(
         lookupTracker?.recordCallLookup(info, scope.scopeOwnerLookupNames)
         scope.processFunctionsAndConstructorsByName(
             info,
-            session,
             bodyResolveComponents,
             constructorFilter
         ) { candidate ->

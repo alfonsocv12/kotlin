@@ -1590,6 +1590,7 @@ object DIAGNOSTICS_LIST : DiagnosticList("FirErrors") {
         val DESTRUCTURING_SHORT_FORM_OF_NON_DATA_CLASS by warning<KtElement>(PositioningStrategy.REFERENCED_NAME_BY_QUALIFIED) {
             parameter<ConeKotlinType>("rhsType")
             parameter<Name>("destructuredName")
+            parameter<String>("target")
         }
         val DESTRUCTURING_SHORT_FORM_UNDERSCORE by warning<KtElement>(PositioningStrategy.REFERENCED_NAME_BY_QUALIFIED)
         val NAME_BASED_DESTRUCTURING_UNDERSCORE_WITHOUT_RENAMING by error<KtElement>(PositioningStrategy.REFERENCED_NAME_BY_QUALIFIED)
@@ -1821,6 +1822,9 @@ object DIAGNOSTICS_LIST : DiagnosticList("FirErrors") {
             parameter<FirExpression>("receiverExpression")
             parameter<String>("operator")
             parameter<FirExpression?>("argumentExpression")
+        }
+        val UNSAFE_CALLABLE_REFERENCE by error<PsiElement>(PositioningStrategy.DOT_BY_QUALIFIED) {
+            parameter<ConeKotlinType>("receiverType")
         }
         val ITERATOR_ON_NULLABLE by error<KtExpression>()
         val COMPONENT_FUNCTION_ON_NULLABLE by error<KtExpression> {

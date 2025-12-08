@@ -14,7 +14,10 @@ import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.ir.backend.js.JsLoweredDeclarationOrigin
 import org.jetbrains.kotlin.ir.backend.js.ir.getExportedIdentifier
 import org.jetbrains.kotlin.ir.backend.js.tsexport.*
-import org.jetbrains.kotlin.ir.backend.js.utils.*
+import org.jetbrains.kotlin.ir.backend.js.utils.getDeprecated
+import org.jetbrains.kotlin.ir.backend.js.utils.getFqNameWithJsNameWhenAvailable
+import org.jetbrains.kotlin.ir.backend.js.utils.isExplicitlyExported
+import org.jetbrains.kotlin.ir.backend.js.utils.realOverrideTarget
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
@@ -212,7 +215,7 @@ class ExportModelGenerator(val context: WasmBackendContext) {
             )
             nonNullType.isNothing() -> ExportedType.Primitive.Nothing
 
-            classifier is IrTypeParameterSymbol -> ExportedType.TypeParameter(classifier.owner.name.identifier)
+            classifier is IrTypeParameterSymbol -> ExportedType.TypeParameterRef(ExportedTypeParameter(classifier.owner.name.identifier))
 
             classifier is IrClassSymbol -> {
                 val klass = classifier.owner
@@ -220,29 +223,22 @@ class ExportModelGenerator(val context: WasmBackendContext) {
 
                 require(klass.isExternal) { "Unexpected non-external class: ${klass.fqNameWhenAvailable}" }
 
-                val name = "$NOT_EXPORTED_NAMESPACE.${klass.getFqNameWithJsNameWhenAvailable(shouldIncludePackage = true).asString()}"
+                val name = "$NOT_EXPORTED_NAMESPACE.${klass.getFqNameWithJsNameWhenAvailable(shouldIncludePackage = true, isEsModules = true).asString()}"
+
+                val classType = ExportedType.ClassType(
+                    name = name,
+                    arguments = type.arguments.memoryOptimizedMap { exportTypeArgument(it) },
+                    classId = klass.classId,
+                )
 
                 when (klass.kind) {
                     ClassKind.OBJECT ->
-                        ExportedType.TypeOf(
-                            ExportedType.ClassType(
-                                name,
-                                emptyList(),
-                                isObject = true,
-                                isExternal = klass.isEffectivelyExternal(),
-                                classId = klass.classId,
-                            )
-                        )
+                        ExportedType.TypeOf(classType)
 
                     ClassKind.CLASS,
-                    ClassKind.INTERFACE ->
-                        ExportedType.ClassType(
-                            name,
-                            type.arguments.memoryOptimizedMap { exportTypeArgument(it) },
-                            isObject = false,
-                            isExternal = klass.isEffectivelyExternal(),
-                            classId = klass.classId,
-                        )
+                    ClassKind.INTERFACE,
+                        ->
+                        classType
                     else -> error("Unexpected class kind ${klass.kind}")
                 }
             }
@@ -264,14 +260,14 @@ class ExportModelGenerator(val context: WasmBackendContext) {
         return ExportedType.ErrorType("UnknownType ${type.render()}")
     }
 
-    private fun exportTypeParameter(typeParameter: IrTypeParameter): ExportedType.TypeParameter {
+    private fun exportTypeParameter(typeParameter: IrTypeParameter): ExportedTypeParameter {
         val constraint = typeParameter.superTypes.asSequence()
             .filter { !it.isNullable() || it.makeNotNull() != context.wasmSymbols.jsRelatedSymbols.jsAnyType }
             .map { exportType(it) }
             .filter { it !is ExportedType.ErrorType }
             .toList()
 
-        return ExportedType.TypeParameter(
+        return ExportedTypeParameter(
             typeParameter.name.identifier,
             constraint.run {
                 when (size) {
@@ -333,12 +329,10 @@ class ExportModelGenerator(val context: WasmBackendContext) {
                 members = members,
                 nestedClasses = emptyList(),
                 originalClassId = declaration.classId,
-                innerClassReference = runIf(declaration.isInner) { declaration.typeScriptInnerClassReference() },
-                isFinal = declaration.modality == Modality.FINAL,
             )
         }
 
-        val parentFqName = declaration.getFqNameWithJsNameWhenAvailable(shouldIncludePackage = true).parentOrNull()
+        val parentFqName = declaration.getFqNameWithJsNameWhenAvailable(shouldIncludePackage = true, isEsModules = true).parentOrNull()
 
         return ExportedNamespace(
             name = "$NOT_EXPORTED_NAMESPACE${parentFqName?.asString()?.takeIf { it.isNotEmpty() }?.let { ".$it" }.orEmpty()}",

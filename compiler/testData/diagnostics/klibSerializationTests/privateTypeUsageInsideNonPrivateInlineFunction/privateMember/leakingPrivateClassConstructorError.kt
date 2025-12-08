@@ -1,6 +1,8 @@
+// RUN_PIPELINE_TILL: BACKEND
 // LANGUAGE: +ForbidExposureOfPrivateTypesInNonPrivateInlineFunctionsInKlibs
 // IGNORE_FIR_DIAGNOSTICS
 // DIAGNOSTICS: -NOTHING_TO_INLINE
+// RUN_PIPELINE_TILL: BACKEND
 
 private class Private {
     fun foo() = "OK"

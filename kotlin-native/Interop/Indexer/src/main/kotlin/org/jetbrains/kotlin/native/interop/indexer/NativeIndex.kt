@@ -255,12 +255,15 @@ sealed class ObjCContainer {
 
 sealed class ObjCClassOrProtocol(val name: String) : ObjCContainer(), TypeDeclaration {
     abstract val isForwardDeclaration: Boolean
+    abstract val binaryName: String?
+    open val swiftName: String? get() = null
 }
 
 data class ObjCMethod(
         val selector: String, val encoding: String, val parameters: List<Parameter>, private val returnType: Type,
         val isVariadic: Boolean, val isClass: Boolean, val nsConsumesSelf: Boolean, val nsReturnsRetained: Boolean,
-        val isOptional: Boolean, val isInit: Boolean, val isExplicitlyDesignatedInitializer: Boolean, val isDirect: Boolean
+        val isOptional: Boolean, val isInit: Boolean, val isExplicitlyDesignatedInitializer: Boolean, val isDirect: Boolean,
+        val swiftName: String?
 ) {
 
     fun containsInstancetype(): Boolean = returnType.containsInstancetype() // Clang doesn't allow parameter types to use instancetype.
@@ -298,17 +301,22 @@ private fun Type.substituteInstancetype(container: ObjCClassOrProtocol): Type = 
     else -> this
 }
 
-data class ObjCProperty(val name: String, val getter: ObjCMethod, val setter: ObjCMethod?) {
+data class ObjCProperty(
+        val name: String,
+        val getter: ObjCMethod, val setter: ObjCMethod?,
+        val swiftName: String?
+) {
     fun getType(container: ObjCClassOrProtocol): Type = getter.getReturnType(container)
 }
 
 abstract class ObjCClass(name: String) : ObjCClassOrProtocol(name) {
-    abstract val binaryName: String?
     abstract val baseClass: ObjCClass?
     /**
      * Categories whose methods and properties should be generated as members of Kotlin class.
      */
     abstract val includedCategories: List<ObjCCategory>
+
+    open val typeParameters: List<String> get() = emptyList()
 }
 abstract class ObjCProtocol(name: String) : ObjCClassOrProtocol(name)
 
@@ -376,7 +384,7 @@ interface PrimitiveType : Type
 
 object CharType : PrimitiveType
 
-open class BoolType: PrimitiveType
+open class BoolType : PrimitiveType
 
 object CBoolType : BoolType()
 

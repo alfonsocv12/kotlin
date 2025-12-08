@@ -23,8 +23,8 @@ import org.jetbrains.kotlin.ir.backend.js.ic.JsModuleArtifact
 import org.jetbrains.kotlin.ir.backend.js.transformers.irToJs.CompilationOutputs
 import org.jetbrains.kotlin.js.config.*
 import org.jetbrains.kotlin.js.engine.ScriptExecutionException
-import org.jetbrains.kotlin.js.test.ir.AbstractJsCompilerInvocationTest
-import org.jetbrains.kotlin.js.test.ir.JsCompilerInvocationTestConfiguration
+import org.jetbrains.kotlin.js.test.runners.AbstractJsCompilerInvocationTest
+import org.jetbrains.kotlin.js.test.runners.JsCompilerInvocationTestConfiguration
 import org.jetbrains.kotlin.js.testOld.V8JsTestChecker
 import org.jetbrains.kotlin.klib.KlibCompilerInvocationTestUtils
 import org.jetbrains.kotlin.name.FqName
@@ -135,6 +135,7 @@ abstract class JsAbstractInvalidationTest(
                     includedLibrary = mainModuleInfo.modulePath,
                 ).apply {
                     put(JSConfigurationKeys.GENERATE_DTS, projectInfo.checkTypeScriptDefinitions)
+                    put(JSConfigurationKeys.SOURCE_MAP_EMBED_SOURCES, SourceMapSourceEmbedding.NEVER)
                 }
 
                 val dirtyData = when (granularity) {

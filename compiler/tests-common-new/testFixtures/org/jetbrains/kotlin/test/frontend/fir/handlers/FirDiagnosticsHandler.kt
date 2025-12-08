@@ -8,9 +8,11 @@ package org.jetbrains.kotlin.test.frontend.fir.handlers
 import com.intellij.openapi.util.TextRange
 import org.jetbrains.kotlin.*
 import org.jetbrains.kotlin.checkers.utils.TypeOfCall
-import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport
 import org.jetbrains.kotlin.cli.pipeline.metadata.MetadataFrontendPipelineArtifact
-import org.jetbrains.kotlin.config.*
+import org.jetbrains.kotlin.config.AnalysisFlag
+import org.jetbrains.kotlin.config.AnalysisFlags
+import org.jetbrains.kotlin.config.CommonConfigurationKeys
+import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.diagnostics.*
 import org.jetbrains.kotlin.diagnostics.KtDiagnosticRenderers.TO_STRING
 import org.jetbrains.kotlin.diagnostics.impl.BaseDiagnosticsCollector
@@ -116,7 +118,7 @@ class FullDiagnosticsRenderer(private val directive: SimpleDirective) {
                         is KtDiagnosticWithSource -> it.textRanges
                         is KtDiagnosticWithoutSource -> listOf(it.firstRange)
                     },
-                    severity = AnalyzerWithCompilerReport.convertSeverity(it.severity).toString().toLowerCaseAsciiOnly(),
+                    severity = it.severity.toCompilerMessageSeverity().toString().toLowerCaseAsciiOnly(),
                     message = it.renderMessage()
                 )
             }
@@ -158,7 +160,7 @@ class FirDiagnosticsHandler(testServices: TestServices) : FirAnalysisHandler(tes
             val currentModule = part.module
             val lightTreeComparingModeEnabled = FirDiagnosticsDirectives.COMPARE_WITH_LIGHT_TREE in currentModule.directives
             val lightTreeEnabled = currentModule.directives.singleValue(FirDiagnosticsDirectives.FIR_PARSER) == FirParser.LightTree
-            val forceRenderArguments = FirDiagnosticsDirectives.RENDER_DIAGNOSTICS_MESSAGES in currentModule.directives
+            val forceRenderArguments = FirDiagnosticsDirectives.RENDER_DIAGNOSTIC_ARGUMENTS in currentModule.directives
 
             for (file in currentModule.files) {
                 val firFile = info.mainFirFilesByTestFile[file] ?: continue
@@ -627,7 +629,7 @@ enum class KmpCompilationMode {
 }
 
 open class FirDiagnosticCollectorService(val testServices: TestServices) : TestService {
-    val reporterForLTSyntaxErrors = SimpleDiagnosticsCollector(BaseDiagnosticsCollector.RawReporter.DO_NOTHING)
+    val reporterForLTSyntaxErrors = SimpleDiagnosticsCollector()
 
     private val cache: MutableMap<FirOutputArtifact, DiagnosticsMap> = mutableMapOf()
 
@@ -681,7 +683,7 @@ open class FirDiagnosticCollectorService(val testServices: TestServices) : TestS
                         result += platformPart.session.runCheckers(
                             platformPart.scopeSession,
                             allFiles,
-                            DiagnosticReporterFactory.createPendingReporter(messageCollector),
+                            DiagnosticReporterFactory.createPendingReporter(),
                             mppCheckerKind = MppCheckerKind.Platform
                         ).convertToTestDiagnostics(KmpCompilationMode.PLATFORM)
                     }
@@ -691,7 +693,7 @@ open class FirDiagnosticCollectorService(val testServices: TestServices) : TestS
                             result += part.session.runCheckers(
                                 part.scopeSession,
                                 part.firFilesByTestFile.values,
-                                DiagnosticReporterFactory.createPendingReporter(messageCollector),
+                                DiagnosticReporterFactory.createPendingReporter(),
                                 mppCheckerKind = MppCheckerKind.Common
                             ).convertToTestDiagnostics(KmpCompilationMode.PLATFORM)
                         }
@@ -709,7 +711,7 @@ open class FirDiagnosticCollectorService(val testServices: TestServices) : TestS
                         result += part.session.runCheckers(
                             part.scopeSession,
                             part.firFilesByTestFile.values,
-                            DiagnosticReporterFactory.createPendingReporter(messageCollector),
+                            DiagnosticReporterFactory.createPendingReporter(),
                             mppCheckerKind = MppCheckerKind.Platform
                         ).convertToTestDiagnostics(KmpCompilationMode.METADATA)
                     }
@@ -723,7 +725,7 @@ open class FirDiagnosticCollectorService(val testServices: TestServices) : TestS
                     platformPart.session.collectLostDiagnosticsOnFile(
                         platformPart.scopeSession,
                         file,
-                        DiagnosticReporterFactory.createPendingReporter(messageCollector)
+                        DiagnosticReporterFactory.createPendingReporter()
                     ).forEach { lostDiagnostics.put(file, DiagnosticWithKmpCompilationMode(it, KmpCompilationMode.PLATFORM)) }
                 }
             }

@@ -143,12 +143,12 @@ tasks.withType<Test>().configureEach {
                         """permission java.io.FilePermission "${file.parentFile.absolutePath}/-", "read,write";""",
                         """permission java.io.FilePermission "${file.parentFile.absolutePath}", "read";""",
                     )
-                } else if (file != null) {
+                } else {
                     val parents = parentsReadPermission(file)
                     listOf(
                         """permission java.io.FilePermission "${file.absolutePath}", "read";""",
                     ) + parents
-                } else emptyList()
+                }
             }
 
             val allPermissionsForGradleRoDepCache = System.getenv("GRADLE_RO_DEP_CACHE")?.let {
@@ -203,7 +203,7 @@ tasks.withType<Test>().configureEach {
                                 if (nativeHome.isPresent) {
                                     konanPermissions.add("""permission java.io.FilePermission "${nativeHome.get()}/-" , "read,write,delete";""")
                                 }
-                                if (testInputsCheck.useXcode.get()) {
+                                if (OperatingSystem.current().isMacOsX) {
                                     // Should we consider those files inputs? I need to think about the execute permission
                                     // in any case I need to check where those paths come from to avoid hardcoding
                                     konanPermissions.addAll(
@@ -253,6 +253,14 @@ tasks.withType<Test>().configureEach {
                                     append("""permission java.io.FilePermission "${it.get()}", "execute";""")
                                 }
                                 binaryenExecutable?.let {
+                                    append("""permission java.io.FilePermission "${it.get()}", "execute";""")
+                                }
+                            }
+                        )
+                        .replace(
+                            "{{js}}",
+                            buildString {
+                                d8Executable?.let {
                                     append("""permission java.io.FilePermission "${it.get()}", "execute";""")
                                 }
                             }

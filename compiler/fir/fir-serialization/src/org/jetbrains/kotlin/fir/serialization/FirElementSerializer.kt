@@ -440,55 +440,9 @@ class FirElementSerializer private constructor(
 
     @OptIn(UnexpandedTypeCheck::class)
     fun snippetProto(snippet: FirReplSnippet): ProtoBuf.Class.Builder = whileAnalysing(session, snippet) {
-        val builder = ProtoBuf.Class.newBuilder()
-
-        val flags = Flags.getClassFlags(
-            extension.hasAdditionalAnnotations(snippet),
-            ProtoEnumFlags.visibility(Visibilities.Public),
-            ProtoEnumFlags.modality(Modality.FINAL),
-            ProtoEnumFlags.classKind(ClassKind.CLASS, false),
-            /* inner = */ false,
-            /* isData = */ false,
-            /* isExternal = */ false,
-            /* isExpect = */ false,
-            /* isValue = */ false,
-            /* isFun = */ false,
-            /* hasEnumEntries = */ false,
-        )
-        if (flags != builder.flags) {
-            builder.flags = flags
-        }
-
-        val classId = snippetClassId(snippet)
-
-        builder.fqName = getClassifierId(classId)
-
-        for (statement in snippet.body.statements) {
-            val declaration = statement as? FirDeclaration ?: continue
-            when (declaration) {
-                is FirProperty -> propertyProto(declaration)?.let { builder.addProperty(it) }
-                is FirNamedFunction -> functionProto(declaration)?.let { builder.addFunction(it) }
-                is FirRegularClass -> builder.addNestedClassName(getSimpleNameIndex(declaration.name))
-                is FirTypeAlias -> typeAliasProto(declaration)?.let { builder.addTypeAlias(it) }
-                else -> {}
-            }
-        }
-
         if (versionRequirementTable == null) error("Version requirements must be serialized for snippets: ${snippet.render()}")
-
-        builder.addAllVersionRequirement(versionRequirementTable.serializeVersionRequirements(snippet))
-
+        val builder = classProtoImpl(snippet.snippetClass)
         extension.serializeSnippet(snippet, builder, versionRequirementTable, this)
-
-        if (metDefinitelyNotNullType) {
-            builder.addVersionRequirement(
-                writeLanguageVersionRequirement(LanguageFeature.DefinitelyNonNullableTypes, versionRequirementTable)
-            )
-        }
-
-        typeTable.serialize()?.let { builder.typeTable = it }
-        versionRequirementTable.serialize()?.let { builder.versionRequirementTable = it }
-
         return builder
     }
 
@@ -526,7 +480,7 @@ class FirElementSerializer private constructor(
         processScope: (FirTypeScope, ((S) -> Unit)) -> Unit
     ): List<T> {
         val foundInScope = buildList {
-            val memberScope = unsubstitutedScope(session, scopeSession, withForcedTypeCalculator = false, memberRequiredPhase = null)
+            val memberScope = unsubstitutedScope(withForcedTypeCalculator = false, memberRequiredPhase = null)
             processScope(memberScope) {
                 val declaration = it.fir as T
                 val dispatchReceiverLookupTag = declaration.dispatchReceiverClassLookupTagOrNull()
@@ -990,7 +944,7 @@ class FirElementSerializer private constructor(
         if (shouldWriteAnnotationParameterDefaultValues(extension.metadataVersion) &&
             parameter.containingDeclarationSymbol.isAnnotationConstructor(session)
         ) {
-            parameter.defaultValue?.toConstantValue<ConstantValue<*>>(session, scopeSession, extension.constValueProvider)?.let { value ->
+            parameter.defaultValue?.toConstantValue<ConstantValue<*>>(extension.constValueProvider)?.let { value ->
                 builder.setAnnotationParameterDefaultValue(extension.annotationSerializer.valueProto(value))
             }
         }
@@ -1381,7 +1335,7 @@ class FirElementSerializer private constructor(
     }
 
     private fun serializeVersionRequirementFromRequireKotlin(annotation: FirAnnotation): ProtoBuf.VersionRequirement.Builder? {
-        val convertedAnnotation = annotation.toConstantValue<AnnotationValue>(session, scopeSession, extension.constValueProvider) ?: return null
+        val convertedAnnotation = annotation.toConstantValue<AnnotationValue>(extension.constValueProvider) ?: return null
         val argumentMapping = convertedAnnotation.value.argumentsMapping
 
         val versionString = argumentMapping[RequireKotlinConstants.VERSION]?.value as String? ?: return null
@@ -1632,4 +1586,4 @@ internal fun scriptClassId(script: FirScript): ClassId =
     ClassId(script.symbol.fqName.parentOrNull() ?: FqName.ROOT, NameUtils.getScriptTargetClassName(script.name))
 
 internal fun snippetClassId(snippet: FirReplSnippet): ClassId =
-    ClassId(FqName.ROOT, NameUtils.getSnippetTargetClassName(snippet.name))
+    ClassId(FqName.ROOT, NameUtils.getSnippetTargetClassName(snippet.snippetClass.name))

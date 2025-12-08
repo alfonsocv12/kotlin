@@ -815,6 +815,7 @@ import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors.UNRESOLVED_LABEL
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors.UNRESOLVED_REFERENCE
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors.UNRESOLVED_REFERENCE_WRONG_RECEIVER
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors.UNSAFE_CALL
+import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors.UNSAFE_CALLABLE_REFERENCE
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors.UNSAFE_IMPLICIT_INVOKE_CALL
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors.UNSAFE_INFIX_CALL
 import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors.UNSAFE_OPERATOR_CALL
@@ -2886,12 +2887,13 @@ object FirErrorsDefaultMessages : BaseDiagnosticRendererFactory() {
             buildString {
                 append("This syntax will be used for name-based destructuring ")
                 appendVersion(LanguageFeature.EnableNameBasedDestructuringShortForm)
-                appendLine(" which will stop compiling or change its meaning for non-data class ''{0}''.")
+                appendLine(" which will stop compiling or change its meaning for {2} ''{0}''.")
                 appendLine("Use the new positional destructuring syntax ''[{1}, ...]'' to prepare for the transition.")
                 append("See https://kotl.in/name-based-destructuring for more information.")
             },
             RENDER_TYPE,
-            NAME
+            NAME,
+            TO_STRING,
         )
         map.put(
             DESTRUCTURING_SHORT_FORM_UNDERSCORE,
@@ -3139,6 +3141,11 @@ object FirErrorsDefaultMessages : BaseDiagnosticRendererFactory() {
             NOT_RENDERED,
             NOT_RENDERED,
             NOT_RENDERED,
+        )
+        map.put(
+            UNSAFE_CALLABLE_REFERENCE,
+            "Bound callable reference cannot be created on nullable receiver of type ''{0}''.",
+            RENDER_TYPE,
         )
         map.put(
             ITERATOR_ON_NULLABLE,

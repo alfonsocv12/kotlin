@@ -29,3 +29,36 @@ suspend fun testCustom(): String {
     delay(33L)
     return "Hello, World!"
 }
+
+suspend fun callAfter(delay: Long, callback: () -> Int): Int {
+    delay(delay)
+    return callback()
+}
+
+suspend fun cancelAfter(delay: Long): Int {
+    delay(delay)
+    val reason = CancellationException("Cancelled after $delay")
+    currentCoroutineContext().cancel(reason)
+    throw reason
+}
+
+suspend fun cancelSilentlyAfter(delay: Long, callback: () -> Int): Int {
+    delay(delay)
+    currentCoroutineContext().cancel()
+    return callback()
+}
+
+suspend fun cancelImmediately(): Int {
+    val reason = CancellationException("Cancelled")
+    currentCoroutineContext().cancel(reason)
+    throw reason
+}
+
+suspend fun throwAfter(delay: Long, message: String): Int {
+    delay(delay)
+    error(message)
+}
+
+suspend fun throwImmediately(message: String): Int {
+    error(message)
+}

@@ -88,6 +88,7 @@ data class BuildOptions(
      * Note that `--continuous` *disables* `--no-daemon`.
      */
     val continuousBuild: Boolean? = null,
+    val generateCompilerRefIndex: Boolean? = null,
 ) {
     enum class ConfigurationCacheValue {
 
@@ -167,7 +168,6 @@ data class BuildOptions(
         val restrictedDistribution: Boolean? = null,
         val useXcodeMessageStyle: Boolean? = null,
         val version: String? = System.getProperty("kotlinNativeVersion"),
-        val cacheOrchestration: String? = null,
         val incremental: Boolean? = null,
         val enableKlibsCrossCompilation: Boolean? = null,
     )
@@ -334,6 +334,10 @@ data class BuildOptions(
             arguments.add("-Pkotlin.kmp.isolated-projects.support=${kmpIsolatedProjectsSupport.name.toLowerCaseAsciiOnly()}")
         }
 
+        if (generateCompilerRefIndex != null) {
+            arguments.add("-Pkotlin.compiler.generateCompilerRefIndex=$generateCompilerRefIndex")
+        }
+
         arguments.addAll(freeArgs)
 
         return arguments.toList()
@@ -371,9 +375,6 @@ data class BuildOptions(
         }
         nativeOptions.version?.let {
             arguments.add("-Pkotlin.native.version=${it}")
-        }
-        nativeOptions.cacheOrchestration?.let {
-            arguments.add("-Pkotlin.native.cacheOrchestration=${it}")
         }
         nativeOptions.incremental?.let {
             arguments.add("-Pkotlin.incremental.native=${it}")

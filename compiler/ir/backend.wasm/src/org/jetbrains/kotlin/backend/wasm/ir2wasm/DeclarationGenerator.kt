@@ -32,6 +32,8 @@ import org.jetbrains.kotlin.wasm.ir.source.location.SourceLocation
 private const val TYPE_INFO_FLAG_ANONYMOUS_CLASS = 1
 private const val TYPE_INFO_FLAG_LOCAL_CLASS = 2
 
+private const val MAX_WASM_IMPORT_NAME_LENGTH = 100_000
+
 class DeclarationGenerator(
     private val backendContext: WasmBackendContext,
     private val wasmFileCodegenContext: WasmFileCodegenContext,
@@ -39,12 +41,15 @@ class DeclarationGenerator(
     private val wasmModuleMetadataCache: WasmModuleMetadataCache,
     private val allowIncompleteImplementations: Boolean,
     private val skipCommentInstructions: Boolean,
+    skipLocations: Boolean,
 ) : IrVisitorVoid() {
     // Shortcuts
     private val irBuiltIns: IrBuiltIns = backendContext.irBuiltIns
 
     private val unitGetInstanceFunction: IrSimpleFunction by lazy { backendContext.findUnitGetInstanceFunction() }
     private val unitPrimaryConstructor: IrConstructor? by lazy { backendContext.irBuiltIns.unitClass.owner.primaryConstructor }
+
+    private val locationProvider = if (skipLocations) LocationProviderStub else LocationProviderImpl
 
     override fun visitElement(element: IrElement) {
         error("Unexpected element of type ${element::class}")
@@ -141,12 +146,15 @@ class DeclarationGenerator(
 
         val sourceFile = declaration.getSourceFile()!!
         val locationTarget = declaration.locationTarget
-        val functionStartLocation = locationTarget.getSourceLocation(declaration.symbol, sourceFile)
-        val functionEndLocation = locationTarget.getSourceLocation(declaration.symbol, sourceFile, LocationType.END)
+        val functionStartLocation = locationProvider.getSourceLocation(locationTarget, declaration.symbol, sourceFile)
+        val functionEndLocation = locationProvider.getSourceEndLocation(locationTarget, declaration.symbol, sourceFile)
+
+        val expressionBuilder = WasmExpressionBuilderWithOptimizer(skipCommentInstructions)
 
         val function = WasmFunction.Defined(
             watName,
             functionTypeSymbol,
+            instructions = expressionBuilder.expression,
             startLocation = functionStartLocation,
             endLocation = functionEndLocation
         )
@@ -157,20 +165,20 @@ class DeclarationGenerator(
             wasmFileCodegenContext,
             wasmModuleTypeTransformer,
             sourceFile,
-            skipCommentInstructions
         )
 
         for (irParameter in irParameters) {
             functionCodegenContext.defineLocal(irParameter.symbol)
         }
 
-        val exprGen = functionCodegenContext.bodyGen
         val bodyBuilder = BodyGenerator(
             backendContext,
             wasmFileCodegenContext,
             functionCodegenContext,
             wasmModuleMetadataCache,
             wasmModuleTypeTransformer,
+            locationProvider,
+            expressionBuilder,
         )
 
         val declarationBody = declaration.body
@@ -186,15 +194,17 @@ class DeclarationGenerator(
         // variables on constructor call sites.
         // TODO: Redesign construction scheme.
         if (declaration is IrConstructor) {
-            exprGen.buildGetLocal(/*implicit this*/ function.locals[0], SourceLocation.NoLocation("Get implicit dispatch receiver"))
-            exprGen.buildInstr(WasmOp.RETURN, SourceLocation.NoLocation("Implicit return from constructor"))
+            expressionBuilder.buildGetLocal(/*implicit this*/ function.locals[0], SourceLocation.NoLocation("Get implicit dispatch receiver"))
+            expressionBuilder.buildInstr(WasmOp.RETURN, SourceLocation.NoLocation("Implicit return from constructor"))
         }
 
         // Add unreachable if function returns something but not as a last instruction.
         // We can do a separate lowering which adds explicit returns everywhere instead.
         if (wasmFunctionType.resultTypes.isNotEmpty()) {
-            exprGen.buildUnreachableForVerifier()
+            expressionBuilder.buildUnreachableForVerifier()
         }
+
+        expressionBuilder.complete()
 
         wasmFileCodegenContext.defineFunction(declaration.symbol, function)
 
@@ -385,8 +395,24 @@ class DeclarationGenerator(
                 ""
             }
         val simpleName = klass.name.asString()
-        val packageNameStringLiteralId = wasmFileCodegenContext.referenceStringLiteralId(qualifier)
-        val simpleNameStringLiteralId = wasmFileCodegenContext.referenceStringLiteralId(simpleName)
+        val packageNameStringLiteralId: WasmSymbol<Int>
+        val simpleNameStringLiteralId: WasmSymbol<Int>
+        val packageNameGlobalReference: WasmSymbol<WasmGlobal>?
+        val simpleNameGlobalReference: WasmSymbol<WasmGlobal>?
+
+        if (backendContext.isWasmJsTarget) {
+            val packageNameReferenceAndId = wasmFileCodegenContext.referenceGlobalString(qualifier)
+            packageNameGlobalReference = packageNameReferenceAndId.first
+            packageNameStringLiteralId = packageNameReferenceAndId.second
+            val simpleNameReferenceAndId = wasmFileCodegenContext.referenceGlobalString(simpleName)
+            simpleNameGlobalReference = simpleNameReferenceAndId.first
+            simpleNameStringLiteralId = simpleNameReferenceAndId.second
+        } else {
+            packageNameStringLiteralId = wasmFileCodegenContext.referenceStringLiteralId(qualifier)
+            simpleNameStringLiteralId = wasmFileCodegenContext.referenceStringLiteralId(simpleName)
+            packageNameGlobalReference = null
+            simpleNameGlobalReference = null
+        }
 
         val location = SourceLocation.NoLocation("Create instance of rtti struct")
         val initRttiGlobal = buildWasmExpression {
@@ -407,7 +433,9 @@ class DeclarationGenerator(
             buildConstI32(isAnonymousFlag or isLocalFlag, location)
 
             val qualifierStringLoaderRef =
-                if (qualifier.fitsLatin1)
+                if (backendContext.isWasmJsTarget)
+                    wasmFileCodegenContext.wasmStringsElements.createStringLiteralJsString
+                else if (qualifier.fitsLatin1)
                     wasmFileCodegenContext.wasmStringsElements.createStringLiteralLatin1
                 else
                     wasmFileCodegenContext.wasmStringsElements.createStringLiteralUtf16
@@ -419,7 +447,9 @@ class DeclarationGenerator(
             )
 
             val simpleNameStringLoaderRef =
-                if (simpleName.fitsLatin1)
+                if (backendContext.isWasmJsTarget)
+                    wasmFileCodegenContext.wasmStringsElements.createStringLiteralJsString
+                else if (simpleName.fitsLatin1)
                     wasmFileCodegenContext.wasmStringsElements.createStringLiteralLatin1
                 else
                     wasmFileCodegenContext.wasmStringsElements.createStringLiteralUtf16
@@ -429,6 +459,11 @@ class DeclarationGenerator(
                 location,
                 WasmImmediate.FuncIdx(simpleNameStringLoaderRef),
             )
+
+            if (backendContext.isWasmJsTarget) {
+                buildGetGlobal(packageNameGlobalReference!!, location)
+                buildGetGlobal(simpleNameGlobalReference!!, location)
+            }
 
             buildStructNew(wasmFileCodegenContext.rttiType, location)
         }
@@ -576,17 +611,21 @@ class DeclarationGenerator(
         val wasmType = wasmModuleTypeTransformer.transformType(declaration.type)
 
         val initBody = mutableListOf<WasmInstr>()
-        val wasmExpressionGenerator = WasmExpressionBuilder(initBody, skipCommentInstructions = skipCommentInstructions)
+        val wasmExpressionGenerator = WasmExpressionBuilder(
+            expression = initBody,
+            skipCommentInstructions = skipCommentInstructions,
+        )
 
         val initValue: IrExpression? = declaration.initializer?.expression
         if (initValue is IrConst && initValue.kind !is IrConstKind.String) {
             val sourceFile = declaration.getSourceFile()!!
+            val location = locationProvider.getSourceLocation(initValue, declaration.symbol, sourceFile)
             generateConstExpression(
                 initValue,
                 wasmExpressionGenerator,
                 wasmFileCodegenContext,
                 backendContext,
-                initValue.getSourceLocation(declaration.symbol, sourceFile)
+                location
             )
         } else {
             generateDefaultInitializerForType(wasmType, wasmExpressionGenerator)
@@ -656,13 +695,33 @@ fun generateConstExpression(
         is IrConstKind.Double -> body.buildConstF64(expression.value as Double, location)
         is IrConstKind.String -> {
             val stringValue = expression.value as String
-            val literalId = context.referenceStringLiteralId(stringValue)
             body.commentGroupStart { "const string: \"$stringValue\"" }
-            body.buildConstI32Symbol(literalId, location)
-            if (stringValue.fitsLatin1) {
-                body.buildCall(context.wasmStringsElements.createStringLiteralLatin1, location)
+
+            if (backendContext.isWasmJsTarget && !stringValue.hasUnpairedSurrogates) {
+                val stringValueSplits = stringValue.chunked(MAX_WASM_IMPORT_NAME_LENGTH).ifEmpty { listOf("") }
+                val jsConcat: WasmSymbol<WasmFunction> =
+                    context.referenceFunction(backendContext.wasmSymbols.jsRelatedSymbols.jsConcat)
+
+                val (globalReferenceFirst, literalIdToStore) = context.referenceGlobalString(stringValueSplits.first(), stringValue)
+                body.buildConstI32Symbol(literalIdToStore, location)
+                body.buildGetGlobal(globalReferenceFirst, location)
+
+                for (stringValueSplit in stringValueSplits.drop(1)) {
+                    val (globalReference, _) = context.referenceGlobalString(stringValueSplit)
+                    body.buildGetGlobal(globalReference, location)
+                    body.buildCall(jsConcat, location)
+                }
+
+                body.buildCall(context.wasmStringsElements.createStringLiteralJsString, location)
             } else {
-                body.buildCall(context.wasmStringsElements.createStringLiteralUtf16, location)
+                val literalId = context.referenceStringLiteralId(stringValue)
+                body.buildConstI32Symbol(literalId, location)
+
+                if (stringValue.fitsLatin1) {
+                    body.buildCall(context.wasmStringsElements.createStringLiteralLatin1, location)
+                } else {
+                    body.buildCall(context.wasmStringsElements.createStringLiteralUtf16, location)
+                }
             }
             body.commentGroupEnd()
         }

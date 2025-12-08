@@ -134,7 +134,7 @@ public class ExportModelToTsDeclarations(private val moduleKind: ModuleKind) {
     }
 
     private fun ExportedConstructSignature.generateTypeScriptString(indent: String): String {
-        return "new(${parameters.generateTypeScriptString(indent)}): ${returnType.toTypeScript(indent)};"
+        return "new${renderTypeParameters(typeParameters)}(${parameters.generateTypeScriptString(indent)}): ${returnType.toTypeScript(indent)};"
     }
 
     private fun ExportedProperty.generateTypeScriptString(indent: String, prefix: String): String {
@@ -179,6 +179,16 @@ public class ExportModelToTsDeclarations(private val moduleKind: ModuleKind) {
         }
     }
 
+    private fun renderTypeParameters(typeParameters: List<ExportedTypeParameter>): String = if (typeParameters.isNotEmpty()) {
+        typeParameters.joinToString(", ", "<", ">") { tp ->
+            tp.constraint?.let {
+                "${tp.name} extends ${it.toTypeScript(indent, isInCommentContext = false)}"
+            } ?: tp.name
+        }
+    } else {
+        ""
+    }
+
     private fun ExportedFunction.generateTypeScriptString(indent: String, prefix: String): String {
         val visibility = if (isProtected) "protected " else ""
 
@@ -193,11 +203,7 @@ public class ExportModelToTsDeclarations(private val moduleKind: ModuleKind) {
         }
 
         val renderedParameters = parameters.generateTypeScriptString(indent)
-        val renderedTypeParameters = if (typeParameters.isNotEmpty()) {
-            "<" + typeParameters.joinToString(", ") { it.toTypeScript(indent) } + ">"
-        } else {
-            ""
-        }
+        val renderedTypeParameters = renderTypeParameters(typeParameters)
 
         val renderedReturnType = returnType.toTypeScript(indent)
         val containsUnresolvedChar = when (val exportedName = name) {
@@ -235,8 +241,6 @@ public class ExportModelToTsDeclarations(private val moduleKind: ModuleKind) {
                 ExportedType.ClassType(
                     name,
                     emptyList(),
-                    isObject = true,
-                    isExternal = isExternal,
                     classId = originalClassId,
                 )
             )
@@ -310,27 +314,15 @@ public class ExportModelToTsDeclarations(private val moduleKind: ModuleKind) {
     }
 
     private fun ExportedRegularClass.generateTypeScriptString(indent: String, prefix: String): String {
-        val isInner = innerClassReference != null
         val keyword = if (isInterface) "interface" else "class"
         val superInterfacesKeyword = if (isInterface) "extends" else "implements"
 
         val superClassClause = superClasses.toExtendsClause(indent)
         val superInterfacesClause = superInterfaces.toImplementsClause(superInterfacesKeyword, indent)
 
-        val (membersForNamespace, membersForClassItself) = members.partition { isInterface && it is ExportedFunction && it.isStatic }
+        val (membersForNamespace, classMembers) = members.partition { isInterface && it is ExportedFunction && it.isStatic }
         val namespaceMembers = membersForNamespace.map { (it as ExportedFunction).copy(isMember = false) }
-        val classMembers = membersForClassItself.map {
-            if (isInner && it is ExportedFunction && it.isStatic) {
-                // Remove $outer argument from secondary constructors of inner classes
-                it.copy(parameters = it.parameters.drop(1))
-            } else {
-                it
-            }
-        }
-
-        val (innerClasses, nonInnerClasses) = nestedClasses.partition { it is ExportedRegularClass && it.innerClassReference != null }
-        val innerClassesProperties = innerClasses.map { (it as ExportedRegularClass).toReadonlyProperty() }
-        val membersString = (classMembers + innerClassesProperties)
+        val membersString = classMembers
             .joinToString("") { it.toTypeScript("$indent    ") + "\n" }
 
         // If there are no exported constructors, add a private constructor to disable default one
@@ -340,11 +332,7 @@ public class ExportModelToTsDeclarations(private val moduleKind: ModuleKind) {
             ""
         }
 
-        val renderedTypeParameters = if (typeParameters.isNotEmpty()) {
-            "<" + typeParameters.joinToString(", ") { it.toTypeScript(indent) } + ">"
-        } else {
-            ""
-        }
+        val renderedTypeParameters = renderTypeParameters(typeParameters)
 
         val modifiers = if (isAbstract && !isInterface) "abstract " else ""
 
@@ -357,9 +345,7 @@ public class ExportModelToTsDeclarations(private val moduleKind: ModuleKind) {
                     typeParameters,
                     ExportedType.ClassType(
                         name,
-                        typeParameters.map { it.copy(constraint = null) },
-                        isObject = false,
-                        isExternal,
+                        typeParameters.map(ExportedType::TypeParameterRef),
                         originalClassId,
                     )
                 ),
@@ -369,7 +355,7 @@ public class ExportModelToTsDeclarations(private val moduleKind: ModuleKind) {
             generateMetadataNamespace(listOf(constructorProperty))
         })
 
-        val realNestedDeclarations = metadataNamespace + namespaceMembers + nonInnerClasses + innerClasses.map { it.withProtectedConstructorsForInnerClass() }
+        val realNestedDeclarations = metadataNamespace + namespaceMembers + nestedClasses
 
         val klassExport =
             "$prefix$modifiers$keyword $name$renderedTypeParameters$superClassClause$superInterfacesClause {\n$bodyString}${
@@ -399,8 +385,6 @@ public class ExportModelToTsDeclarations(private val moduleKind: ModuleKind) {
                 is ExportedType.ClassType -> ExportedType.ClassType(
                     "${parentType.name}.$Metadata.$MetadataConstructor",
                     parentType.arguments,
-                    parentType.isObject,
-                    parentType.isExternal,
                     parentType.classId,
                 )
                 else -> parentType
@@ -426,44 +410,6 @@ public class ExportModelToTsDeclarations(private val moduleKind: ModuleKind) {
 
             else -> ""
         }
-    }
-
-    private fun ExportedClass.withProtectedConstructorsForInnerClass(): ExportedRegularClass {
-        return (this as ExportedRegularClass).copy(members = members.map {
-            if (it !is ExportedConstructor) return@map it
-            val visibility = if (isFinal) ExportedVisibility.PRIVATE else ExportedVisibility.PROTECTED
-            val parameters = if (visibility == ExportedVisibility.PRIVATE) emptyList() else it.parameters
-            it.copy(parameters = parameters, visibility = visibility)
-        })
-    }
-
-    private fun ExportedRegularClass.toReadonlyProperty(): ExportedProperty {
-        val innerClassReference = innerClassReference ?: error("Can't create readonly property for non-inner class")
-        val allPublicConstructors = members.asSequence()
-            .filterIsInstance<ExportedConstructor>()
-            .filterNot { it.isProtected }
-            .map {
-                ExportedConstructSignature(
-                    parameters = it.parameters.drop(1),
-                    returnType = ExportedType.TypeParameter(innerClassReference),
-                )
-            }
-            .toList()
-
-        val type = ExportedType.IntersectionType(
-            ExportedType.InlineInterfaceType(allPublicConstructors),
-            ExportedType.TypeOf(
-                ExportedType.ClassType(
-                    innerClassReference,
-                    emptyList(),
-                    isObject = false,
-                    isExternal,
-                    originalClassId,
-                )
-            )
-        )
-
-        return ExportedProperty(name = name, type = type, mutable = false, isMember = true)
     }
 
     private fun List<ExportedParameter>.generateTypeScriptString(indent: String): String {
@@ -495,18 +441,10 @@ public class ExportModelToTsDeclarations(private val moduleKind: ModuleKind) {
             "(" + parameters.generateTypeScriptString(indent) + ") => " + returnType.toTypeScript(indent, isInCommentContext)
 
         is ExportedType.ConstructorType ->
-            "abstract new " + (if (typeParameters.isNotEmpty()) "<${
-                typeParameters.joinToString(", ") {
-                    it.toTypeScript(
-                        indent,
-                        isInCommentContext
-                    )
-                }
-            }>" else "") + "() => ${returnType.toTypeScript(indent, isInCommentContext)}"
+            "abstract new " + renderTypeParameters(typeParameters) + "() => ${returnType.toTypeScript(indent, isInCommentContext)}"
 
         is ExportedType.ClassType -> {
-            val classTypeReference = if (isObject && !isExternal && isEsModules) "$name.$Metadata.$MetadataType" else name
-            classTypeReference + if (arguments.isNotEmpty()) "<${arguments.joinToString(", ") { it.toTypeScript(indent, isInCommentContext) }}>" else ""
+            name + if (arguments.isNotEmpty()) "<${arguments.joinToString(", ") { it.toTypeScript(indent, isInCommentContext) }}>" else ""
         }
 
 
@@ -551,9 +489,7 @@ public class ExportModelToTsDeclarations(private val moduleKind: ModuleKind) {
             )
         }]"
 
-        is ExportedType.TypeParameter -> constraint?.let {
-            "$name extends ${it.toTypeScript(indent, isInCommentContext)}"
-        } ?: name
+        is ExportedType.TypeParameterRef -> typeParameter.name
     }
 
     private fun generateMetadataNamespace(members: List<ExportedDeclaration>): ExportedNamespace =

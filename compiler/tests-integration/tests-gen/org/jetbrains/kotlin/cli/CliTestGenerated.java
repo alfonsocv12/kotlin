@@ -1696,6 +1696,11 @@ public class CliTestGenerated extends AbstractCliTest {
       runTest("compiler/testData/cli/jvm/multipleBackendThreads.args");
     }
 
+    @TestMetadata("nameBasedDestructuringWithoutCompilerArgument.args")
+    public void testNameBasedDestructuringWithoutCompilerArgument() {
+      runTest("compiler/testData/cli/jvm/nameBasedDestructuringWithoutCompilerArgument.args");
+    }
+
     @TestMetadata("nestedTypeAliasesEnabled.args")
     public void testNestedTypeAliasesEnabled() {
       runTest("compiler/testData/cli/jvm/nestedTypeAliasesEnabled.args");
@@ -2313,6 +2318,21 @@ public class CliTestGenerated extends AbstractCliTest {
     @TestMetadata("noVirtualFileHiddenForMemberWithPlatformDependentAnnotation.args")
     public void testNoVirtualFileHiddenForMemberWithPlatformDependentAnnotation() {
       runTest("compiler/testData/cli/metadata/noVirtualFileHiddenForMemberWithPlatformDependentAnnotation.args");
+    }
+
+    @TestMetadata("optInErrorIsNotSuppressible.args")
+    public void testOptInErrorIsNotSuppressible() {
+      runTest("compiler/testData/cli/metadata/optInErrorIsNotSuppressible.args");
+    }
+
+    @TestMetadata("optInWarningsAreDisabled.args")
+    public void testOptInWarningsAreDisabled() {
+      runTest("compiler/testData/cli/metadata/optInWarningsAreDisabled.args");
+    }
+
+    @TestMetadata("optInWarningsAsErrors.args")
+    public void testOptInWarningsAsErrors() {
+      runTest("compiler/testData/cli/metadata/optInWarningsAsErrors.args");
     }
 
     @TestMetadata("optionalAnnotationsFromMetadata.args")

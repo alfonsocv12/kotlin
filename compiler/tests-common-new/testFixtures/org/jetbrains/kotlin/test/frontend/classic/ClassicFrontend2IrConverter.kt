@@ -97,7 +97,7 @@ class ClassicFrontend2IrConverter(
             testServices.libraryProvider.getDescriptorByCompiledLibrary(it)
         }
 
-        @Suppress("DEPRECATION")
+        @Suppress("DEPRECATION_ERROR")
         val hasErrors = TopDownAnalyzerFacadeForJSIR.checkForErrors(sourceFiles, analysisResult.bindingContext)
         val metadataSerializer = KlibMetadataIncrementalSerializer(
             sourceFiles,
@@ -113,7 +113,7 @@ class ClassicFrontend2IrConverter(
             moduleFragment,
             pluginContext.irBuiltIns,
             icData,
-            diagnosticReporter = DiagnosticReporterFactory.createReporter(messageCollector),
+            diagnosticReporter = DiagnosticReporterFactory.createReporter(),
             hasErrors,
             descriptorMangler = (pluginContext.symbolTable as SymbolTable).signaturer!!.mangler,
             irMangler = JsManglerIr,
@@ -143,10 +143,10 @@ class ClassicFrontend2IrConverter(
             testServices.libraryProvider.getDescriptorByCompiledLibrary(it)
         }
 
-        @Suppress("DEPRECATION")
+        @Suppress("DEPRECATION_ERROR")
         val analyzerFacade = TopDownAnalyzerFacadeForWasm.facadeFor(configuration.get(WasmConfigurationKeys.WASM_TARGET))
 
-        @Suppress("DEPRECATION")
+        @Suppress("DEPRECATION_ERROR")
         val hasErrors = analyzerFacade.checkForErrors(sourceFiles, analysisResult.bindingContext)
         val metadataSerializer = KlibMetadataIncrementalSerializer(
             sourceFiles,
@@ -162,7 +162,7 @@ class ClassicFrontend2IrConverter(
             moduleFragment,
             pluginContext.irBuiltIns,
             icData,
-            diagnosticReporter = DiagnosticReporterFactory.createReporter(messageCollector),
+            diagnosticReporter = DiagnosticReporterFactory.createReporter(),
             hasErrors,
             descriptorMangler = (pluginContext.symbolTable as SymbolTable).signaturer!!.mangler,
             irMangler = JsManglerIr,

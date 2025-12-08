@@ -330,7 +330,8 @@ abstract class AbstractInvalidationTest(
         }
 
         protected fun prepareExternalJsFiles(): MutableList<String> {
-            return testDir.filesInDir.mapNotNullTo(mutableListOf(MODULE_EMULATION_FILE)) { file ->
+            val moduleEmulationPath = ForTestCompileRuntime.transformTestDataPath(MODULE_EMULATION_FILE)
+            return testDir.filesInDir.mapNotNullTo(mutableListOf(moduleEmulationPath.absolutePath)) { file ->
                 file.takeIf { it.name.isAllowedJsFile() }?.readText()?.let { jsCode ->
                     val externalModule = jsDir.resolve(file.name)
                     externalModule.writeAsJsModule(jsCode, file.nameWithoutExtension)
@@ -415,7 +416,7 @@ abstract class AbstractInvalidationTest(
     ) {
         val outputStream = ByteArrayOutputStream()
         val messageCollector = PrintingMessageCollector(PrintStream(outputStream), MessageRenderer.PLAIN_FULL_PATHS, true)
-        val diagnosticCollector = DiagnosticReporterFactory.createPendingReporter(messageCollector)
+        val diagnosticCollector = DiagnosticReporterFactory.createPendingReporter()
         val performanceManager = createPerformanceManagerFor(configuration.targetPlatform ?: error("Expected a target platform"))
         val phaseConfig = createPhaseConfig(stepId, buildDir)
 

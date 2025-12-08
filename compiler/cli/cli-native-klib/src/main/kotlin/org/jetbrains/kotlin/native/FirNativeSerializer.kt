@@ -10,8 +10,8 @@ import org.jetbrains.kotlin.backend.common.serialization.serializeModuleIntoKlib
 import org.jetbrains.kotlin.backend.konan.KonanCompilationException
 import org.jetbrains.kotlin.backend.konan.KonanConfigKeys
 import org.jetbrains.kotlin.backend.konan.driver.PhaseContext
-import org.jetbrains.kotlin.backend.konan.serialization.SerializerOutput
 import org.jetbrains.kotlin.backend.konan.serialization.KonanIrModuleSerializer
+import org.jetbrains.kotlin.backend.konan.serialization.SerializerOutput
 import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
 import org.jetbrains.kotlin.cli.common.fir.reportToMessageCollector
 import org.jetbrains.kotlin.config.CommonConfigurationKeys
@@ -19,10 +19,9 @@ import org.jetbrains.kotlin.config.languageVersionSettings
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporterFactory
 import org.jetbrains.kotlin.diagnostics.impl.deduplicating
 import org.jetbrains.kotlin.fir.moduleData
-import org.jetbrains.kotlin.fir.pipeline.Fir2KlibMetadataSerializer
 import org.jetbrains.kotlin.fir.pipeline.AllModulesFrontendOutput
+import org.jetbrains.kotlin.fir.pipeline.Fir2KlibMetadataSerializer
 import org.jetbrains.kotlin.ir.KtDiagnosticReporterWithImplicitIrBasedContext
-import org.jetbrains.kotlin.konan.library.KonanLibrary
 import org.jetbrains.kotlin.library.metadata.resolver.TopologicalLibraryOrder
 
 fun PhaseContext.firSerializer(input: FirOutput): SerializerOutput? = when (input) {
@@ -47,8 +46,7 @@ private fun PhaseContext.firSerializerBase(
     }
 
     val irModuleFragment = fir2IrOutput?.fir2irActualizedResult?.irModuleFragment
-    val messageCollector = configuration.getNotNull(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY)
-    val diagnosticReporter = DiagnosticReporterFactory.createPendingReporter(messageCollector)
+    val diagnosticReporter = DiagnosticReporterFactory.createPendingReporter()
     val irDiagnosticReporter = KtDiagnosticReporterWithImplicitIrBasedContext(diagnosticReporter.deduplicating(), configuration.languageVersionSettings)
     val serializerOutput = serializeModuleIntoKlib(
             moduleName = irModuleFragment?.name?.asString() ?: firResult.outputs.last().session.moduleData.name.asString(),
@@ -63,7 +61,7 @@ private fun PhaseContext.firSerializerBase(
                 produceHeaderKlib = produceHeaderKlib,
             ),
             cleanFiles = emptyList(),
-            dependencies = usedResolvedLibraries?.map { it.library as KonanLibrary }.orEmpty(),
+            dependencies = usedResolvedLibraries?.map { it.library }.orEmpty(),
             createModuleSerializer = { irDiagnosticReporter ->
                 KonanIrModuleSerializer(
                     settings = IrSerializationSettings(
@@ -76,6 +74,7 @@ private fun PhaseContext.firSerializerBase(
             },
     )
     val renderDiagnosticNames = configuration.getBoolean(CLIConfigurationKeys.RENDER_DIAGNOSTIC_INTERNAL_NAME)
+    val messageCollector = configuration.getNotNull(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY)
     diagnosticReporter.reportToMessageCollector(messageCollector, renderDiagnosticNames)
     if (diagnosticReporter.hasErrors) {
         throw KonanCompilationException("Compilation failed: there were errors during module serialization")

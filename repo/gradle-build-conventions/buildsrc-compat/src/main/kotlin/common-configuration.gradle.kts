@@ -334,8 +334,6 @@ fun Project.configureTests() {
             ":examples:scripting-jvm-simple-script-host",
             ":generators",
             ":generators:analysis-api-generator:generator-kotlin-native",
-            ":js:js.tests",                    // Drop this line after KT-81098
-            ":js:js.tests:klib-compatibility", // Drop this line after KT-81098
             ":jps:jps-common",
             ":jps:jps-plugin",
             ":kotlin-allopen-compiler-plugin",
@@ -393,12 +391,9 @@ fun Project.configureTests() {
             ":native:kotlin-klib-commonizer",
             ":native:kotlin-klib-commonizer-api",
             ":native:kotlin-native-utils",
-            ":native:native.tests",
-            ":native:native.tests:cli-tests",
             ":native:native.tests:driver",
             ":native:native.tests:gc-fuzzing-tests",
             ":native:native.tests:gc-fuzzing-tests:engine",
-            ":native:native.tests:litmus-tests",
             ":native:objcexport-header-generator",
             ":native:objcexport-header-generator-analysis-api",
             ":native:objcexport-header-generator-k1",

@@ -203,6 +203,16 @@ public class ScriptResolveCandidatesFirTreeConsistencyTestGenerated extends Abst
   }
 
   @Nested
+  @TestMetadata("analysis/analysis-api/testData/components/resolver/singleByPsi/destructuringDeclaration")
+  @TestDataPath("$PROJECT_ROOT")
+  public class DestructuringDeclaration {
+    @Test
+    public void testAllFilesPresentInDestructuringDeclaration() {
+      KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("analysis/analysis-api/testData/components/resolver/singleByPsi/destructuringDeclaration"), Pattern.compile("^(.+)\\.(kts)$"), null, true);
+    }
+  }
+
+  @Nested
   @TestMetadata("analysis/analysis-api/testData/components/resolver/singleByPsi/expressions")
   @TestDataPath("$PROJECT_ROOT")
   public class Expressions {
@@ -349,6 +359,16 @@ public class ScriptResolveCandidatesFirTreeConsistencyTestGenerated extends Abst
     @Test
     public void testAllFilesPresentInKDoc() {
       KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("analysis/analysis-api/testData/components/resolver/singleByPsi/kDoc"), Pattern.compile("^(.+)\\.(kts)$"), null, true);
+    }
+
+    @Nested
+    @TestMetadata("analysis/analysis-api/testData/components/resolver/singleByPsi/kDoc/blockTags")
+    @TestDataPath("$PROJECT_ROOT")
+    public class BlockTags {
+      @Test
+      public void testAllFilesPresentInBlockTags() {
+        KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("analysis/analysis-api/testData/components/resolver/singleByPsi/kDoc/blockTags"), Pattern.compile("^(.+)\\.(kts)$"), null, true);
+      }
     }
 
     @Nested

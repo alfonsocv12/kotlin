@@ -12,6 +12,8 @@ import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.sir.*
 import org.jetbrains.kotlin.sir.providers.*
 import org.jetbrains.kotlin.sir.providers.source.kaSymbolOrNull
+import org.jetbrains.kotlin.sir.providers.utils.KotlinCoroutineSupportModule
+import org.jetbrains.kotlin.sir.providers.utils.KotlinRuntimeModule
 import org.jetbrains.kotlin.sir.providers.utils.KotlinRuntimeSupportModule
 import org.jetbrains.kotlin.sir.util.isNever
 import org.jetbrains.kotlin.sir.util.isVoid
@@ -70,10 +72,22 @@ public class SirBridgeProviderImpl(private val session: SirSession, private val 
             kotlinFqName = kotlinFqName,
             selfParameter = selfParameter?.let { bridgeParameter(it, 0) },
             extensionReceiverParameter = extensionReceiverParameter?.let { bridgeParameter(it, 0) },
-            errorParameter = errorParameter?.let {
+            errorParameter = run {
+                isAsync.ifTrue {
+                    Bridge.AsOptionalWrapper(
+                        Bridge.AsObject(
+                            swiftType = KotlinRuntimeModule.kotlinBase.nominalType(),
+                            kotlinType = KotlinType.KotlinObject,
+                            cType = CType.Object
+                        )
+                    )
+                } ?: errorParameter?.let {
+                    Bridge.AsOutError
+                }
+            }?.let {
                 BridgedParameter.InOut(
-                    name = it.name!!.let(::createBridgeParameterName),
-                    bridge = Bridge.AsOutError
+                    name = (errorParameter?.name ?: "error").let(::createBridgeParameterName),
+                    bridge = it
                 )
             },
             isAsync = isAsync,
@@ -136,11 +150,30 @@ private class BridgeFunctionDescriptor(
     val cBridgeName = kotlinBridgeName
 
     val allParameters
-        get() = listOfNotNull(selfParameter) + parameters + listOfNotNull(errorParameter) + listOfNotNull(asyncContinuationParameter)
+        get() = listOfNotNull(selfParameter) + parameters + listOfNotNull(errorParameter.takeIf { !isAsync }) +
+                (asyncParameters?.toList() ?: emptyList())
 
-    val asyncContinuationParameter: BridgedParameter? = isAsync.ifTrue {
-        require(returnType is Bridge)
-        BridgedParameter.In(name = "continuation", bridge = Bridge.AsBlock(parameters = listOf(returnType), returnType = Bridge.AsOutVoid))
+    val asyncParameters: Triple<BridgedParameter.In, BridgedParameter.In, BridgedParameter.In>? by lazy {
+        isAsync.ifTrue {
+            Triple(
+                BridgedParameter.In(
+                    name = "continuation",
+                    bridge = Bridge.AsBlock(parameters = listOf(returnType), returnType = Bridge.AsOutVoid)
+                ),
+                BridgedParameter.In(
+                    name = "exception",
+                    bridge = Bridge.AsBlock(parameters = listOfNotNull(errorParameter?.bridge), returnType = Bridge.AsOutVoid)
+                ),
+                BridgedParameter.In(
+                    name = "cancellation",
+                    bridge = Bridge.AsObject(
+                        swiftType = KotlinCoroutineSupportModule.swiftJob.nominalType(),
+                        kotlinType = KotlinType.KotlinObject,
+                        cType = CType.Object,
+                    )
+                ),
+            )
+        }
     }
 
     override val name
@@ -210,7 +243,6 @@ private class BridgeFunctionDescriptor(
         val errorParameter = descriptor.errorParameter
 
         if (isAsync) {
-            require(errorParameter == null) { "Throwing async functions aren't supported yet" }
             add(descriptor.swiftAsyncCall(typeNamer))
         } else if (errorParameter != null) {
             add("var ${errorParameter.name}: UnsafeMutableRawPointer? = nil")
@@ -282,15 +314,22 @@ private fun BridgeFunctionDescriptor.createKotlinBridge(
     val resultName = "_result"
 
     if (isAsync) {
-        val continuation = asyncContinuationParameter
-        require(continuation != null) { "Async functions must have a continuation" }
-        require(errorParameter == null) { "Throwing async functions aren't supported yet" }
+        val (continuation, exception, cancellation) = asyncParameters ?: error("Async function must have a continuation & cancellation")
+        val errorParameter = errorParameter ?: error("Async function must have an error parameter")
         add(
             """
-            GlobalScope.launch(start = CoroutineStart.UNDISPATCHED) {
-                val $resultName = $callSite
-                __${continuation.name}(${resultName})
-            }
+            CoroutineScope(__${cancellation.name.kotlinIdentifier} + Dispatchers.Default).launch(start = CoroutineStart.UNDISPATCHED) {
+                try {
+                    val $resultName = $callSite
+                    __${continuation.name}(${resultName})
+                } catch (error: CancellationException) {
+                    __${cancellation.name.kotlinIdentifier}.cancel()
+                    __${exception.name}(null)
+                    throw error
+                } catch (error: Throwable) {
+                    __${exception.name}(error)
+                }
+            }.alsoCancel(__${cancellation.name.kotlinIdentifier})
             """.trimIndent().prependIndent(indent)
         )
     } else if (returnType.swiftType.isVoid && errorParameter == null) {
@@ -338,13 +377,30 @@ private fun BridgeFunctionDescriptor.swiftLinesForCBridgeCallAndTransformation(t
 }
 
 private fun BridgeFunctionDescriptor.swiftAsyncCall(typeNamer: SirTypeNamer): String {
-    val continuation = asyncContinuationParameter ?: error("Can not form async call to non-async function bridge")
+    val (continuation, exception, cancellation) = asyncParameters ?: error("Async function must have a continuation & cancellation")
+    val errorParameter = errorParameter ?: error("Async function must have an error parameter")
+    val indent = "                        "
 
     return """
-        await withUnsafeContinuation { nativeContinuation in
-            let ${continuation.name.swiftIdentifier}: ${continuation.bridge.swiftType.swiftName} = { nativeContinuation.resume(returning: $0) }
-            let _: () = ${swiftInvocationLineForCBridge(typeNamer)}
-        }
+        try${"!".takeIf { !isAsync } ?: ""} await {
+            try Task.checkCancellation()
+            var ${cancellation.name.swiftIdentifier}: ${cancellation.bridge.swiftType.swiftName}! = nil
+            return try await withTaskCancellationHandler {
+                try await withUnsafeThrowingContinuation { nativeContinuation in
+                    withUnsafeCurrentTask { currentTask in
+                        let ${continuation.name.swiftIdentifier}: ${continuation.bridge.swiftType.swiftName} = { nativeContinuation.resume(returning: $0) }
+                        let ${exception.name.swiftIdentifier}: ${exception.bridge.swiftType.swiftName} = { error in
+                            nativeContinuation.resume(throwing: error.map { KotlinError(wrapped: $0) } ?? CancellationError())
+                        }
+                        ${cancellation.name.swiftIdentifier} = ${cancellation.bridge.swiftType.swiftName}(currentTask!)
+                        
+                        let _: () = ${swiftInvocationLineForCBridge(typeNamer).prependIndentToTrailingLines(indent)}
+                    }            
+                }
+            } onCancel: {
+                ${cancellation.name.swiftIdentifier}?.cancelExternally()
+            }
+        }()
     """.trimIndent()
 }
 
@@ -391,3 +447,14 @@ private fun BridgeFunctionDescriptor.additionalImports(): List<String> = listOfN
 
 private val BridgeFunctionDescriptor.safeImportName: String
     get() = kotlinFqName.pathSegments().joinToString(separator = "_") { it.asString().replace("_", "__") }
+
+private fun String.prependIndentToTrailingLines(indent: String): String = this.lines().let { lines ->
+    lines.singleOrNull() ?: buildString {
+        append(lines.first())
+        for (line in lines.drop(1)) {
+            append('\n')
+            append(indent)
+            append(line)
+        }
+    }
+}

@@ -522,7 +522,7 @@ internal class JsAstMapperVisitor(
         }
 
         ctx.StringLiteral()?.let {
-            return it.text.unescapeString(ctx).toStringLiteral().applyLocation(ctx)
+            return it.text.unescapeString().toStringLiteral().applyLocation(ctx)
         }
 
         ctx.numericLiteral()?.let {
@@ -572,7 +572,12 @@ internal class JsAstMapperVisitor(
     }
 
     override fun visitTemplateStringExpression(ctx: JavaScriptParser.TemplateStringExpressionContext): JsNode? {
-        reportError("Template string literals are not supported yet", ctx)
+        val template = visitNode<JsTemplateStringLiteral>(ctx.templateStringLiteral())
+
+        return template.apply {
+            tag = ctx.singleExpressionImpl()?.let { visitNode<JsExpression>(it) }
+            applyLocation(ctx)
+        }
     }
 
     override fun visitTernaryExpression(ctx: JavaScriptParser.TernaryExpressionContext): JsConditional {
@@ -606,8 +611,10 @@ internal class JsAstMapperVisitor(
         return visitNode<JsObjectLiteral>(ctx.objectLiteral())
     }
 
-    override fun visitMetaExpression(ctx: JavaScriptParser.MetaExpressionContext): JsNode? {
-        reportError("Meta expressions are not supported yet", ctx)
+    override fun visitMetaExpression(ctx: JavaScriptParser.MetaExpressionContext): JsNameRef {
+        return makeRefNode(ctx.Target().text).apply {
+            qualifier = makeRefNode(ctx.New().text).applyLocation(ctx.New())
+        }.applyLocation(ctx.Target())
     }
 
     override fun visitInExpression(ctx: JavaScriptParser.InExpressionContext): JsBinaryOperation {
@@ -1045,7 +1052,7 @@ internal class JsAstMapperVisitor(
         }
 
         ctx.StringLiteral()?.let {
-            return it.text.unescapeString(ctx).toStringLiteral().applyLocation(ctx)
+            return it.text.unescapeString().toStringLiteral().applyLocation(ctx)
         }
 
         ctx.RegularExpressionLiteral()?.run {
@@ -1062,37 +1069,60 @@ internal class JsAstMapperVisitor(
         return super.visitLiteral(ctx) as JsLiteral
     }
 
-    override fun visitTemplateStringLiteral(ctx: JavaScriptParser.TemplateStringLiteralContext): JsNode? {
-        reportError("Template string literals are not supported yet", ctx)
+    override fun visitTemplateStringLiteral(ctx: JavaScriptParser.TemplateStringLiteralContext): JsTemplateStringLiteral {
+        return JsTemplateStringLiteral(
+            tag = null,
+            segments = ctx.templateStringAtom()?.map { element ->
+                visitNode<JsTemplateStringLiteral.Segment>(element)
+            } ?: listOf()
+        ).applyLocation(ctx)
     }
 
-    override fun visitTemplateStringAtom(ctx: JavaScriptParser.TemplateStringAtomContext): JsNode? {
-        reportError("Template string literals are not supported yet", ctx)
+    override fun visitTemplateStringAtom(ctx: JavaScriptParser.TemplateStringAtomContext): JsTemplateStringLiteral.Segment {
+        ctx.TemplateStringAtom()?.let { stringElement ->
+            return JsTemplateStringLiteral.Segment.StringLiteral(stringElement.text.unescapeTemplateString(stringElement))
+                .applyLocation(ctx)
+        }
+
+        ctx.singleExpression()?.let { expressionElement ->
+            return JsTemplateStringLiteral.Segment.Interpolation(
+                visitNode<JsExpression>(expressionElement)
+                    .applyLocation(expressionElement)
+            ).applyLocation(ctx)
+        }
+
+        raiseParserException("Invalid template string segment '${ctx.text}'", ctx)
     }
 
     override fun visitNumericLiteral(ctx: JavaScriptParser.NumericLiteralContext): JsNumberLiteral {
-        ctx.BinaryIntegerLiteral()?.run {
-            reportError("Binary integer literals are not supported yet", ctx)
+        if ('_' in ctx.text)
+            reportError("Numeric separators are not supported yet", ctx)
+
+        ctx.BinaryIntegerLiteral()?.let { binaryLiteral ->
+            return binaryLiteral.text.toBinaryLiteral().applyLocation(ctx)
         }
 
-        ctx.OctalIntegerLiteral()?.let {
-            val value = it.text.removePrefix("0")
-
+        ctx.OctalIntegerLiteral()?.let { octalLiteral ->
             // In a non-strict mode invalid old octal literals, such are containing 8 and 9 (like 0888 or 0999)
             // are treated like decimal literals (888 and 999 correspondingly).
             // To embrace compatibility, we emit a warning here like the old GWT parser did.
-            value.forEach { digit ->
+            octalLiteral.text.forEach { digit ->
                 if (digit !in '0'..'7') {
-                    reportWarning("illegal octal value '$value'; interpreting it as a decimal value", it.startPosition, it.stopPosition)
-                    return value.toDecimalLiteral().applyLocation(ctx)
+                    val decimalPart = octalLiteral.text.removePrefix("0")
+                    reportWarning(
+                        "illegal octal value '$decimalPart'; interpreting it as a decimal value",
+                        octalLiteral.startPosition,
+                        octalLiteral.stopPosition
+                    )
+                    return decimalPart.toDecimalLiteral().applyLocation(ctx)
                 }
             }
 
-            return value.toOctalLiteral().applyLocation(ctx)
+            return octalLiteral.text.toOctalLiteral().applyLocation(ctx)
         }
 
-        ctx.OctalIntegerLiteral2()?.run {
-            reportError("Octal integer literals are not supported yet", ctx)
+        ctx.OctalIntegerLiteral2()?.let { newOctalLiteral ->
+            return newOctalLiteral.text.toOctalLiteral().applyLocation(ctx)
         }
 
         ctx.DecimalLiteral()?.let { decimalTerminal ->
@@ -1162,6 +1192,15 @@ internal class JsAstMapperVisitor(
             message,
             ctx.startPosition,
             ctx.stopPosition
+        )
+        throw AbortParsingException()
+    }
+
+    private fun reportError(message: String, terminal: TerminalNode): Nothing {
+        reporter.error(
+            message,
+            terminal.startPosition,
+            terminal.stopPosition
         )
         throw AbortParsingException()
     }
@@ -1238,5 +1277,114 @@ internal class JsAstMapperVisitor(
         commentsAfterNode = mapComments(commentsSource.commentsAfter)
 
         return this
+    }
+
+    private fun String.unescapeString(): String {
+        val chars = this.toCharArray()
+
+        return buildString(this.length) {
+            var i = 0
+
+            while (i < chars.size) {
+                var char = chars[i]
+                if (char == '\\' && i + 1 < chars.size) {
+                    char = chars[i + 1]
+                    when (char) {
+                        'b' -> { append('\b'); i += 2 }
+                        'f' -> { append('\u000C'); i += 2 }
+                        'n' -> { append('\n'); i += 2 }
+                        'r' -> { append('\r'); i += 2 }
+                        't' -> { append('\t'); i += 2 }
+                        'v' -> { append('\u000B'); i += 2 }
+                        '\\' -> { append("\\"); i += 2 }
+                        'u' if i + 5 < chars.size -> {
+                            val hex = String(chars, i + 2, 4)
+                            append(hex.toInt(16).toChar())
+                            i += 6
+                        }
+                        'x' if i + 3 < chars.size -> {
+                            val hex = String(chars, i + 2, 2)
+                            append(hex.toInt(16).toChar())
+                            i += 4
+                        }
+                        in '0'..'7' -> {
+                            var octalVal = char - '0'
+                            i += 2
+                            if (i < chars.size && chars[i] in '0'..'7') {
+                                octalVal = 8 * octalVal + (chars[i] - '0')
+                                i++
+                                // c is the 3rd char of an octal sequence only if
+                                // the resulting val <= 037 (31 in decimal)
+                                if (i < chars.size && chars[i] in '0'..'7' && octalVal <= 31) {
+                                    octalVal = 8 * octalVal + (chars[i] - '0')
+                                    i++
+                                }
+                            }
+                            append(octalVal.toChar())
+                        }
+                        '\n' -> { i += 2 }
+                        '\r' -> {
+                            i += 2
+                            if (chars.getOrNull(i) == '\n') i++
+                        }
+                        else -> { append(char); i += 2 }
+                    }
+                } else {
+                    append(char)
+                    i++
+                }
+            }
+        }
+    }
+
+    private fun String.unescapeTemplateString(terminal: TerminalNode): String {
+        val chars = this.toCharArray()
+
+        return buildString(this.length) {
+            var i = 0
+
+            while (i < chars.size) {
+                var char = chars[i]
+                if (char == '\\' && i + 1 < chars.size) {
+                    char = chars[i + 1]
+                    when (char) {
+                        'b' -> { append('\b'); i += 2 }
+                        'f' -> { append('\u000C'); i += 2 }
+                        'n' -> { append('\n'); i += 2 }
+                        'r' -> { append('\r'); i += 2 }
+                        't' -> { append('\t'); i += 2 }
+                        'v' -> { append('\u000B'); i += 2 }
+                        '\\' -> { append("\\"); i += 2 }
+                        'u' if i + 5 < chars.size -> {
+                            val hex = String(chars, i + 2, 4)
+                            append(hex.toInt(16).toChar())
+                            i += 6
+                        }
+                        'u' -> reportError("Invalid Unicode escape sequence", terminal)
+                        'x' if i + 3 < chars.size -> {
+                            val hex = String(chars, i + 2, 2)
+                            append(hex.toInt(16).toChar())
+                            i += 4
+                        }
+                        'x' ->
+                            reportError("Invalid hexadecimal escape sequence", terminal)
+                        '0' -> { append('\u0000'); i += 2 }
+                        in '1'..'7' ->
+                            reportError("Octal escape sequences are not allowed in template strings", terminal)
+                        in '8'..'9' ->
+                            reportError("\\8 and \\9 are not allowed in template strings", terminal)
+                        '\n' -> { i += 2 }
+                        '\r' -> {
+                            i += 2
+                            if (chars.getOrNull(i) == '\n') i++
+                        }
+                        else -> { append(char); i += 2 }
+                    }
+                } else {
+                    append(char)
+                    i++
+                }
+            }
+        }
     }
 }

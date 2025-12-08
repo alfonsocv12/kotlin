@@ -14,7 +14,6 @@ import org.jetbrains.kotlin.backend.konan.ir.*
 import org.jetbrains.kotlin.backend.konan.IntrinsicType
 import org.jetbrains.kotlin.backend.konan.ir.tryGetIntrinsicType
 import org.jetbrains.kotlin.backend.konan.serialization.isFromCInteropLibrary
-import org.jetbrains.kotlin.config.nativeBinaryOptions.CCallMode
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.Modality
@@ -36,7 +35,7 @@ import org.jetbrains.kotlin.ir.util.isNullable
 import org.jetbrains.kotlin.ir.util.isSubtypeOf
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 import org.jetbrains.kotlin.konan.ForeignExceptionMode
-import org.jetbrains.kotlin.konan.library.KonanLibrary
+import org.jetbrains.kotlin.library.KotlinLibrary
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.NativeStandardInteropNames.objCActionClassId
@@ -131,8 +130,8 @@ private abstract class BaseInteropIrTransformer(
             override val symbols get() = context.symbols
             override val typeSystem: IrTypeSystemContext get() = context.typeSystem
 
-            val klib: KonanLibrary? get() {
-                return (element as? IrCall)?.symbol?.owner?.konanLibrary as? KonanLibrary
+            val klib: KotlinLibrary? get() {
+                return (element as? IrCall)?.symbol?.owner?.konanLibrary
             }
 
             override val language: String
@@ -872,12 +871,12 @@ private class InteropTransformerPart2(
         }
     }
 
-    private fun generateCFunctionCallOrGlobalAccess(expression: IrCall): IrExpression = when (context.config.cCallMode) {
-        CCallMode.Indirect -> tryGenerateIndirectCCall(expression)
-        CCallMode.IndirectOrDirect -> tryGenerateIndirectCCall(expression) ?: tryGenerateDirectCCallOrGlobalAccess(expression)
-        CCallMode.DirectOrIndirect -> tryGenerateDirectCCallOrGlobalAccess(expression) ?: tryGenerateIndirectCCall(expression)
-        CCallMode.Direct -> tryGenerateDirectCCallOrGlobalAccess(expression)
-    } ?: error(renderCompilerError(expression, "the call is incompatible with cCallMode=${context.config.cCallMode}"))
+    private fun generateCFunctionCallOrGlobalAccess(
+            expression: IrCall
+    ): IrExpression = context.config.cCallMode.select(
+            indirect = { -> tryGenerateIndirectCCall(expression) },
+            direct = { -> tryGenerateDirectCCallOrGlobalAccess(expression) }
+    ) ?: error(renderCompilerError(expression, "the call is incompatible with cCallMode=${context.config.cCallMode}"))
 
     private fun lowerObjCInitBy(expression: IrCall): IrExpression {
         val argument = expression.arguments[1]!!

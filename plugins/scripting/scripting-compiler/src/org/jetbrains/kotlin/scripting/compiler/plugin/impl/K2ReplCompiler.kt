@@ -56,6 +56,7 @@ import org.jetbrains.kotlin.scripting.compiler.plugin.services.FirReplHistoryPro
 import org.jetbrains.kotlin.scripting.compiler.plugin.services.firReplHistoryProvider
 import org.jetbrains.kotlin.scripting.compiler.plugin.services.isReplSnippetSource
 import org.jetbrains.kotlin.scripting.definitions.ScriptConfigurationsProvider
+import org.jetbrains.kotlin.scripting.definitions.ScriptPriorities
 import java.io.File
 import java.nio.file.Path
 import kotlin.script.experimental.api.*
@@ -247,7 +248,7 @@ private fun compileImpl(
     val compilerConfiguration = state.compilerContext.environment.configuration.copy().apply {
         jvmTarget = selectJvmTarget(scriptCompilationConfiguration, messageCollector)
     }
-    val diagnosticsReporter = DiagnosticReporterFactory.createPendingReporter(messageCollector)
+    val diagnosticsReporter = DiagnosticReporterFactory.createPendingReporter()
     val renderDiagnosticName = compilerConfiguration.getBoolean(CLIConfigurationKeys.RENDER_DIAGNOSTIC_INTERNAL_NAME)
     val compilerEnvironment = ModuleCompilerEnvironment(state.projectEnvironment, diagnosticsReporter)
     val targetId = TargetId(snippet.name!!, "java-production")
@@ -257,6 +258,14 @@ private fun compileImpl(
         getScriptKtFile(snippet, initialScriptCompilationConfiguration, project, messageCollector).valueOr {
             return it
         }
+
+    // TODO: ensure that currentLineId passing is only used for single snippet compilation
+    val priority = state.scriptCompilationConfiguration[ScriptCompilationConfiguration.repl.currentLineId]?.no
+        ?: state.hostConfiguration[ScriptingHostConfiguration.repl.firReplHistoryProvider]?.getSnippetCount()
+    if (priority != null) {
+        val script = snippetKtFile.script!!
+        script.putUserData(ScriptPriorities.PRIORITY_KEY, priority)
+    }
 
     // configuration refinement with the additional sources collection
     val allSourceFiles = mutableListOf(snippetKtFile)

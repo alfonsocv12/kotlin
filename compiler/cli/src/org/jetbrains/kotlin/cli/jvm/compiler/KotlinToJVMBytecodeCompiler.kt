@@ -77,7 +77,7 @@ object KotlinToJVMBytecodeCompiler {
 
         check(compilerConfiguration.useFir == false)
         val messageCollector = environment.messageCollector
-        val diagnosticsReporter = DiagnosticReporterFactory.createReporter(messageCollector)
+        val diagnosticsReporter = DiagnosticReporterFactory.createReporter()
         val backendInputForMultiModuleChunk =
             runFrontendAndGenerateIrUsingClassicFrontend(environment, compilerConfiguration, chunk, diagnosticsReporter) ?: return true
 
@@ -254,8 +254,7 @@ object KotlinToJVMBytecodeCompiler {
 
         result.throwIfError()
 
-        val messageCollector = environment.configuration.getNotNull(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY)
-        val diagnosticsReporter = DiagnosticReporterFactory.createReporter(messageCollector)
+        val diagnosticsReporter = DiagnosticReporterFactory.createReporter()
         val (codegenFactory, backendInput) = convertToIr(environment, result, diagnosticsReporter)
         val input = runLowerings(
             environment.project, environment.configuration, result.moduleDescriptor, module = null, codegenFactory,
@@ -329,7 +328,7 @@ object KotlinToJVMBytecodeCompiler {
             // To support partial and incremental compilation, we add the scope which contains binaries from output directories
             // of the compiled modules (.class) to the list of scopes of the source module
             val scope = if (moduleOutputs.isEmpty()) sourcesOnly else sourcesOnly.uniteWith(DirectoriesScope(project, moduleOutputs))
-            @Suppress("DEPRECATION")
+            @Suppress("DEPRECATION_ERROR")
             TopDownAnalyzerFacadeForJVM.analyzeFilesWithJavaIntegration(
                 project,
                 sourceFiles,

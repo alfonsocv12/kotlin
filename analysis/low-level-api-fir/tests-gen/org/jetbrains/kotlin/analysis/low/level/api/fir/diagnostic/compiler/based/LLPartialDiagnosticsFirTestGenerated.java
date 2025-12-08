@@ -411,6 +411,12 @@ public class LLPartialDiagnosticsFirTestGenerated extends AbstractLLPartialDiagn
     }
 
     @Test
+    @TestMetadata("initializerTypeMismatchWithLambdaAndOuterTvInPCLA.kt")
+    public void testInitializerTypeMismatchWithLambdaAndOuterTvInPCLA() {
+      runTest("compiler/fir/analysis-tests/testData/resolve/initializerTypeMismatchWithLambdaAndOuterTvInPCLA.kt");
+    }
+
+    @Test
     @TestMetadata("intersectionScope.kt")
     public void testIntersectionScope() {
       runTest("compiler/fir/analysis-tests/testData/resolve/intersectionScope.kt");
@@ -822,6 +828,24 @@ public class LLPartialDiagnosticsFirTestGenerated extends AbstractLLPartialDiagn
     @TestMetadata("typesInLocalFunctions.kt")
     public void testTypesInLocalFunctions() {
       runTest("compiler/fir/analysis-tests/testData/resolve/typesInLocalFunctions.kt");
+    }
+
+    @Test
+    @TestMetadata("uninferredTypeParamInArgumentLambda.kt")
+    public void testUninferredTypeParamInArgumentLambda() {
+      runTest("compiler/fir/analysis-tests/testData/resolve/uninferredTypeParamInArgumentLambda.kt");
+    }
+
+    @Test
+    @TestMetadata("uninferredTypeParamInLambdaInPCLA.kt")
+    public void testUninferredTypeParamInLambdaInPCLA() {
+      runTest("compiler/fir/analysis-tests/testData/resolve/uninferredTypeParamInLambdaInPCLA.kt");
+    }
+
+    @Test
+    @TestMetadata("uninferredTypeParamInTopLevelLambda.kt")
+    public void testUninferredTypeParamInTopLevelLambda() {
+      runTest("compiler/fir/analysis-tests/testData/resolve/uninferredTypeParamInTopLevelLambda.kt");
     }
 
     @Test
@@ -2180,6 +2204,46 @@ public class LLPartialDiagnosticsFirTestGenerated extends AbstractLLPartialDiagn
       }
 
       @Nested
+      @TestMetadata("compiler/fir/analysis-tests/testData/resolve/collectionLiterals/ofOverloads")
+      @TestDataPath("$PROJECT_ROOT")
+      public class OfOverloads {
+        @Test
+        public void testAllFilesPresentInOfOverloads() {
+          KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/fir/analysis-tests/testData/resolve/collectionLiterals/ofOverloads"), Pattern.compile("^([^.]+)\\.kt(\\.can-freeze-ide)?$"), null, true);
+        }
+
+        @Test
+        @TestMetadata("nonOperatorOfWithSameSignature.kt")
+        public void testNonOperatorOfWithSameSignature() {
+          runTest("compiler/fir/analysis-tests/testData/resolve/collectionLiterals/ofOverloads/nonOperatorOfWithSameSignature.kt");
+        }
+
+        @Test
+        @TestMetadata("nonOperatorOfWithUnrelatedType.kt")
+        public void testNonOperatorOfWithUnrelatedType() {
+          runTest("compiler/fir/analysis-tests/testData/resolve/collectionLiterals/ofOverloads/nonOperatorOfWithUnrelatedType.kt");
+        }
+
+        @Test
+        @TestMetadata("nonVarargNonOperatorOfInCompanion.kt")
+        public void testNonVarargNonOperatorOfInCompanion() {
+          runTest("compiler/fir/analysis-tests/testData/resolve/collectionLiterals/ofOverloads/nonVarargNonOperatorOfInCompanion.kt");
+        }
+
+        @Test
+        @TestMetadata("varargNonOperatorOfWithMoreNarrowTypeAsExtension.kt")
+        public void testVarargNonOperatorOfWithMoreNarrowTypeAsExtension() {
+          runTest("compiler/fir/analysis-tests/testData/resolve/collectionLiterals/ofOverloads/varargNonOperatorOfWithMoreNarrowTypeAsExtension.kt");
+        }
+
+        @Test
+        @TestMetadata("varargNonOperatorOfWithMoreNarrowTypeInCompanion.kt")
+        public void testVarargNonOperatorOfWithMoreNarrowTypeInCompanion() {
+          runTest("compiler/fir/analysis-tests/testData/resolve/collectionLiterals/ofOverloads/varargNonOperatorOfWithMoreNarrowTypeInCompanion.kt");
+        }
+      }
+
+      @Nested
       @TestMetadata("compiler/fir/analysis-tests/testData/resolve/collectionLiterals/userTypes")
       @TestDataPath("$PROJECT_ROOT")
       public class UserTypes {
@@ -3340,6 +3404,46 @@ public class LLPartialDiagnosticsFirTestGenerated extends AbstractLLPartialDiagn
           runTest("compiler/fir/analysis-tests/testData/resolve/contextParameters/smartcast/withImpliesContract.kt");
         }
       }
+
+      @Nested
+      @TestMetadata("compiler/fir/analysis-tests/testData/resolve/contextParameters/specificity")
+      @TestDataPath("$PROJECT_ROOT")
+      public class Specificity {
+        @Test
+        public void testAllFilesPresentInSpecificity() {
+          KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/fir/analysis-tests/testData/resolve/contextParameters/specificity"), Pattern.compile("^([^.]+)\\.kt(\\.can-freeze-ide)?$"), null, true);
+        }
+
+        @Test
+        @TestMetadata("generics.kt")
+        public void testGenerics() {
+          runTest("compiler/fir/analysis-tests/testData/resolve/contextParameters/specificity/generics.kt");
+        }
+
+        @Test
+        @TestMetadata("intVsLongWithContext.kt")
+        public void testIntVsLongWithContext() {
+          runTest("compiler/fir/analysis-tests/testData/resolve/contextParameters/specificity/intVsLongWithContext.kt");
+        }
+
+        @Test
+        @TestMetadata("newSpecificity.kt")
+        public void testNewSpecificity() {
+          runTest("compiler/fir/analysis-tests/testData/resolve/contextParameters/specificity/newSpecificity.kt");
+        }
+
+        @Test
+        @TestMetadata("three.kt")
+        public void testThree() {
+          runTest("compiler/fir/analysis-tests/testData/resolve/contextParameters/specificity/three.kt");
+        }
+
+        @Test
+        @TestMetadata("transaction.kt")
+        public void testTransaction() {
+          runTest("compiler/fir/analysis-tests/testData/resolve/contextParameters/specificity/transaction.kt");
+        }
+      }
     }
 
     @Nested
@@ -4035,6 +4139,12 @@ public class LLPartialDiagnosticsFirTestGenerated extends AbstractLLPartialDiagn
       @TestMetadata("annotationInFullForm.kt")
       public void testAnnotationInFullForm() {
         runTest("compiler/fir/analysis-tests/testData/resolve/destructuring/annotationInFullForm.kt");
+      }
+
+      @Test
+      @TestMetadata("dataClassCustomComponent.kt")
+      public void testDataClassCustomComponent() {
+        runTest("compiler/fir/analysis-tests/testData/resolve/destructuring/dataClassCustomComponent.kt");
       }
 
       @Test
@@ -6582,6 +6692,24 @@ public class LLPartialDiagnosticsFirTestGenerated extends AbstractLLPartialDiagn
         @Test
         public void testAllFilesPresentInCapturedTypes() {
           KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/fir/analysis-tests/testData/resolve/inference/capturedTypes"), Pattern.compile("^([^.]+)\\.kt(\\.can-freeze-ide)?$"), null, true);
+        }
+
+        @Test
+        @TestMetadata("elvisWithDeepGeneric.kt.can-freeze-ide")
+        public void testElvisWithDeepGeneric() {
+          runTest("compiler/fir/analysis-tests/testData/resolve/inference/capturedTypes/elvisWithDeepGeneric.kt.can-freeze-ide");
+        }
+
+        @Test
+        @TestMetadata("elvisWithDeepGeneric2.kt.can-freeze-ide")
+        public void testElvisWithDeepGeneric2() {
+          runTest("compiler/fir/analysis-tests/testData/resolve/inference/capturedTypes/elvisWithDeepGeneric2.kt.can-freeze-ide");
+        }
+
+        @Test
+        @TestMetadata("equalityOfStarProjection.kt")
+        public void testEqualityOfStarProjection() {
+          runTest("compiler/fir/analysis-tests/testData/resolve/inference/capturedTypes/equalityOfStarProjection.kt");
         }
 
         @Test
@@ -10422,6 +10550,12 @@ public class LLPartialDiagnosticsFirTestGenerated extends AbstractLLPartialDiagn
       }
 
       @Test
+      @TestMetadata("importJavaMapped.kt")
+      public void testImportJavaMapped() {
+        runTest("compiler/fir/analysis-tests/testData/resolveWithStdlib/j+k/importJavaMapped.kt");
+      }
+
+      @Test
       @TestMetadata("IntersectionTypesProblem.kt")
       public void testIntersectionTypesProblem() {
         runTest("compiler/fir/analysis-tests/testData/resolveWithStdlib/j+k/IntersectionTypesProblem.kt");
@@ -11269,6 +11403,12 @@ public class LLPartialDiagnosticsFirTestGenerated extends AbstractLLPartialDiagn
       @TestMetadata("region.kt")
       public void testRegion() {
         runTest("compiler/fir/analysis-tests/testData/resolveWithStdlib/restrictSuspension/region.kt");
+      }
+
+      @Test
+      @TestMetadata("smartcastReceiver.kt")
+      public void testSmartcastReceiver() {
+        runTest("compiler/fir/analysis-tests/testData/resolveWithStdlib/restrictSuspension/smartcastReceiver.kt");
       }
     }
 

@@ -26,10 +26,8 @@ import org.jetbrains.kotlin.cli.common.arguments.CommonCompilerArguments
 import org.jetbrains.kotlin.cli.common.messages.*
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.IncrementalCompilation
-import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.config.languageVersionSettings
 import org.jetbrains.kotlin.config.messageCollector
-import org.jetbrains.kotlin.diagnostics.DiagnosticBaseContext
 import org.jetbrains.kotlin.diagnostics.KtSourcelessDiagnosticFactory
 import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.fir.packageFqName
@@ -39,10 +37,8 @@ import org.jetbrains.kotlin.platform.TargetPlatform
 import org.jetbrains.kotlin.platform.isCommon
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.text
-import org.jetbrains.kotlin.util.Logger
 import org.jetbrains.kotlin.util.PerformanceManagerImpl
 import java.io.File
-import org.jetbrains.kotlin.cli.common.messages.toLogger as toLoggerNew
 
 fun incrementalCompilationIsEnabled(arguments: CommonCompilerArguments): Boolean {
     return arguments.incrementalCompilation ?: IncrementalCompilation.isEnabledForJvm()
@@ -139,13 +135,6 @@ fun <PathProvider : Any> getLibraryFromHome(
 fun createPerformanceManagerFor(platform: TargetPlatform) =
     PerformanceManagerImpl(platform, "Kotlin to ${if (platform.isCommon()) "Metadata" else platform.first().platformName} compiler")
 
-@Deprecated(
-    "Use org.jetbrains.kotlin.cli.common.messages.toLogger() instead",
-    ReplaceWith("toLogger()", "org.jetbrains.kotlin.cli.common.messages.toLogger"),
-    DeprecationLevel.ERROR
-)
-fun MessageCollector.toLogger(): Logger = toLoggerNew()
-
 fun disposeRootInWriteAction(disposable: Disposable) {
     if (ApplicationManager.getApplication() != null) {
         runWriteAction {
@@ -157,10 +146,6 @@ fun disposeRootInWriteAction(disposable: Disposable) {
 }
 
 fun CompilerConfiguration.reportIfNeeded(factory: KtSourcelessDiagnosticFactory, message: String) {
-    val diagnostic = factory.create(message, object : DiagnosticBaseContext {
-        override val languageVersionSettings: LanguageVersionSettings
-            get() = this@reportIfNeeded.languageVersionSettings
-
-    }) ?: return
-    messageCollector.report(AnalyzerWithCompilerReport.convertSeverity(diagnostic.severity), message)
+    val effectiveSeverity = factory.getEffectiveSeverity(languageVersionSettings) ?: return
+    messageCollector.report(effectiveSeverity.toCompilerMessageSeverity(), message)
 }

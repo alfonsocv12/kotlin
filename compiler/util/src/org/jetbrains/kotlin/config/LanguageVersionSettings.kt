@@ -440,7 +440,6 @@ enum class LanguageFeature(
     InferenceEnhancementsIn23(KOTLIN_2_3, "KT-76826"),
     AllowReturnInExpressionBodyWithExplicitType(KOTLIN_2_3, "KT-76926"),
     ParseLambdaWithSuspendModifier(KOTLIN_2_3, "KT-22765"),
-    DiscriminateSuspendInOverloadResolution(KOTLIN_2_3, "KT-23610"),
     JsAllowLongInExportedDeclarations(sinceVersion = KOTLIN_2_3, "KT-79222"),
     JsStaticInInterface(KOTLIN_2_3, "KT-80168"),
 
@@ -479,11 +478,17 @@ enum class LanguageFeature(
     DisableMaxTypeDepthFromInitialConstraints(sinceVersion = KOTLIN_2_4, enabledInProgressiveMode = true, "KTLC-372"),
     JsAllowExportingSuspendFunctions(sinceVersion = KOTLIN_2_4, "KT-56281"),
     ImprovedResolutionInSecondaryConstructors(sinceVersion = KOTLIN_2_4, "KT-77275"),
+    CacheLocalVariableScopes(sinceVersion = KOTLIN_2_4, "KT-68606"),
     ForbidTypeAliasToCompilerRequiredAnnotation(KOTLIN_2_4, enabledInProgressiveMode = true, "KT-79369"),
     ForbidArrayLiteralsInNonAnnotationContexts(KOTLIN_2_4, enabledInProgressiveMode = true, "KTLC-369"),
+    LexicographicVariableReadinessCalculation(KOTLIN_2_4, enabledInProgressiveMode = false, "KT-77939"),
     ForbidClassLiteralWithPotentiallyNullableReifiedLhs(KOTLIN_2_4, enabledInProgressiveMode = true, "KTLC-370"),
     ForbidOverriddenDefaultParametersInInline(KOTLIN_2_4, enabledInProgressiveMode = true, issue = "KT-49722"),
     ForbidRootIdePackageInCli(KOTLIN_2_4, enabledInProgressiveMode = true, issue = "KT-81357"),
+    ReportOptInUsageOnCompanionObjectAccesses(KOTLIN_2_4, enabledInProgressiveMode = true, issue = "KT-82524"),
+    ChangedIntersectionWithRecursiveCapturedType(KOTLIN_2_4, issue = "KT-65059"),
+    SkipHiddenObjectsInResolution(KOTLIN_2_4, issue = "KT-82555"),
+    JvmEnhancedBridges(KOTLIN_2_4, "KT-82900"),
 
     // 2.5
 
@@ -534,6 +539,7 @@ enum class LanguageFeature(
 
     DontMakeExplicitJavaTypeArgumentsFlexible(sinceVersion = null, "KTLC-284"),
     PreciseSimplificationToFlexibleLowerConstraint(sinceVersion = null, "KT-78621"),
+    DiscriminateSuspendInOverloadResolution(sinceVersion = null, "KT-23610"), // Postponed because of KT-82869
 
     // Experimental features
 
@@ -723,16 +729,6 @@ interface LanguageOrApiVersion : DescriptionAware {
             else -> versionString
         }
 }
-
-// This is a public API used in IDEA kotlin plugin code, in particular in
-// community/plugins/kotlin/base/compiler-configuration-ui/src/org/jetbrains/kotlin/idea/base/compilerPreferences/configuration/KotlinCompilerConfigurableTab.java
-@Suppress("unused")
-@Deprecated(
-    message = "This function is no more actual after 2.0 release, consider replacing with isStable",
-    replaceWith = ReplaceWith("isStable")
-)
-fun LanguageVersion.isStableOrReadyForPreview(): Boolean =
-    isStable || this == KOTLIN_1_9 || this == KOTLIN_2_0
 
 fun LanguageVersion.toKotlinVersion() = KotlinVersion(major, minor)
 fun LanguageVersionSettings.toKotlinVersion() = languageVersion.toKotlinVersion()

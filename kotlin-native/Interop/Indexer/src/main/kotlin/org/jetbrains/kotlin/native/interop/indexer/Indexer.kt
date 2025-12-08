@@ -55,8 +55,10 @@ private interface ObjCContainerImpl {
 
 private class ObjCProtocolImpl(
         name: String,
+        override val binaryName: String?,
         override val location: Location,
-        override val isForwardDeclaration: Boolean
+        override val isForwardDeclaration: Boolean,
+        override val swiftName: String? = null
 ) : ObjCProtocol(name), ObjCContainerImpl {
     override val protocols = mutableListOf<ObjCProtocol>()
     override val methods = mutableListOf<ObjCMethod>()
@@ -67,7 +69,9 @@ private class ObjCClassImpl(
         name: String,
         override val location: Location,
         override val isForwardDeclaration: Boolean,
-        override val binaryName: String?
+        override val binaryName: String?,
+        override val typeParameters: List<String> = emptyList<String>(),
+        override val swiftName: String? = null
 ) : ObjCClass(name), ObjCContainerImpl {
     override val protocols = mutableListOf<ObjCProtocol>()
     override val methods = mutableListOf<ObjCMethod>()
@@ -412,6 +416,7 @@ public open class NativeIndexImpl(val library: NativeLibrary, val verbose: Boole
         assert(cursor.kind == CXCursorKind.CXCursor_ObjCInterfaceDecl) { cursor.kind }
 
         val name = clang_getCursorDisplayName(cursor).convertAndDispose()
+        val parameters = mutableListOf<String>()
 
         if (isObjCInterfaceDeclForward(cursor)) {
             return objCClassRegistry.getOrPut(cursor) {
@@ -419,9 +424,22 @@ public open class NativeIndexImpl(val library: NativeLibrary, val verbose: Boole
             }
         }
 
+        visitChildren(cursor) { child, _ ->
+            if (child.kind == CXCursorKind.CXCursor_TemplateTypeParameter) {
+                parameters += getCursorSpelling(child)
+            }
+            CXChildVisitResult.CXChildVisit_Continue
+        }
+
         return objCClassRegistry.getOrPut(cursor, {
-            ObjCClassImpl(name, getLocation(cursor), isForwardDeclaration = false,
-                    binaryName = getObjCBinaryName(cursor).takeIf { it != name })
+            ObjCClassImpl(
+                    name = name,
+                    location = getLocation(cursor),
+                    isForwardDeclaration = false,
+                    binaryName = getObjCBinaryName(cursor).takeIf { it != name },
+                    typeParameters = parameters,
+                    swiftName = readSwiftName(cursor)
+            )
         }) { objcClass ->
             addChildrenToObjCContainer(cursor, objcClass)
             if (name in this.library.objCClassesIncludingCategories) {
@@ -479,17 +497,31 @@ public open class NativeIndexImpl(val library: NativeLibrary, val verbose: Boole
                 getObjCProtocolAt(definition)
             } else {
                 objCProtocolRegistry.getOrPut(cursor) {
-                    ObjCProtocolImpl(name, getLocation(cursor), isForwardDeclaration = true)
+                    ObjCProtocolImpl(name, binaryName = null, getLocation(cursor), isForwardDeclaration = true)
                 }
             }
         }
 
+        val binaryName = if (hasAttribute(cursor, OBJC_RUNTIME_NAME)) {
+            // TODO KT-82200 extract the value from objc_runtime_name here.
+            null
+        } else {
+            name
+        }
+
         return objCProtocolRegistry.getOrPut(cursor, {
-            ObjCProtocolImpl(name, getLocation(cursor), isForwardDeclaration = false)
+            ObjCProtocolImpl(
+                    name = name,
+                    binaryName = binaryName,
+                    location = getLocation(cursor),
+                    isForwardDeclaration = false,
+                    swiftName = readSwiftName(cursor)
+            )
         }) {
             addChildrenToObjCContainer(cursor, it)
         }
     }
+
 
     private fun getObjCBinaryName(cursor: CValue<CXCursor>): String {
         val prefix = "_OBJC_CLASS_\$_"
@@ -1015,7 +1047,7 @@ public open class NativeIndexImpl(val library: NativeLibrary, val verbose: Boole
                     }
 
                     if (getter != null) {
-                        val property = ObjCProperty(entityName!!, getter, setter)
+                        val property = ObjCProperty(entityName!!, getter, setter, readSwiftName(cursor))
                         val objCContainer: ObjCContainerImpl? = when (container.kind) {
                             CXCursorKind.CXCursor_ObjCCategoryDecl -> getObjCCategoryAt(container)
                             CXCursorKind.CXCursor_ObjCInterfaceDecl -> getObjCClassAt(container)
@@ -1109,15 +1141,16 @@ public open class NativeIndexImpl(val library: NativeLibrary, val verbose: Boole
         }
 
         return ObjCMethod(
-            selector, encoding, parameters, returnType,
-            isVariadic = clang_Cursor_isVariadic(cursor) != 0,
-            isClass = isClass,
-            nsConsumesSelf = clang_Cursor_isObjCConsumingSelfMethod(cursor) != 0,
-            nsReturnsRetained = clang_Cursor_isObjCReturningRetainedMethod(cursor) != 0,
-            isOptional = (clang_Cursor_isObjCOptional(cursor) != 0),
-            isInit = (clang_Cursor_isObjCInitMethod(cursor) != 0),
-            isExplicitlyDesignatedInitializer = hasAttribute(cursor, OBJC_DESIGNATED_INITIALIZER),
-            isDirect = hasAttribute(cursor, OBJC_DIRECT),
+                selector, encoding, parameters, returnType,
+                isVariadic = clang_Cursor_isVariadic(cursor) != 0,
+                isClass = isClass,
+                nsConsumesSelf = clang_Cursor_isObjCConsumingSelfMethod(cursor) != 0,
+                nsReturnsRetained = clang_Cursor_isObjCReturningRetainedMethod(cursor) != 0,
+                isOptional = (clang_Cursor_isObjCOptional(cursor) != 0),
+                isInit = (clang_Cursor_isObjCInitMethod(cursor) != 0),
+                isExplicitlyDesignatedInitializer = hasAttribute(cursor, OBJC_DESIGNATED_INITIALIZER),
+                isDirect = hasAttribute(cursor, OBJC_DIRECT),
+                swiftName = readSwiftName(cursor)
         )
     }
 
@@ -1163,6 +1196,7 @@ public open class NativeIndexImpl(val library: NativeLibrary, val verbose: Boole
     private val NS_CONSUMED = "ns_consumed"
     private val OBJC_DESIGNATED_INITIALIZER = "objc_designated_initializer"
     private val OBJC_DIRECT = "objc_direct"
+    private val OBJC_RUNTIME_NAME = "objc_runtime_name"
 
     private fun hasAttribute(cursor: CValue<CXCursor>, name: String): Boolean {
         var result = false
