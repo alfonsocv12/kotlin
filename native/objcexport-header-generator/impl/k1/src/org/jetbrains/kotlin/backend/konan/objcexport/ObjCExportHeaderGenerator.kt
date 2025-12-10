@@ -14,6 +14,9 @@ import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.descriptors.SourceFile
 import org.jetbrains.kotlin.resolve.scopes.MemberScope
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 
 abstract class ObjCExportHeaderGenerator @InternalKotlinNativeApi constructor(
     val moduleDescriptors: List<ModuleDescriptor>,
@@ -33,8 +36,8 @@ abstract class ObjCExportHeaderGenerator @InternalKotlinNativeApi constructor(
         ObjCExportTranslatorImpl(this, mapper, namer, problemCollector, objcGenerics, objcExportBlockExplicitParameterNames)
 
     private val generatedClasses = mutableSetOf<ClassDescriptor>()
-    private val extensions = mutableMapOf<ClassDescriptor, MutableList<CallableMemberDescriptor>>()
-    private val topLevel = mutableMapOf<SourceFile, MutableList<CallableMemberDescriptor>>()
+    private val extensions = ConcurrentHashMap<ClassDescriptor, MutableList<CallableMemberDescriptor>>()
+    private val topLevel = ConcurrentHashMap<SourceFile, MutableList<CallableMemberDescriptor>>()
 
     open val shouldExportKDoc = false
 
@@ -117,29 +120,39 @@ abstract class ObjCExportHeaderGenerator @InternalKotlinNativeApi constructor(
             .flatMap { it.getPackageFragments() }
             .makePackagesOrderStable()
 
-        packageFragments.forEach { packageFragment ->
-            packageFragment.getMemberScope().getContributedDescriptors()
-                .asSequence()
-                .filterIsInstance<CallableMemberDescriptor>()
-                .filter { mapper.shouldBeExposed(it) }
-                .forEach {
-                    val classDescriptor = getClassIfCategory(it)
-                    if (classDescriptor == null) {
-                        topLevel.getOrPut(it.findSourceFile(), { mutableListOf() }) += it
-                    } else {
-                        // If a class is hidden from Objective-C API then it is meaningless
-                        // to export its extensions.
-                        if (!classDescriptor.isHiddenFromObjC()) {
-                            extensions.getOrPut(classDescriptor, { mutableListOf() }) += it
+        val executor = Executors.newWorkStealingPool()
+        val classesToTranslate = Collections.synchronizedList(mutableListOf<ClassDescriptor>())
+
+        try {
+            val futures = packageFragments.map { packageFragment ->
+                executor.submit {
+                    packageFragment.getMemberScope().getContributedDescriptors()
+                        .asSequence()
+                        .filterIsInstance<CallableMemberDescriptor>()
+                        .filter { mapper.shouldBeExposed(it) }
+                        .forEach {
+                            val classDescriptor = getClassIfCategory(it)
+                            if (classDescriptor == null) {
+                                topLevel.getOrPut(it.findSourceFile()) {
+                                    Collections.synchronizedList(mutableListOf())
+                                }.add(it)
+                            } else {
+                                // If a class is hidden from Objective-C API then it is meaningless
+                                // to export its extensions.
+                                if (!classDescriptor.isHiddenFromObjC()) {
+                                    extensions.getOrPut(classDescriptor) {
+                                        Collections.synchronizedList(mutableListOf())
+                                    }.add(it)
+                                }
+                            }
                         }
-                    }
+
+                    packageFragment.getMemberScope().collectClasses(classesToTranslate)
                 }
-        }
-
-        val classesToTranslate = mutableListOf<ClassDescriptor>()
-
-        packageFragments.forEach { packageFragment ->
-            packageFragment.getMemberScope().collectClasses(classesToTranslate)
+            }
+            futures.forEach { it.get() }
+        } finally {
+            executor.shutdown()
         }
 
         classesToTranslate.makeClassesOrderStable().forEach { translateClass(it) }
